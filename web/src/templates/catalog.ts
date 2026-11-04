@@ -23,6 +23,7 @@ export interface Template {
   build?: () => Block[];  // si existe, el template ya está disponible
   guide?: string[];       // pasos guiados que se muestran en el builder
   doc?: string;           // si es un documento (plantilla para llenar), su tipo
+  tab?: string;           // si es una función del proyecto (no un estudio ni un documento), la pestaña a abrir
 }
 
 // Helpers para construir bloques a partir del registro
@@ -185,13 +186,13 @@ export const TEMPLATES: Template[] = [
   { key: "aeiou", doc: "aeiou", get name() { return t("AEIOU (observación)"); }, category: "Generativa", phase: 5,
     get description() { return t("Plantilla de observación de campo: Activities, Environments, Interactions, Objects, Users."); },
     get when() { return t("Investigación contextual y etnográfica."); }, get duration() { return t("Variable"); }, get participants() { return t("Sesiones de campo"); } },
-  { key: "diary_study", get name() { return t("Diary Study"); }, category: "Generativa", phase: 5,
+  { key: "diary_study", doc: "diary_study", get name() { return t("Diary Study"); }, category: "Generativa", phase: 5,
     get description() { return t("Entradas recurrentes del participante durante días o semanas."); },
     get when() { return t("Comportamientos que ocurren en el tiempo."); }, get duration() { return t("1–4 semanas"); }, get participants() { return t("8–15"); } },
   { key: "contextual_inquiry", doc: "observation", get name() { return t("Contextual Inquiry"); }, category: "Generativa", phase: 5,
     get description() { return t("Observación + entrevista en el entorno real del usuario (modelo maestro-aprendiz)."); },
     get when() { return t("Entender flujos de trabajo reales (p. ej. bodega, punto de venta)."); }, get duration() { return t("1–2 h"); }, get participants() { return t("4–8"); } },
-  { key: "jtbd", get name() { return t("Jobs To Be Done"); }, category: "Generativa", phase: 5,
+  { key: "jtbd", doc: "jtbd", get name() { return t("Jobs To Be Done"); }, category: "Generativa", phase: 5,
     get description() { return t("Job statements, contexto de la contratación y fuerzas del progreso."); },
     get when() { return t("Entender por qué alguien 'contrata' tu producto."); }, get duration() { return t("45 min"); }, get participants() { return t("8–12"); } },
   { key: "screener", get name() { return t("Screener de reclutamiento"); }, category: "Generativa", phase: 1,
@@ -209,19 +210,19 @@ export const TEMPLATES: Template[] = [
   // ── Síntesis y mapeo ─────────────────────────────────────────
   { key: "affinity_map", doc: "affinity", get name() { return t("Affinity Mapping"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Canvas de notas adhesivas para agrupar observaciones por tema."); }, get when() { return t("Después de entrevistas o tests."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
-  { key: "empathy_map", get name() { return t("Empathy Map"); }, category: "Síntesis y mapeo", phase: 5,
+  { key: "empathy_map", doc: "empathy_map", get name() { return t("Empathy Map"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Dice, Piensa, Hace, Siente + dolores y ganancias."); }, get when() { return t("Alinear al equipo sobre un segmento."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
   { key: "persona", doc: "persona_profile", get name() { return t("User Personas"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Proto-persona o persona validada con evidencia ligada a insights."); }, get when() { return t("Comunicar segmentos."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
   { key: "journey_map", doc: "journey_map", get name() { return t("Customer Journey Map"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Etapas, acciones, pensamientos, emociones, pain points y oportunidades."); }, get when() { return t("Visualizar la experiencia de punta a punta."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
-  { key: "service_blueprint", get name() { return t("Service Blueprint"); }, category: "Síntesis y mapeo", phase: 5,
+  { key: "service_blueprint", doc: "service_blueprint", get name() { return t("Service Blueprint"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Frontstage, backstage, procesos de soporte y evidencia física."); }, get when() { return t("Servicios con muchas partes (operaciones, logística)."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
-  { key: "cognitive_map", get name() { return t("Cognitive Mapping"); }, category: "Síntesis y mapeo", phase: 5,
+  { key: "cognitive_map", doc: "cognitive_map", get name() { return t("Cognitive Mapping"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Mapa de conceptos y relaciones de cómo el usuario entiende un sistema."); }, get when() { return t("Explorar modelos mentales complejos."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo o participantes"); } },
-  { key: "user_flow", get name() { return t("User / Task Flow"); }, category: "Síntesis y mapeo", phase: 5,
+  { key: "user_flow", doc: "user_flow", get name() { return t("User / Task Flow"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Diagrama de pasos, decisiones y salidas de una tarea."); }, get when() { return t("Documentar flujos actuales o ideales."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
-  { key: "stakeholder_map", get name() { return t("Stakeholder Map"); }, category: "Síntesis y mapeo", phase: 5,
+  { key: "stakeholder_map", doc: "stakeholder_map", get name() { return t("Stakeholder Map"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Actores, influencia e interés alrededor del producto."); }, get when() { return t("Al iniciar un proyecto."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
 
   // ── Métricas ─────────────────────────────────────────────────
@@ -287,12 +288,12 @@ export const TEMPLATES: Template[] = [
   { key: "research_plan", doc: "ux_blueprint", get name() { return t("Research Plan"); }, category: "Organización", phase: 6,
     get description() { return t("Objetivos, preguntas de investigación, hipótesis, metodología, reclutamiento y timeline."); },
     get when() { return t("Al iniciar cualquier investigación."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
-  { key: "participants", get name() { return t("Panel de participantes"); }, category: "Organización", phase: 6,
+  { key: "participants", tab: "participants", get name() { return t("Panel de participantes"); }, category: "Organización", phase: 6,
     get description() { return t("Base de participantes, consentimiento informado e historial de estudios."); }, get when() { return t("Reclutamiento continuo."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
   { key: "insight_repo", get name() { return t("Repositorio de insights"); }, category: "Organización", phase: 1,
     get description() { return t("Hallazgos con etiquetas, severidad y confianza, ligados a cada estudio. Disponible en cada proyecto."); },
     get when() { return t("Siempre."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
-  { key: "report", get name() { return t("Reporte compartible"); }, category: "Organización", phase: 1,
+  { key: "report", tab: "report", get name() { return t("Reporte compartible"); }, category: "Organización", phase: 1,
     get description() { return t("Link público de solo lectura con resultados, gráficas e insights de un estudio."); },
     get when() { return t("Presentar a stakeholders."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
 ];

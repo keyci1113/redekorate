@@ -15,7 +15,7 @@ export type Section =
   | (S & { type: "gallery" })
   | (S & { type: "rowgroups"; addGroups?: boolean })        // grupos de filas: AEIOU, fases de observación
   | (S & { type: "entries"; nameLabel: string; bodyLabel: string; addLabel: string })
-  | (S & { type: "custom"; component: "journey" | "affinity" | "usability" | "heuristic" });
+  | (S & { type: "custom"; component: "journey" | "affinity" | "usability" | "heuristic" | "blueprint" });
 
 export interface Note { id: string; text: string }
 export interface Bar { id: string; label: string; value: number }

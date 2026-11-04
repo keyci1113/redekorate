@@ -1,4 +1,4 @@
-import { BookOpenCheck, ClipboardList, Compass, Eye, FileText, Gauge, LayoutGrid, Map, MessagesSquare, ScanSearch, UserRound, UsersRound } from "lucide-react";
+import { BookOpenCheck, Brain, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
 import type { DocCategory, DocData, DocTemplate, Entry, Note, RowGroup } from "./types";
 import type { Lang } from "../lib/i18n";
 import { uid } from "../lib/hooks";
@@ -154,6 +154,8 @@ const personaProfile: DocTemplate = {
 // ───────────────────────────────────────── Mapas y síntesis
 const stage = (name: string, actions: [string, number][], value = "", barriers = "", opportunities = "") =>
   ({ id: uid(), name, actions: actions.map(([text, emotion]) => ({ id: uid(), text, emotion })), value, barriers, opportunities });
+const bstage = (name: string, evidence = "", customer = "", frontstage = "", backstage = "", support = "") =>
+  ({ id: uid(), name, evidence, customer, frontstage, backstage, support });
 
 const journey: DocTemplate = {
   kind: "journey_map", name: "User Journey Map", category: "Mapas y síntesis", icon: <Map size={18} />,
@@ -202,6 +204,172 @@ const affinity: DocTemplate = {
       n(L(lang, "Prefiere la opción manual para tener control", "Prefers the manual option to stay in control"), "value", 1, null),
     ] } };
   },
+};
+
+const empathyMap: DocTemplate = {
+  kind: "empathy_map", name: "Empathy Map", category: "Mapas y síntesis", icon: <Heart size={18} />,
+  description: "Dice, Piensa, Hace, Siente + dolores y ganancias del usuario.",
+  purpose: "Para alinear al equipo sobre cómo piensa, siente y actúa un segmento de usuarios",
+  question: "¿Qué dice, piensa, hace y siente este usuario frente al problema?",
+  instructions: ["Define a qué usuario o segmento te refieres", "Llena cada cuadrante con frases cortas basadas en evidencia, no en suposiciones", "Usa dolores y ganancias para encontrar oportunidades de diseño"],
+  credit: "Basado en el Empathy Map de Dave Gray (Gamestorming / XPLANE)",
+  sections: [
+    { id: "who", type: "fields", title: "Usuario o segmento", span: 12, cols: 3, fields: [{ id: "name", label: "Nombre o segmento" }, { id: "scenario", label: "Escenario" }, { id: "goal", label: "Objetivo" }] },
+    { id: "says", type: "notes", color: "yellow", title: "Dice", prompt: "Frases textuales que dijo o diría en voz alta.", span: 4 },
+    { id: "thinks", type: "notes", color: "purple", title: "Piensa", prompt: "Qué piensa pero no necesariamente dice.", span: 4 },
+    { id: "does", type: "notes", color: "blue", title: "Hace", prompt: "Acciones y comportamientos observados.", span: 4 },
+    { id: "feels", type: "notes", color: "pink", title: "Siente", prompt: "Emociones: miedos, ansiedades, ilusiones.", span: 4 },
+    { id: "pains", type: "notes", color: "orange", title: "Dolores", prompt: "Frustraciones, obstáculos, riesgos que enfrenta.", span: 4 },
+    { id: "gains", type: "notes", color: "green", title: "Ganancias", prompt: "Lo que espera obtener; cómo mide el éxito.", span: 4 },
+  ],
+  example: (lang) => ({
+    who: { name: L(lang, "Ana, gerente de tienda", "Ana, store manager"), scenario: L(lang, "Cierre de caja al final del día", "Closing the register at the end of the day"), goal: L(lang, "Cuadrar las ventas sin errores", "Reconcile sales without errors") },
+    says: notes(L(lang, "\"No tengo tiempo para reportes complicados\"", "\"I don't have time for complicated reports\""), L(lang, "\"¿Por qué no cuadra esto?\"", "\"Why doesn't this add up?\"")),
+    thinks: notes(L(lang, "Cree que cometerá un error y tendrá que explicarlo", "She worries she'll make a mistake and have to explain it")),
+    does: notes(L(lang, "Revisa el total tres veces antes de cerrar", "Checks the total three times before closing"), L(lang, "Pide ayuda a un compañero por WhatsApp", "Asks a coworker for help over WhatsApp")),
+    feels: notes(L(lang, "Ansiosa por terminar antes de irse", "Anxious to finish before leaving"), L(lang, "Aliviada cuando el total cuadra", "Relieved when the total matches")),
+    pains: notes(L(lang, "Los reportes tardan en cargar al final del día", "Reports are slow to load at the end of the day"), L(lang, "No sabe por qué un número no cuadra", "Doesn't know why a number is off")),
+    gains: notes(L(lang, "Cerrar en menos de 10 minutos", "Closing in under 10 minutes"), L(lang, "Confianza en que el reporte es correcto", "Confidence that the report is correct")),
+  }),
+};
+
+const stakeholderMap: DocTemplate = {
+  kind: "stakeholder_map", name: "Stakeholder Map", category: "Mapas y síntesis", icon: <Network size={18} />,
+  description: "Actores, influencia e interés alrededor del producto, en cuadrantes para decidir cómo relacionarte con cada quién.",
+  purpose: "Para identificar a quién involucrar, informar o monitorear al iniciar un proyecto",
+  question: "¿Quién tiene poder de decisión o interés en este proyecto, y cómo deberíamos relacionarnos con cada quién?",
+  instructions: ["Haz una lista de las personas o áreas involucradas", "Ubica a cada una según su poder de decisión y su interés en el proyecto", "Define cómo te vas a relacionar con cada cuadrante"],
+  credit: "Basado en la matriz poder / interés de Mendelow",
+  sections: [
+    { id: "context", type: "fields", span: 12, cols: 2, fields: [{ id: "project", label: "Proyecto" }, { id: "date", label: "Fecha" }] },
+    { id: "manage", type: "notes", color: "purple", title: "Alto poder · Alto interés — Gestionar de cerca", prompt: "Involúcralos activamente; son clave para el éxito del proyecto.", span: 6 },
+    { id: "satisfy", type: "notes", color: "blue", title: "Alto poder · Bajo interés — Mantener satisfechos", prompt: "Mantenlos informados de lo importante, sin saturarlos.", span: 6 },
+    { id: "inform", type: "notes", color: "green", title: "Bajo poder · Alto interés — Mantener informados", prompt: "Comunícales avances; pueden influir en la opinión de otros.", span: 6 },
+    { id: "monitor", type: "notes", color: "yellow", title: "Bajo poder · Bajo interés — Monitorear", prompt: "Esfuerzo mínimo de seguimiento.", span: 6 },
+  ],
+  example: (lang) => ({
+    context: { project: L(lang, "Rediseño del checkout", "Checkout redesign"), date: "" },
+    manage: notes(L(lang, "Dirección de Producto", "Head of Product"), L(lang, "Gerencia de Operaciones", "Operations management")),
+    satisfy: notes(L(lang, "Legal y cumplimiento", "Legal and compliance")),
+    inform: notes(L(lang, "Equipo de soporte al cliente", "Customer support team"), L(lang, "Vendedores en tienda", "In-store sales staff")),
+    monitor: notes(L(lang, "Proveedores externos de pago", "External payment providers")),
+  }),
+};
+
+const cognitiveMap: DocTemplate = {
+  kind: "cognitive_map", name: "Cognitive Mapping", category: "Mapas y síntesis", icon: <Brain size={18} />,
+  description: "Mapa de conceptos y relaciones que muestra cómo el usuario entiende un sistema.",
+  purpose: "Para explorar modelos mentales complejos y encontrar vacíos o confusiones en cómo las personas entienden el sistema",
+  question: "¿Qué conceptos usa el usuario y cómo cree que se relacionan entre sí?",
+  instructions: ["Anota los conceptos clave que el usuario mencionó o usó", "Describe cómo el usuario cree que se relacionan esos conceptos entre sí", "Compara el mapa con el modelo real del sistema para encontrar diferencias"],
+  sections: [
+    { id: "who", type: "fields", span: 12, cols: 2, fields: [{ id: "participant", label: "Participante o segmento" }, { id: "system", label: "Sistema o tema explorado" }] },
+    { id: "concepts", type: "chips", title: "Conceptos", prompt: "Las ideas o elementos que el usuario menciona.", span: 12 },
+    { id: "relations", type: "entries", title: "Relaciones entre conceptos", prompt: "Describe cómo un concepto se conecta con otro y por qué.", span: 12, nameLabel: "Ej.: Concepto A → Concepto B", bodyLabel: "¿Cómo se relacionan? (causa, pertenece a, lleva a, se confunde con…)", addLabel: "Agregar relación" },
+    { id: "gaps", type: "list", title: "Vacíos o confusiones encontradas", prompt: "Diferencias entre el modelo mental del usuario y el modelo real del sistema.", span: 12 },
+  ],
+  example: (lang) => ({
+    who: { participant: L(lang, "Usuario nuevo, primera semana", "New user, first week"), system: L(lang, "Sistema de permisos de la app", "The app's permission system") },
+    concepts: [L(lang, "Cuenta", "Account"), L(lang, "Equipo", "Team"), L(lang, "Rol", "Role"), L(lang, "Proyecto", "Project"), L(lang, "Permiso", "Permission")],
+    relations: entries(
+      [L(lang, "Cuenta → Equipo", "Account → Team"), L(lang, "Cree que su cuenta pertenece a un solo equipo; no sabe que puede estar en varios.", "Believes their account belongs to a single team; doesn't know they can be in several.")],
+      [L(lang, "Rol → Permiso", "Role → Permission"), L(lang, "Entiende que el rol define qué puede hacer, pero no distingue entre roles de equipo y de proyecto.", "Understands the role defines what they can do, but doesn't distinguish team roles from project roles.")],
+    ),
+    gaps: [L(lang, "El sistema real separa permisos por proyecto; el usuario asume que son globales por cuenta.", "The real system separates permissions per project; the user assumes they're global to the account.")],
+  }),
+};
+
+const userFlow: DocTemplate = {
+  kind: "user_flow", name: "User / Task Flow", category: "Mapas y síntesis", icon: <Route size={18} />,
+  description: "Diagrama de pasos, decisiones y salidas de una tarea.",
+  purpose: "Para documentar cómo es (o debería ser) el flujo de una tarea, paso a paso",
+  question: "¿Qué pasos sigue el usuario, dónde decide algo y cómo puede salir del flujo?",
+  instructions: ["Escribe los pasos en el orden en que ocurren", "Anota los puntos de decisión y qué pasa en cada camino posible", "Anota las salidas: dónde puede terminar o abandonar el flujo"],
+  sections: [
+    { id: "who", type: "fields", span: 12, cols: 2, fields: [{ id: "task", label: "Tarea o flujo" }, { id: "entry", label: "Punto de entrada" }] },
+    { id: "steps", type: "list", title: "Pasos del flujo", numbered: true, span: 12 },
+    { id: "decisions", type: "list", title: "Puntos de decisión", prompt: "¿Dónde elige el usuario entre caminos distintos? ¿Qué pasa en cada caso?", span: 6 },
+    { id: "exits", type: "list", title: "Salidas", prompt: "¿Dónde puede terminar, abandonar o salir del flujo?", span: 6 },
+  ],
+  example: (lang) => ({
+    who: { task: L(lang, "Recuperar contraseña", "Reset password"), entry: L(lang, "Botón \"¿Olvidaste tu contraseña?\" en el login", "\"Forgot password?\" button on the login screen") },
+    steps: [
+      L(lang, "El usuario da clic en \"¿Olvidaste tu contraseña?\"", "User clicks \"Forgot your password?\""),
+      L(lang, "Escribe su correo y envía el formulario", "Enters their email and submits the form"),
+      L(lang, "Revisa su correo y da clic en el enlace recibido", "Checks their email and clicks the link received"),
+      L(lang, "Escribe una nueva contraseña y la confirma", "Enters a new password and confirms it"),
+      L(lang, "Inicia sesión con la nueva contraseña", "Logs in with the new password"),
+    ],
+    decisions: [L(lang, "¿El correo existe en el sistema? Si no, se muestra el mismo mensaje por seguridad.", "Does the email exist in the system? If not, the same message is shown for security."), L(lang, "¿El enlace ya venció (1 hora)? Si sí, se pide solicitar uno nuevo.", "Has the link expired (1 hour)? If so, the user is asked to request a new one.")],
+    exits: [L(lang, "El usuario cierra la pestaña sin revisar su correo.", "The user closes the tab without checking their email."), L(lang, "Contraseña restablecida con éxito.", "Password successfully reset.")],
+  }),
+};
+
+const serviceBlueprint: DocTemplate = {
+  kind: "service_blueprint", name: "Service Blueprint", category: "Mapas y síntesis", icon: <Workflow size={18} />,
+  description: "Frontstage, backstage, procesos de soporte y evidencia física del servicio, etapa por etapa.",
+  purpose: "Para entender y rediseñar servicios con muchas partes, visibles e invisibles para el usuario",
+  question: "¿Qué hace el cliente, qué ve, y qué pasa detrás de cámaras en cada etapa del servicio?",
+  instructions: ["Nombra cada etapa del servicio en orden", "Llena la evidencia física y las acciones del cliente", "Documenta lo que hace el personal o sistema visible (frontstage) y el invisible (backstage)", "Anota los procesos de soporte que hacen posible cada etapa"],
+  sections: [
+    { id: "who", type: "fields", span: 12, cols: 3, fields: [{ id: "service", label: "Servicio" }, { id: "scenario", label: "Escenario" }, { id: "goal", label: "Objetivo del cliente" }] },
+    { id: "blueprint", type: "custom", component: "blueprint", span: 12 },
+  ],
+  init: () => ({ blueprint: { stages: [0, 1, 2].map(() => bstage("")) } }),
+  example: (lang) => ({
+    who: { service: L(lang, "Devolución en tienda", "In-store return"), scenario: L(lang, "Cliente quiere devolver un producto defectuoso", "Customer wants to return a defective product"), goal: L(lang, "Recuperar su dinero sin fricción", "Get their money back with no friction") },
+    blueprint: { stages: [
+      bstage(L(lang, "Llegada a tienda", "Arrival at the store"),
+        L(lang, "Letrero de \"Devoluciones\" en la entrada", "\"Returns\" sign at the entrance"),
+        L(lang, "Busca el mostrador de devoluciones con el producto y el recibo", "Looks for the returns counter with the product and receipt"),
+        L(lang, "Un empleado lo saluda y lo dirige al mostrador correcto", "An employee greets them and points them to the right counter"),
+        "—",
+        L(lang, "Señalización actualizada por el equipo de tienda", "Signage kept up to date by the store team")),
+      bstage(L(lang, "Revisión del producto", "Product review"),
+        L(lang, "Formulario de devolución en el mostrador", "Return form at the counter"),
+        L(lang, "Explica el defecto y entrega el producto", "Explains the defect and hands over the product"),
+        L(lang, "El cajero revisa el producto y el recibo, y llena el formulario", "The cashier checks the product and receipt, and fills out the form"),
+        L(lang, "Un supervisor valida devoluciones mayores a cierto monto", "A supervisor validates returns above a certain amount"),
+        L(lang, "Política de devoluciones y límites de autorización por rol", "Return policy and authorization limits by role")),
+      bstage(L(lang, "Reembolso", "Refund"),
+        L(lang, "Recibo de reembolso impreso", "Printed refund receipt"),
+        L(lang, "Confirma el método de reembolso", "Confirms the refund method"),
+        L(lang, "El cajero procesa el reembolso en el sistema de punto de venta", "The cashier processes the refund in the point-of-sale system"),
+        L(lang, "El sistema de pagos acredita el reembolso en 3–5 días", "The payments system credits the refund in 3–5 days"),
+        L(lang, "Conciliación diaria de devoluciones con finanzas", "Daily reconciliation of returns with finance")),
+    ] },
+  }),
+};
+
+const jtbd: DocTemplate = {
+  kind: "jtbd", name: "Jobs To Be Done", category: "Mapas y síntesis", icon: <Briefcase size={18} />,
+  description: "Job statements, contexto de la \"contratación\" y las cuatro fuerzas del progreso.",
+  purpose: "Para entender por qué alguien \"contrata\" tu producto en lugar de otra alternativa",
+  question: "¿Qué progreso quiere lograr esta persona, y qué fuerzas la empujan o la frenan?",
+  instructions: ["Escribe el job statement a partir de entrevistas reales", "Llena las cuatro fuerzas con evidencia, no suposiciones", "Anota qué \"contrataba\" antes de tu producto y qué dispara el cambio"],
+  credit: "Basado en la teoría Jobs To Be Done de Clayton Christensen y el marco de las Cuatro Fuerzas de Bob Moesta",
+  sections: [
+    { id: "who", type: "fields", span: 12, cols: 2, fields: [{ id: "product", label: "Producto o servicio" }, { id: "segment", label: "Segmento de usuario" }] },
+    { id: "statement", type: "text", title: "Job Statement", prompt: "Cuando [situación], quiero [motivación], para poder [resultado esperado].", span: 12, rows: 3 },
+    { id: "push", type: "notes", color: "orange", title: "Empuje de la situación (Push)", prompt: "¿Qué de su situación actual la empuja a buscar algo nuevo?", span: 6 },
+    { id: "pull", type: "notes", color: "green", title: "Atracción de lo nuevo (Pull)", prompt: "¿Qué le atrae de la nueva solución?", span: 6 },
+    { id: "anxiety", type: "notes", color: "pink", title: "Ansiedad de lo nuevo (Anxiety)", prompt: "¿Qué le preocupa o la detiene de cambiar?", span: 6 },
+    { id: "habit", type: "notes", color: "blue", title: "Hábito de lo actual (Habit)", prompt: "¿Qué la hace quedarse con lo que ya usa?", span: 6 },
+    { id: "triggers", type: "list", title: "Señales de que está por \"contratar\" algo nuevo", span: 6 },
+    { id: "competing", type: "list", title: "Qué \"contrata\" hoy en su lugar", prompt: "Otros productos, soluciones caseras, o no hacer nada.", span: 6 },
+  ],
+  example: (lang) => ({
+    who: { product: L(lang, "App de contabilidad para pequeños negocios", "Accounting app for small businesses"), segment: L(lang, "Dueños de tienda que llevan sus cuentas en papel", "Shop owners who keep their books on paper") },
+    statement: L(lang,
+      "Cuando mi negocio crece y ya no puedo llevar las cuentas en un cuaderno, quiero ver mis ventas y gastos de un vistazo, para poder tomar decisiones sin esperar al contador.",
+      "When my business grows and I can no longer keep the books in a notebook, I want to see my sales and expenses at a glance, so I can make decisions without waiting for the accountant."),
+    push: notes(L(lang, "Perdió horas buscando un gasto en el cuaderno", "Lost hours looking for an expense in the notebook"), L(lang, "El contador tarda días en responder", "The accountant takes days to respond")),
+    pull: notes(L(lang, "Ver todo en el celular, sin instalar nada en la computadora", "Seeing everything on the phone, without installing anything on the computer")),
+    anxiety: notes(L(lang, "Miedo a perder sus datos si cambia de app", "Afraid of losing data if she switches apps"), L(lang, "No confía en dejar de imprimir todo", "Doesn't trust giving up printing everything")),
+    habit: notes(L(lang, "Ya sabe exactamente cómo usar su cuaderno", "Already knows exactly how to use her notebook")),
+    triggers: [L(lang, "Contrata a su primer empleado", "Hires their first employee"), L(lang, "Un gasto importante se le pasó por alto", "An important expense slipped through unnoticed")],
+    competing: [L(lang, "Cuaderno y calculadora", "Notebook and calculator"), L(lang, "Hoja de cálculo armada por su sobrino", "A spreadsheet built by their nephew"), L(lang, "Contador externo una vez al mes", "An outside accountant once a month")],
+  }),
 };
 
 // ───────────────────────────────────────── Campo y entrevistas
@@ -322,6 +490,31 @@ const observation: DocTemplate = {
   }),
 };
 
+const diaryStudy: DocTemplate = {
+  kind: "diary_study", name: "Diary Study", category: "Campo y entrevistas", icon: <NotebookPen size={18} />,
+  description: "Entradas recurrentes del participante durante días o semanas, con los prompts que vas a enviarle y la bitácora de lo que reporta.",
+  purpose: "Para capturar comportamientos y decisiones que ocurren a lo largo del tiempo, no en una sola sesión",
+  question: "¿Qué hace, piensa o decide esta persona día a día alrededor del problema?",
+  instructions: ["Define qué quieres aprender y por cuánto tiempo necesitas observarlo", "Escribe los prompts que le enviarás al participante en cada registro", "Explícale cómo y dónde debe registrar sus entradas (foto, texto, WhatsApp, formulario…)", "Vacía aquí sus entradas y busca patrones al final"],
+  sections: [
+    { id: "setup", type: "fields", title: "Configuración del estudio", span: 12, cols: 3, fields: [{ id: "duration", label: "Duración", placeholder: "Ej.: 2 semanas" }, { id: "frequency", label: "Frecuencia de registro", placeholder: "Ej.: Una vez al día" }, { id: "participants", label: "Participantes" }] },
+    { id: "prompts", type: "list", title: "Prompts para cada registro", prompt: "Lo que le preguntarás o pedirás que registre cada vez.", span: 6 },
+    { id: "method", type: "text", title: "Cómo va a registrar sus entradas", prompt: "Foto, nota de voz, texto por WhatsApp, formulario…", span: 6, rows: 4 },
+    { id: "log", type: "entries", title: "Bitácora de entradas", prompt: "Vacía aquí cada entrada que te comparta el participante.", span: 12, nameLabel: "Participante y día (ej.: Ana · Día 3)", bodyLabel: "Qué registró o reportó…", addLabel: "Agregar entrada" },
+    { id: "patterns", type: "list", title: "Patrones y hallazgos", span: 12 },
+  ],
+  example: (lang) => ({
+    setup: { duration: L(lang, "2 semanas", "2 weeks"), frequency: L(lang, "Una vez al día, al cerrar el negocio", "Once a day, when closing up the shop"), participants: "6" },
+    prompts: [L(lang, "¿Qué registraste hoy y cuánto tiempo te tomó?", "What did you log today and how long did it take?"), L(lang, "¿Hubo algún momento de duda o frustración?", "Was there a moment of doubt or frustration?"), L(lang, "¿Qué harías distinto mañana?", "What would you do differently tomorrow?")],
+    method: L(lang, "Nota de voz de 1 minuto por WhatsApp al número del estudio, todas las noches.", "A 1-minute voice note over WhatsApp to the study number, every night."),
+    log: entries(
+      [L(lang, "Ana · Día 1", "Ana · Day 1"), L(lang, "Se le olvidó registrar dos ventas en efectivo y las agregó de memoria al día siguiente.", "She forgot to log two cash sales and added them from memory the next day.")],
+      [L(lang, "Ana · Día 4", "Ana · Day 4"), L(lang, "Primera vez que cuadra la caja sin ayuda; dice que ya le toma la mitad del tiempo.", "First time she balances the register without help; says it now takes half the time.")],
+    ),
+    patterns: [L(lang, "Los primeros 3 días todos cometen al menos un olvido.", "Everyone makes at least one mistake in the first 3 days."), L(lang, "Para el día 5 la mayoría deja de necesitar ayuda.", "By day 5 most no longer need help.")],
+  }),
+};
+
 // ───────────────────────────────────────── Evaluación
 const script: DocTemplate = {
   kind: "usability_script", name: "Guion de prueba de usabilidad", category: "Evaluación", icon: <BookOpenCheck size={18} />,
@@ -425,7 +618,7 @@ const heuristic: DocTemplate = {
   },
 };
 
-export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, interviews, aeiou, observation, script, results, heuristic];
+export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, diaryStudy, script, results, heuristic];
 export const docTemplate = (kind: string) => DOC_TEMPLATES.find((d) => d.kind === kind);
 export const DOC_ICON = Compass;
 export type { DocData };

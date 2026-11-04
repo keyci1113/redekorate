@@ -6,6 +6,7 @@ import type { JourneyData } from "./Journey";
 import type { AffinityData } from "./Affinity";
 import { taskRate, type UsabilityData } from "./UsabilityMatrix";
 import type { HeuristicData } from "./Heuristic";
+import type { BlueprintData } from "./Blueprint";
 import { heuristicCategories } from "./heuristics";
 
 type Block =
@@ -62,6 +63,7 @@ export function docBlocks(tpl: DocTemplate, title: string, data: DocData, lang: 
         if (s.component === "affinity") blocks.push(...affinityBlocks((v as AffinityData) ?? { participants: [], notes: [], groups: [] }, T));
         if (s.component === "usability") blocks.push(...usabilityBlocks((v as UsabilityData) ?? { tasks: [], users: [], results: {} }, T));
         if (s.component === "heuristic") blocks.push(...heuristicBlocks(v as HeuristicData | undefined, T, lang));
+        if (s.component === "blueprint") blocks.push(...blueprintBlocks((v as BlueprintData) ?? { stages: [] }, T));
         break;
     }
     if (!blocks.length) continue;
@@ -81,6 +83,19 @@ function journeyBlocks(d: JourneyData, T: TF): Block[] {
     if (!s.name.trim() && !acts.length && !pairs.length) return;
     out.push({ t: "h", level: 2, text: `${i + 1}. ${s.name.trim() || T("Etapa")}` });
     if (acts.length) { out.push({ t: "p", text: T("Acciones y actividades") }); out.push({ t: "list", items: acts }); }
+    if (pairs.length) out.push({ t: "kv", pairs });
+  });
+  return out;
+}
+
+const BP_LANES = [["evidence", "Evidencia física"], ["customer", "Acciones del cliente"], ["frontstage", "Frontstage (visible)"], ["backstage", "Backstage (no visible)"], ["support", "Procesos de soporte"]] as const;
+
+function blueprintBlocks(d: BlueprintData, T: TF): Block[] {
+  const out: Block[] = [];
+  d.stages.forEach((s, i) => {
+    const pairs = BP_LANES.filter(([k]) => s[k]?.trim()).map(([k, label]) => [T(label), s[k].trim()] as [string, string]);
+    if (!s.name.trim() && !pairs.length) return;
+    out.push({ t: "h", level: 2, text: `${i + 1}. ${s.name.trim() || T("Etapa")}` });
     if (pairs.length) out.push({ t: "kv", pairs });
   });
   return out;
