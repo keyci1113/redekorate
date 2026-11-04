@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: redekorate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Define DB_PASSWORD en .env}
+      POSTGRES_DB: redekorate
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redekorate"]
+      interval: 5s
+      retries: 10
+    # La base de datos NO se expone fuera de la red interna de Docker
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://redekorate:${DB_PASSWORD}@db:5432/redekorate
+      JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
+      APP_URL: ${APP_URL:-}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PORT: 4000
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "127.0.0.1:${PORT:-4000}:4000"   # solo accesible por el proxy HTTPS local
+
+volumes:
+  pgdata:
+  uploads:

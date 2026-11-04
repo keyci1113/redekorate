@@ -1,0 +1,52 @@
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+
+/* Spline Sans (títulos) · licencia OFL en assets/fonts/OFL.txt */
+@font-face {
+  font-family: "Spline Sans";
+  src: url("./assets/fonts/SplineSans-Variable.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Spline Sans", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #F7F5FB;      /* lavanda muy suave */
+  --color-surface: #FFFFFF;
+  --color-ink: #1F1633;        /* texto principal */
+  --color-ink-2: #3F3654;
+  --color-ink-3: #625A78;
+  --color-line: #E7E2F0;
+  --color-line-2: #D5CDE4;
+  --color-accent: #7C3AED;     /* morado */
+  --color-accent-soft: #F1EAFE;
+  --color-accent-ink: #5B21B6;
+  --color-good: #1E6B43;
+  --color-good-soft: #E3F2E9;
+  --color-warn: #87520A;
+  --color-warn-soft: #FBF0DB;
+  --color-bad: #A3302A;
+  --color-bad-soft: #F9E4E1;
+}
+
+html, body, #root { height: 100%; }
+body { @apply bg-paper text-ink font-sans antialiased; font-feature-settings: "cv11", "ss01"; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
+
+@layer components {
+.display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.025em; }
+.label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
+.focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1; }
+.field { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15; }
+}
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media print { aside, header button, .no-print { display: none !important; } body { background: white; } }
+
+/* Documentos: el texto de ejemplo (placeholder) se ve claramente como guía, no como contenido */
+article :is(input, textarea)::placeholder { font-style: italic; color: color-mix(in oklab, var(--color-ink-3) 75%, transparent); }
+article .bg-accent :is(input, textarea)::placeholder { color: rgb(255 255 255 / 0.7); }
+/* Al imprimir/PDF no se muestran los textos de ejemplo */
+@media print { :is(input, textarea)::placeholder { color: transparent !important; } }
