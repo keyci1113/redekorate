@@ -1519,5 +1519,16 @@ export const EN: Record<string, string> = {
 "Crea un estudio primero; luego podrás elegir cuáles incluir en un reporte compartido.": "Create a study first; then you'll be able to choose which ones to include in a shared report.",
 "{a} estudios": "{a} studies",
 "Reporte de proyecto": "Project report",
-"Tema": "Theme"
+"Tema": "Theme",
+"Card sorting": "Card sorting",
+"SUS · 78.5": "SUS · 78.5",
+"NPS · +42": "NPS · +42",
+"Excelente · 68% promotores": "Excellent · 68% promoters",
+"Five Second · 91% recuerda": "Five Second · 91% recall",
+"El mensaje se entiende": "The message is clear",
+"Tree Testing · 76% directo": "Tree Testing · 76% direct",
+"Preference Test": "Preference Test",
+"Variante B · 64% prefiere": "Variant B · 64% prefer it",
+"CSAT · 4.6 / 5": "CSAT · 4.6 / 5",
+"92% satisfechos": "92% satisfied"
 };
