@@ -403,7 +403,7 @@ function FirstClickResult({ block, answers }: { block: FirstClickBlock; answers:
       {block.image?.url && (
         <div className="relative overflow-hidden rounded-xl border border-line">
           <img src={block.image.url} alt="" className="w-full" />
-          <div className="absolute inset-0 bg-ink/25" />
+          <div className="absolute inset-0 bg-black/25" />
           {a && <div className="absolute rounded border-2 border-dashed border-white" style={{ left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.w * 100}%`, height: `${a.h * 100}%` }} />}
           {vals.map((v, i) => (
             <span key={i} className={cx("absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow", isSuccess(block, v) === false ? "bg-bad/80" : "bg-accent/85")}

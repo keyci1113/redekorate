@@ -59,7 +59,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
       <div className={cx("w-full rounded-2xl border border-line bg-surface shadow-xl", wide ? "max-w-2xl" : "max-w-md")} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 className="text-[15px] font-semibold">{title}</h2>

@@ -1518,5 +1518,6 @@ export const EN: Record<string, string> = {
 "Aún no hay estudios para reportar": "No studies to report on yet",
 "Crea un estudio primero; luego podrás elegir cuáles incluir en un reporte compartido.": "Create a study first; then you'll be able to choose which ones to include in a shared report.",
 "{a} estudios": "{a} studies",
-"Reporte de proyecto": "Project report"
+"Reporte de proyecto": "Project report",
+"Tema": "Theme"
 };

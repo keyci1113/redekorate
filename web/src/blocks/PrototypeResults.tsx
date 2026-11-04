@@ -169,7 +169,7 @@ function Screens({ vals, proto }: { vals: PrototypeTaskValue[]; proto: Prototype
         </div>
         <div className={cx("relative mx-auto overflow-hidden rounded-xl border border-line", proto.device === "mobile" ? "max-w-[360px]" : "")}>
           <img src={cur.s.image} alt="" className="block w-full" />
-          <div className="absolute inset-0 bg-ink/30" />
+          <div className="absolute inset-0 bg-black/30" />
           {mode === "heat" ? cur.clicks.map((c, i) => (
             <span key={i} className="pointer-events-none absolute h-16 w-16 -translate-x-1/2 -translate-y-1/2 rounded-full mix-blend-screen"
               style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, background: c.h ? "radial-gradient(circle, rgba(250,204,21,.85) 0%, rgba(249,115,22,.45) 30%, rgba(124,58,237,0) 70%)" : "radial-gradient(circle, rgba(248,113,113,.9) 0%, rgba(220,38,38,.4) 30%, rgba(220,38,38,0) 70%)" }} />

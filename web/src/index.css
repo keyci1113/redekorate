@@ -31,6 +31,50 @@
   --color-bad-soft: #F9E4E1;
 }
 
+/* Modo oscuro: redefine los mismos tokens, así que ninguna clase bg-paper/text-ink/etc.
+   necesita un equivalente dark: — todo el sitio los hereda automáticamente.
+   Sin elección guardada sigue la preferencia del sistema; data-theme la anula. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-paper: #140F1F;
+    --color-surface: #1D1730;
+    --color-ink: #F2EEFB;
+    --color-ink-2: #C7BEDE;
+    --color-ink-3: #948AB3;
+    --color-line: #342B49;
+    --color-line-2: #4A3F66;
+    --color-accent: #8B5CF6;
+    --color-accent-soft: #2B2147;
+    --color-accent-ink: #D8B4FE;
+    --color-good: #34D399;
+    --color-good-soft: #0E2A1F;
+    --color-warn: #FBBF24;
+    --color-warn-soft: #2E2308;
+    --color-bad: #F87171;
+    --color-bad-soft: #2E1618;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #140F1F;
+  --color-surface: #1D1730;
+  --color-ink: #F2EEFB;
+  --color-ink-2: #C7BEDE;
+  --color-ink-3: #948AB3;
+  --color-line: #342B49;
+  --color-line-2: #4A3F66;
+  --color-accent: #8B5CF6;
+  --color-accent-soft: #2B2147;
+  --color-accent-ink: #D8B4FE;
+  --color-good: #34D399;
+  --color-good-soft: #0E2A1F;
+  --color-warn: #FBBF24;
+  --color-warn-soft: #2E2308;
+  --color-bad: #F87171;
+  --color-bad-soft: #2E1618;
+}
+
 html, body, #root { height: 100%; }
 body { @apply bg-paper text-ink font-sans antialiased; font-feature-settings: "cv11", "ss01"; }
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
@@ -43,6 +87,7 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
 }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fall { 0% { top: -18%; opacity: 0; } 10% { opacity: 1; } 88% { opacity: 1; } 100% { top: 112%; opacity: 0; } }
 @media print { aside, header button, .no-print { display: none !important; } body { background: white; } }
 
 /* Documentos: el texto de ejemplo (placeholder) se ve claramente como guía, no como contenido */

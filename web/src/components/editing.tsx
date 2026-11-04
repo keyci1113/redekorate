@@ -26,7 +26,7 @@ export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact,
     return (
       <div className="group relative overflow-hidden rounded-lg border border-line bg-paper">
         <img src={value} alt="" className={cx("w-full object-contain", compact ? "h-24" : "max-h-56")} />
-        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-ink/40 opacity-0 transition group-hover:opacity-100">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition group-hover:opacity-100">
           <button type="button" onClick={() => input.current?.click()} className="rounded-md bg-surface px-2.5 py-1 text-xs font-medium">{t("Cambiar")}</button>
           <button type="button" onClick={() => onChange(null)} className="rounded-md bg-surface px-2.5 py-1 text-xs font-medium text-bad">{t("Quitar")}</button>
         </div>

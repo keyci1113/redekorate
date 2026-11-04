@@ -415,7 +415,7 @@ function PreferenceView({ block, value, onChange }: { block: PreferenceBlock; va
         </div>
       )}
       {zoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6" onClick={() => setZoom(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6" onClick={() => setZoom(null)}>
           <img src={zoom.image} alt={zoom.label} className="max-h-full max-w-full rounded-lg bg-white object-contain" />
           <button className="absolute top-4 right-4 rounded-full bg-white/90 p-2" aria-label={t("Cerrar")}><X size={18} /></button>
         </div>
