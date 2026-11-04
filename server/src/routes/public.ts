@@ -86,6 +86,29 @@ publicApi.get("/reports/:token", async (req, res) => {
   res.json({ study, sessions, answers, insights });
 });
 
+publicApi.get("/project-reports/:token", async (req, res) => {
+  const share = await one(
+    "select project_id, study_ids from report_shares where token = $1 and revoked_at is null and project_id is not null",
+    [req.params.token],
+  );
+  if (!share) throw notFound("Reporte");
+  const project = await one("select name, color from projects where id = $1", [share.project_id]);
+  const studies = await query(
+    `select id, title, method, status, blocks, settings, published_at from studies where id = any($1) order by array_position($1, id)`,
+    [share.study_ids],
+  );
+  const reports = await Promise.all(studies.map(async (s: { id: string; [k: string]: unknown }) => {
+    const sessions = await query("select id, started_at, completed_at from sessions where study_id = $1", [s.id]);
+    const answers = await query("select session_id, block_id, value, duration_ms from answers where study_id = $1", [s.id]);
+    const insights = await query(
+      "select id, title, body, tags, severity, confidence, created_at from insights where study_id = $1 order by created_at desc",
+      [s.id],
+    );
+    return { study: s, sessions, answers, insights };
+  }));
+  res.json({ project, reports });
+});
+
 publicApi.get("/docs/:token", async (req, res) => {
   if (!/^[A-Za-z0-9]{24}$/.test(req.params.token)) throw notFound("Documento");
   const d = await one(

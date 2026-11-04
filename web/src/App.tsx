@@ -12,6 +12,7 @@ import { BuilderPage } from "./pages/BuilderPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { RunnerPage } from "./pages/RunnerPage";
 import { ReportPage } from "./pages/ReportPage";
+import { ProjectReportPage } from "./pages/ProjectReportPage";
 import { AccountPage } from "./pages/AccountPage";
 import { DocumentPage } from "./pages/DocumentPage";
 import { PublicDocPage } from "./pages/PublicDocPage";
@@ -32,6 +33,7 @@ export function App() {
       <Route path="/reset" element={<ResetPage />} />
       <Route path="/s/:slug" element={<RunnerPage />} />
       <Route path="/r/:token" element={<ReportPage />} />
+      <Route path="/pr/:token" element={<ProjectReportPage />} />
       <Route path="/d/:token" element={<PublicDocPage />} />
 
       {/* Privado */}

@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { z } from "zod";
+import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
-import { notFound, parse } from "../lib/http.js";
+import { HttpError, notFound, parse } from "../lib/http.js";
 
 export const projects = Router();
 projects.use(requireAuth);
+
+const tokenId = customAlphabet("abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", 24);
 
 const ProjectInput = z.object({
   name: z.string().trim().min(1).max(160),
@@ -87,4 +90,35 @@ projects.get("/:id/insights", async (req, res) => {
     [req.params.id],
   );
   res.json({ insights: rows });
+});
+
+// Reporte de proyecto: un link que combina los resultados de los estudios que elijas.
+projects.get("/:id/shares", async (req, res) => {
+  await ownProject(req.params.id, req.user!.id);
+  const rows = await query(
+    `select rs.*, coalesce(
+       (select jsonb_agg(s.title order by s.updated_at desc) from studies s where s.id = any(rs.study_ids)), '[]'::jsonb
+     ) as study_titles
+     from report_shares rs where rs.project_id = $1 and rs.revoked_at is null order by rs.created_at desc`,
+    [req.params.id],
+  );
+  res.json({ shares: rows });
+});
+
+projects.post("/:id/shares", async (req, res) => {
+  await ownProject(req.params.id, req.user!.id);
+  const b = parse(z.object({ study_ids: z.array(z.string().uuid()).min(1).max(50) }), req.body);
+  const owned = await query("select id from studies where project_id = $1 and id = any($2)", [req.params.id, b.study_ids]);
+  if (owned.length !== b.study_ids.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
+  const share = await one(
+    "insert into report_shares(project_id, study_ids, token) values ($1,$2,$3) returning *",
+    [req.params.id, b.study_ids, tokenId()],
+  );
+  res.status(201).json({ share });
+});
+
+projects.delete("/:id/shares/:shareId", async (req, res) => {
+  await ownProject(req.params.id, req.user!.id);
+  await query("update report_shares set revoked_at = now() where id = $1 and project_id = $2", [req.params.shareId, req.params.id]);
+  res.json({ ok: true });
 });
