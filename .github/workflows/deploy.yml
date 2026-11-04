@@ -1,0 +1,50 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Nunca dos despliegues a la vez; el más reciente espera a que termine el anterior
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    # El runner self-hosted es el mismo VPS donde corre la app
+    runs-on: [self-hosted, linux]
+    environment: production
+    env:
+      # Nombre fijo para que los volúmenes (pgdata, uploads) no dependan de la ruta del runner
+      COMPOSE_PROJECT_NAME: redekorate
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Escribir .env
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
+        run: |
+          if [ -z "$ENV_FILE" ]; then
+            echo "::error::Falta el secret ENV_FILE (contenido completo del .env)"
+            exit 1
+          fi
+          umask 077
+          printf '%s\n' "$ENV_FILE" > .env
+
+      - name: Construir imagen
+        run: docker compose build --pull app
+
+      - name: Levantar servicios
+        run: docker compose up -d --remove-orphans --wait --wait-timeout 180
+
+      - name: Logs si falla
+        if: failure()
+        run: docker compose logs --tail 200 app
+
+      - name: Limpiar imágenes viejas
+        if: success()
+        run: docker image prune -f

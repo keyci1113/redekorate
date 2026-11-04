@@ -77,6 +77,16 @@ research.tudominio.com {
 }
 ```
 
+### Despliegue automático (GitHub Actions)
+
+`.github/workflows/deploy.yml` construye y levanta la app en cada push a `main` (o a mano desde la pestaña Actions). Corre en un runner self-hosted instalado en el mismo VPS:
+
+1. En el VPS, instala Docker y agrega el usuario del runner al grupo `docker`.
+2. Registra el runner en *Settings → Actions → Runners → New self-hosted runner* (Linux) e instálalo como servicio (`sudo ./svc.sh install && sudo ./svc.sh start`).
+3. Crea el secret `ENV_FILE` en *Settings → Secrets and variables → Actions* con el contenido completo de tu `.env`.
+
+No cambies `DB_PASSWORD` después del primer despliegue: PostgreSQL solo la lee al crear el volumen.
+
 Después de crear tu cuenta, cambia `ALLOW_REGISTRATION=false` y reinicia. Las imágenes y la base de datos viven en volúmenes de Docker (`uploads`, `pgdata`); inclúyelos en tus respaldos.
 
 ## Desarrollo local
