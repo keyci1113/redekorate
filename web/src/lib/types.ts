@@ -30,3 +30,11 @@ export interface Insight {
 }
 
 export interface Share { id: string; token: string; created_at: string }
+export interface ProjectShare { id: string; token: string; study_ids: string[]; study_titles: string[]; created_at: string }
+
+export type ParticipantStudyStatus = "invited" | "completed" | "no_show" | "declined";
+export interface ParticipantStudy { participant_id: string; study_id: string; study_title: string; status: ParticipantStudyStatus; note: string }
+export interface Participant {
+  id: string; project_id: string; name: string; email: string; phone: string; tags: string[]; notes: string;
+  consent: boolean; consent_at: string | null; created_at: string; updated_at: string; studies: ParticipantStudy[];
+}

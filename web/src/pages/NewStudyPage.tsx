@@ -32,7 +32,7 @@ export function NewStudyPage() {
   const [goal, setGoal] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [pick, setPick] = useState<Template | null>(null);
-  const ready = TEMPLATES.filter((tpl) => tpl.build || tpl.doc).length;
+  const ready = TEMPLATES.filter((tpl) => tpl.build || tpl.doc || tpl.tab).length;
   const firstTime = params.get("nuevo") === "1";
 
   const filtered = useMemo(() => TEMPLATES.filter((tpl) =>
@@ -42,7 +42,7 @@ export function NewStudyPage() {
   const shown = CATEGORIES.filter((c) => filtered.some((tpl) => tpl.category === c.id));
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="mx-auto max-w-[1800px] px-8 py-10">
       <Link to={`/projects/${id}`} className="text-sm text-ink-3 hover:text-ink">← {project.data?.project.name ?? t("Proyecto")}</Link>
 
       {firstTime && (
@@ -74,7 +74,7 @@ export function NewStudyPage() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-6 mt-6 flex flex-wrap items-center gap-2 bg-paper/90 px-6 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-8 mt-6 flex flex-wrap items-center gap-2 bg-paper/90 px-8 py-3 backdrop-blur">
         <div className="relative w-56">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input className="field h-8 py-1 pl-8 text-[13px]" placeholder={t("Buscar método…")} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -101,8 +101,8 @@ export function NewStudyPage() {
             <h2 className="flex items-center gap-2 text-lg font-semibold">{CATEGORY_ICON[c.id]} {t(c.id)}</h2>
             <p className="text-sm text-ink-3">{c.blurb}</p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.filter((tpl) => tpl.category === c.id).sort((a, b) => Number(!!(b.build || b.doc)) - Number(!!(a.build || a.doc))).map((tpl) => <TemplateCard key={tpl.key} tpl={tpl} onPick={() => (tpl.doc ? nav(`/projects/${id}?tab=docs&new=${tpl.doc}`) : setPick(tpl))} />)}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {filtered.filter((tpl) => tpl.category === c.id).sort((a, b) => Number(!!(b.build || b.doc || b.tab)) - Number(!!(a.build || a.doc || a.tab))).map((tpl) => <TemplateCard key={tpl.key} tpl={tpl} onPick={() => (tpl.doc ? nav(`/projects/${id}?tab=docs&new=${tpl.doc}`) : tpl.tab ? nav(`/projects/${id}?tab=${tpl.tab}`) : setPick(tpl))} />)}
           </div>
         </section>
       ))}
@@ -114,7 +114,7 @@ export function NewStudyPage() {
 }
 
 function TemplateCard({ tpl, onPick }: { tpl: Template; onPick: () => void }) {
-  const usable = !!tpl.build || !!tpl.doc, included = !tpl.build && !tpl.doc && tpl.phase === 1;
+  const usable = !!tpl.build || !!tpl.doc || !!tpl.tab, included = !usable && tpl.phase === 1;
   return (
     <button disabled={!usable} onClick={onPick}
       className={cx("focus-ring flex flex-col rounded-xl border p-4 text-left transition",

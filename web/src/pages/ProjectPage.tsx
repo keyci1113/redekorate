@@ -3,11 +3,13 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
-import type { Insight, Project, Study } from "../lib/types";
+import type { Insight, Participant, Project, ProjectShare, Study } from "../lib/types";
 import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
+import { ParticipantsPanel } from "../components/ParticipantsPanel";
+import { ReportsPanel } from "../components/ReportsPanel";
 import type { DocRecord } from "../docs/types";
 import { templateByKey } from "../templates/catalog";
 import { CATEGORY_ICON, FallbackIcon } from "../templates/icons";
@@ -17,12 +19,15 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const [tab, setTab] = useState<"studies" | "docs" | "insights">(params.get("tab") === "insights" ? "insights" : params.get("tab") === "docs" ? "docs" : "studies");
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report" } as const;
+  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
   const insights = useLoad(() => api.get<{ insights: Insight[] }>(`/projects/${id}/insights`), [id]);
   const docs = useLoad(() => api.get<{ documents: DocRecord[] }>(`/documents?project_id=${id}`), [id]);
+  const participants = useLoad(() => api.get<{ participants: Participant[] }>(`/participants?project_id=${id}`), [id]);
+  const shares = useLoad(() => api.get<{ shares: ProjectShare[] }>(`/projects/${id}/shares`), [id]);
 
   if (project.loading) return <Spinner />;
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
@@ -57,6 +62,8 @@ export function ProjectPage() {
           { id: "studies", label: t("Estudios"), count: list.length },
           { id: "docs", label: t("Documentos"), count: docs.data?.documents.length ?? 0 },
           { id: "insights", label: t("Repositorio de insights"), count: insights.data?.insights.length ?? 0 },
+          { id: "participants", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
+          { id: "report", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
         ]} />
       </div>
 
@@ -73,6 +80,12 @@ export function ProjectPage() {
         {tab === "docs" && <DocsPanel projectId={p.id} docs={docs.data?.documents ?? []} onChange={docs.reload} preselect={params.get("new")} />}
         {tab === "insights" && (
           <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} />
+        )}
+        {tab === "participants" && (
+          <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} />
+        )}
+        {tab === "report" && (
+          <ReportsPanel projectId={p.id} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} />
         )}
       </div>
 
