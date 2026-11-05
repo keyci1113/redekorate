@@ -7,8 +7,8 @@ import { cx } from "./ui";
 
 import { t } from "../lib/i18n";
 /** Zona para subir una imagen: arrastrar, pegar o elegir archivo. */
-export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact, hint }: {
-  value?: string | null; onChange: (url: string | null) => void; label?: string; compact?: boolean; hint?: string;
+export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact, hint, cover }: {
+  value?: string | null; onChange: (url: string | null) => void; label?: string; compact?: boolean; hint?: string; cover?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact,
   if (value) {
     return (
       <div className="group relative overflow-hidden rounded-lg border border-line bg-paper">
-        <img src={value} alt="" className={cx("w-full object-contain", compact ? "h-24" : "max-h-56")} />
+        <img src={value} alt="" className={cx("w-full", cover ? "aspect-square object-cover" : "object-contain", !cover && (compact ? "h-24" : "max-h-56"))} />
         <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/40 opacity-0 transition group-hover:opacity-100">
           <button type="button" onClick={() => input.current?.click()} className="rounded-md bg-surface px-2.5 py-1 text-xs font-medium">{t("Cambiar")}</button>
           <button type="button" onClick={() => onChange(null)} className="rounded-md bg-surface px-2.5 py-1 text-xs font-medium text-bad">{t("Quitar")}</button>
@@ -90,7 +90,7 @@ export function OptionsEditor({ label, items, onChange, withImages, placeholder 
       {bulkOpen ? (
         <div className="space-y-2">
           <textarea className="field min-h-40 font-mono text-[13px]" value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={t("Una por línea")} />
-          <button type="button" className="rounded-md bg-ink px-3 py-1.5 text-xs font-medium text-paper" onClick={() => {
+          <button type="button" className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-on-accent" onClick={() => {
             const labels = bulkText.split("\n").map((s) => s.trim()).filter(Boolean);
             onChange(labels.map((l, i) => items.find((x) => x.label === l) ?? { id: items[i]?.label === l ? items[i].id : uid(), label: l }));
             setBulkOpen(false);

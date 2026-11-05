@@ -161,7 +161,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
                     className={cx("focus-ring group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 transition", on ? "bg-surface shadow-sm ring-1 ring-line" : "hover:bg-ink/[0.04]")}>
                     <GripVertical size={13} className="shrink-0 cursor-grab text-ink-3/50 group-hover:text-ink-3" />
                     <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">{i + 1}</span>
-                    <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", on ? "bg-accent text-white" : "bg-surface text-ink-2 ring-1 ring-line")}>{def?.icon}</span>
+                    <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md", on ? "bg-accent text-on-accent" : "bg-surface text-ink-2 ring-1 ring-line")}>{def?.icon}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[13px] font-medium">{b.title || def?.label}</span>
                       <span className="flex items-center gap-1.5 text-[11px] text-ink-3">
@@ -180,12 +180,12 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
             })}
           </ol>
           <div className="border-t border-line p-3">
-            <Button variant="primary" className="w-full !bg-accent" icon={<Plus size={16} />} onClick={() => setAdding(true)}>{t("Agregar bloque")}</Button>
+            <Button variant="primary" className="w-full" icon={<Plus size={16} />} aria-expanded={adding} onClick={() => setAdding(!adding)}>{t("Agregar bloque")}</Button>
           </div>
         </aside>
 
         {/* ── Vista previa ── */}
-        <section className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(#E7E2F0_1px,transparent_1px)] [background-size:18px_18px]">
+        <section className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(var(--color-line-2)_1px,transparent_1px)] [background-size:18px_18px]">
           <div className="flex items-center justify-center gap-1 pt-4">
             <span className="label mr-2">{t("Vista del participante")}</span>
             {([["desktop", Monitor], ["mobile", Smartphone]] as const).map(([d, Icon]) => (
@@ -201,7 +201,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
                   {settings.brand?.logo && <img src={settings.brand.logo} alt="" className="mx-auto mb-8 h-8 object-contain" />}
                   <BlockView key={current.id + device} block={current} preview settings={settings} value={previewValue[current.id]} onChange={(v) => setPreviewValue((s) => ({ ...s, [current.id]: v }))} />
                   <div className={cx("mt-8 flex", current.type === "welcome" ? "justify-center" : "justify-end")}>
-                    {current.type !== "thank_you" && current.type !== "prototype_task" && <span className="inline-flex h-11 items-center rounded-lg bg-accent px-5 text-[15px] font-medium text-white">{current.type === "welcome" ? current.buttonLabel : t("Siguiente")}</span>}
+                    {current.type !== "thank_you" && current.type !== "prototype_task" && <span className="inline-flex h-11 items-center rounded-lg bg-accent px-5 text-[15px] font-medium text-on-accent">{current.type === "welcome" ? current.buttonLabel : t("Siguiente")}</span>}
                   </div>
                 </div>
                 {issuesFor(current.id).length > 0 && (
@@ -248,7 +248,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
         </aside>
       </div>
 
-      <AddBlockModal open={adding} onClose={() => setAdding(false)} onPick={(t) => insert(blockDef(t)!.create())} />
+      <AddBlockPanel open={adding} onClose={() => setAdding(false)} onPick={(t) => insert(blockDef(t)!.create())} />
       {protoEditor && (
         <PrototypeEditor prototypes={prototypes} initialId={protoEditor.id} onClose={() => setProtoEditor(null)}
           onChange={(ps) => setSettings((s) => ({ ...s, prototypes: ps }))} />
@@ -264,23 +264,35 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   );
 }
 
-function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (type: string) => void }) {
+/** Panel anclado sobre el botón "Agregar bloque". No bloquea la página: lista, vista previa y propiedades siguen disponibles. */
+function AddBlockPanel({ open, onClose, onPick }: { open: boolean; onClose: () => void; onPick: (type: string) => void }) {
   const [q, setQ] = useState("");
+  useEffect(() => {
+    if (!open) return;
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    return () => window.removeEventListener("keydown", esc);
+  }, [open, onClose]);
+  if (!open) return null;
   const list = BLOCKS.filter((d) => !q || `${d.label} ${d.description}`.toLowerCase().includes(q.toLowerCase()));
   return (
-    <Modal open={open} onClose={onClose} title={t("Agregar bloque")} wide>
-      <div className="relative mb-4">
-        <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
+    <div role="dialog" aria-label={t("Agregar bloque")} className="fixed bottom-14 left-3 z-40 flex max-h-[min(70vh,640px)] w-[min(420px,calc(100vw-1.5rem))] flex-col rounded-xl border border-line bg-surface shadow-(--shadow-lift)">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+        <h2 className="text-[15px] font-semibold">{t("Agregar bloque")}</h2>
+        <button type="button" onClick={onClose} className="focus-ring rounded-md p-1 text-ink-3 hover:bg-ink/5 hover:text-ink" aria-label={t("Cerrar")}><X size={18} /></button>
+      </div>
+      <div className="relative shrink-0 px-4 pt-3">
+        <Search size={15} className="absolute top-1/2 left-7 mt-1.5 -translate-y-1/2 text-ink-3" />
         <input autoFocus className="field pl-9" placeholder={t("Buscar: escala, card sorting, imagen…")} value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="max-h-[60vh] space-y-4 overflow-y-auto">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         {BLOCK_GROUPS.map((g) => {
           const items = list.filter((d) => d.group === g);
           if (!items.length) return null;
           return (
             <div key={g}>
               <p className="label mb-2">{t(g)}</p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
                 {items.map((d) => (
                   <button key={d.type} onClick={() => { onPick(d.type); setQ(""); }} className="focus-ring flex items-center gap-3 rounded-xl border border-line p-3 text-left transition hover:border-accent hover:bg-accent-soft/40">
                     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-accent">{d.icon}</span>
@@ -293,7 +305,7 @@ function AddBlockModal({ open, onClose, onPick }: { open: boolean; onClose: () =
         })}
         {!list.length && <p className="py-6 text-center text-sm text-ink-3">{t("Ningún bloque coincide.")}</p>}
       </div>
-    </Modal>
+    </div>
   );
 }
 
@@ -311,9 +323,9 @@ function DesignModal({ open, onClose, settings, onChange }: { open: boolean; onC
             <div className="flex flex-wrap items-center gap-2">
               {BRAND_COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => onChange({ ...s, brand: { ...brand, color: c } })} aria-label={c}
-                  className={cx("h-7 w-7 rounded-lg transition", (brand.color ?? "#7C3AED") === c && "ring-2 ring-ink ring-offset-2")} style={{ background: c }} />
+                  className={cx("h-7 w-7 rounded-lg transition", (brand.color ?? "#5902A1") === c && "ring-2 ring-ink ring-offset-2")} style={{ background: c }} />
               ))}
-              <input type="color" value={brand.color ?? "#7C3AED"} onChange={(e) => onChange({ ...s, brand: { ...brand, color: e.target.value } })} className="h-7 w-9 cursor-pointer rounded border border-line" title={t("Color personalizado")} />
+              <input type="color" value={brand.color ?? "#5902A1"} onChange={(e) => onChange({ ...s, brand: { ...brand, color: e.target.value } })} className="h-7 w-9 cursor-pointer rounded border border-line" title={t("Color personalizado")} />
             </div>
           </Field>
           <Field group label={t("Logo")} hint={t("Aparece arriba en cada pantalla. PNG con fondo transparente funciona mejor.")}>

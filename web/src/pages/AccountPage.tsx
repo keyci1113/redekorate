@@ -40,10 +40,10 @@ export function AccountPage() {
   const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm();
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
+    <div className="px-(--page-gutter) py-10">
       <h1 className="display text-5xl">{t("Mi cuenta")}</h1>
       <p className="mt-2 text-sm text-ink-2">{t("Administra tu perfil, tu seguridad y tus datos.")}</p>
-      <div className="mt-8 space-y-4">
+      <div className="mt-8 max-w-4xl space-y-4">
         <Section icon={<UserRound size={16} />} title={t("Perfil")}>
           <form className="space-y-4" onSubmit={profile.run(async () => {
             const { user: u } = await api.patch<{ user: User }>("/auth/me", { name }); setUser(u); return t("Perfil actualizado");

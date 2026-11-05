@@ -42,7 +42,7 @@ export function NewStudyPage() {
   const shown = CATEGORIES.filter((c) => filtered.some((tpl) => tpl.category === c.id));
 
   return (
-    <div className="mx-auto max-w-[1800px] px-8 py-10">
+    <div className="px-(--page-gutter) py-10">
       <Link to={`/projects/${id}`} className="text-sm text-ink-3 hover:text-ink">← {project.data?.project.name ?? t("Proyecto")}</Link>
 
       {firstTime && (
@@ -52,7 +52,7 @@ export function NewStudyPage() {
       )}
 
       <div className="mt-5 flex items-center gap-2 text-xs font-medium text-ink-3">
-        <span className="flex items-center gap-1.5 text-accent"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] text-white">1</span>{t("Elige el método")}</span>
+        <span className="flex items-center gap-1.5 text-accent"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[11px] text-on-accent">1</span>{t("Elige el método")}</span>
         <span className="h-px w-6 bg-line-2" />
         <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-line text-[11px]">2</span>{t("Configura")}</span>
         <span className="h-px w-6 bg-line-2" />
@@ -67,14 +67,14 @@ export function NewStudyPage() {
         <div className="mt-3 flex flex-wrap gap-2">
           {GOALS().map((g, i) => (
             <button key={g.label} onClick={() => { setGoal(goal === i ? null : i); setCat("all"); }}
-              className={cx("focus-ring rounded-full border px-3 py-1.5 text-[13px] transition", goal === i ? "border-accent bg-accent text-white" : "border-line text-ink-2 hover:border-accent hover:text-accent-ink")}>
+              className={cx("focus-ring rounded-full border px-3 py-1.5 text-[13px] transition", goal === i ? "border-accent bg-accent text-on-accent" : "border-line text-ink-2 hover:border-accent hover:text-accent-ink")}>
               {g.label}
             </button>
           ))}
         </div>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-8 mt-6 flex flex-wrap items-center gap-2 bg-paper/90 px-8 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-(--page-gutter) mt-6 flex flex-wrap items-center gap-2 bg-paper/90 px-(--page-gutter) py-3 backdrop-blur">
         <div className="relative w-56">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input className="field h-8 py-1 pl-8 text-[13px]" placeholder={t("Buscar método…")} value={q} onChange={(e) => setQ(e.target.value)} />
@@ -89,7 +89,7 @@ export function NewStudyPage() {
 
       {cat === "all" && goal === null && !q && (
         <button onClick={() => setPick(BLANK)} className="focus-ring group mt-4 flex w-full items-center gap-4 rounded-xl border border-dashed border-line-2 bg-surface/50 p-5 text-left transition hover:border-accent hover:bg-surface">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white"><Plus size={18} /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-on-accent"><Plus size={18} /></span>
           <span className="flex-1"><span className="block font-semibold">{BLANK.name}</span><span className="text-sm text-ink-3">{BLANK.description} {t("Combina cualquier tipo de bloque: preguntas, card sorting, imágenes…")}</span></span>
           <ArrowRight size={18} className="text-ink-3 transition group-hover:translate-x-1 group-hover:text-accent" />
         </button>

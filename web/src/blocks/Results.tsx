@@ -258,7 +258,7 @@ function MatrixResult({ block, answers }: { block: MatrixBlock; answers: Answer[
                   const k = vals.filter((v) => v?.[r.id] === c.id).length, p = n ? k / n : 0;
                   return (
                     <td key={c.id} className="p-1 text-center" title={`${r.label} · ${c.label}: ${k} (${Math.round(p * 100)}%)`}>
-                      <div className="rounded-md py-2 text-xs font-medium tabular-nums" style={{ background: `color-mix(in srgb, var(--color-accent) ${Math.round(p * 85)}%, transparent)`, color: p > 0.45 ? "white" : undefined }}>
+                      <div className="rounded-md py-2 text-xs font-medium tabular-nums" style={{ background: `color-mix(in srgb, var(--color-accent) ${Math.round(p * 85)}%, transparent)`, color: p > 0.45 ? "var(--color-on-accent)" : undefined }}>
                         {Math.round(p * 100)}%
                       </div>
                     </td>
@@ -314,7 +314,7 @@ function CardSortResult({ block, answers }: { block: CardSortBlock; answers: Ans
                   {r.order.map((j) => {
                     const v = i === j ? 1 : r.sim[i][j];
                     return <td key={j} className="p-[1px]" title={i === j ? label(i) : `${label(i)} + ${label(j)}: ${Math.round(v * 100)}%`}>
-                      <div className="flex h-7 w-7 items-center justify-center rounded-[3px] tabular-nums" style={{ background: i === j ? "var(--color-line)" : `color-mix(in srgb, var(--color-accent) ${Math.round(v * 90)}%, var(--color-paper))`, color: v > 0.5 && i !== j ? "white" : "var(--color-ink-3)" }}>
+                      <div className="flex h-7 w-7 items-center justify-center rounded-[3px] tabular-nums" style={{ background: i === j ? "var(--color-line)" : `color-mix(in srgb, var(--color-accent) ${Math.round(v * 90)}%, var(--color-paper))`, color: v > 0.5 && i !== j ? "var(--color-on-accent)" : "var(--color-ink-3)" }}>
                         {i !== j && v > 0 ? Math.round(v * 100) : ""}
                       </div>
                     </td>;

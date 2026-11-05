@@ -204,7 +204,7 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
                       return (
                         <li key={h.id}>
                           <button onClick={() => setHotId(h.id)} className="flex w-full items-center gap-2 rounded-lg border border-line px-3 py-2 text-left text-[13px] hover:border-accent">
-                            <span className="flex h-5 w-5 items-center justify-center rounded bg-accent text-[11px] font-semibold text-white">{i + 1}</span>
+                            <span className="flex h-5 w-5 items-center justify-center rounded bg-accent text-[11px] font-semibold text-on-accent">{i + 1}</span>
                             <span className="flex-1 truncate">→ {h.target === "back" ? t("Atrás") : dest?.name ?? <span className="text-bad">{t("Sin destino")}</span>}</span>
                           </button>
                         </li>
@@ -315,7 +315,7 @@ function HotspotCanvas({ screen, proto, selected, onSelect, onCreate, onUpdate }
           <div key={h.id} onPointerDown={(e) => down(e, "move", h)}
             className={cx("group absolute cursor-move rounded-md border-2 transition-colors", on ? "border-accent bg-accent/25" : broken ? "border-bad bg-bad/15" : "border-accent/80 bg-accent/12 hover:bg-accent/20")}
             style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%` }}>
-            <span className={cx("pointer-events-none absolute -top-6 left-0 max-w-[220px] truncate rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-white shadow", broken ? "bg-bad" : "bg-accent")}>
+            <span className={cx("pointer-events-none absolute -top-6 left-0 max-w-[220px] truncate rounded px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-on-accent shadow", broken ? "bg-bad" : "bg-accent")}>
               {i + 1} → {nameOf(h.target)}
             </span>
             {on && <span onPointerDown={(e) => down(e, "resize", h)} className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-se-resize rounded-sm border-2 border-white bg-accent shadow" />}

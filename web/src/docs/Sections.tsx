@@ -1,8 +1,10 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
-import { Check, Plus, Trash2, X } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Copy, Plus, Trash2, UserRound, X } from "lucide-react";
+import { AVATARS, ExampleSketch, ExampleWall } from "./Illustrations";
+import { sectionIcon } from "./sectionIcons";
 import type { Bar, DocData, Entry, Note, NoteColor, Row, RowGroup, Section } from "./types";
 import { tr, type Lang } from "../lib/i18n";
-import { uid } from "../lib/hooks";
+import { copy, uid } from "../lib/hooks";
 import { ImageDrop } from "../components/editing";
 import { cx } from "../components/ui";
 
@@ -22,8 +24,30 @@ export function exAt(v: unknown, ...path: (string | number)[]): unknown {
 export const exStr = (v: unknown, ...path: (string | number)[]) => { const x = exAt(v, ...path); return typeof x === "string" && x.trim() ? x : undefined; };
 
 export const NOTE_BG: Record<NoteColor, string> = {
-  yellow: "#FEF3C7", orange: "#FFE4CC", blue: "#DBEAFE", pink: "#FCE7F3", green: "#DCFCE7", purple: "#EDE9FE",
+  yellow: "var(--color-note-yellow)", blue: "var(--color-note-blue)", green: "var(--color-note-green)", orange: "var(--color-note-orange)", pink: "var(--color-note-pink)", purple: "var(--color-note-lavender)",
 };
+
+/** Copia el texto de una nota con un clic. Aparece al pasar el cursor o enfocar; en pantallas táctiles siempre se ve. */
+export function CopyNote({ text, className }: { text: string; className?: string }) {
+  const { T } = useDoc();
+  const [state, setState] = useState<"idle" | "done" | "failed">("idle");
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  if (!text.trim()) return null;
+  const label = state === "done" ? T("Copiado") : state === "failed" ? T("No se pudo copiar") : T("Copiar");
+  return (
+    <button type="button" data-copy-note title={label} aria-label={label}
+      onClick={async () => {
+        setState((await copy(text.trim())) ? "done" : "failed");
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setState("idle"), 1500);
+      }}
+      className={cx("focus-ring absolute z-10 rounded bg-white/70 p-1 transition group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100 print:hidden",
+        state === "idle" ? "text-ink/70 opacity-0 hover:text-ink" : "opacity-100", state === "done" && "text-good", state === "failed" && "text-bad", className)}>
+      {state === "done" ? <Check size={13} aria-hidden /> : state === "failed" ? <X size={13} aria-hidden /> : <Copy size={13} aria-hidden />}
+    </button>
+  );
+}
 
 /** Textarea que crece con el contenido */
 export function AutoText({ value, onChange, placeholder, className, minRows = 2 }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string; minRows?: number }) {
@@ -41,9 +65,10 @@ export function AutoText({ value, onChange, placeholder, className, minRows = 2 
 
 export function SectionCard({ section, children, tone }: { section: Section; children: ReactNode; tone?: string }) {
   const { T } = useDoc();
+  const Icon = sectionIcon(section);
   return (
-    <section className="flex flex-col rounded-2xl border border-line bg-surface p-4 break-inside-avoid print:border-ink/20" style={tone ? { borderTop: `4px solid ${tone}` } : undefined}>
-      {section.title && <h3 className="text-[13px] font-bold tracking-wide text-accent uppercase">{T(section.title)}</h3>}
+    <section className="flex flex-col rounded-2xl border border-line bg-surface p-4 break-inside-avoid" style={tone ? { borderTop: `4px solid ${tone}` } : undefined}>
+      {section.title && <h3 className="flex items-center gap-1.5 text-[13px] font-bold tracking-wide text-accent uppercase">{Icon && <Icon size={15} aria-hidden className="shrink-0" />}{T(section.title)}</h3>}
       {section.prompt && <p className="mt-1 text-[12px] leading-snug text-ink-3 italic">{T(section.prompt)}</p>}
       <div className="mt-3 flex-1">{children}</div>
     </section>
@@ -116,10 +141,11 @@ function NotesBody({ notes: saved, set, color, placeholder, ex }: { notes: Note[
   return (
     <div className="flex flex-wrap gap-2.5">
       {notes.map((n, i) => (
-        <div key={n.id} className="group relative w-[calc(50%-5px)] min-w-[120px] rounded-md p-2.5 shadow-[0_2px_6px_rgba(31,22,51,.10)] sm:w-[148px]" style={{ background: NOTE_BG[color] }}>
-          {readOnly ? <p className="text-[13px] leading-snug whitespace-pre-line text-[#2b2438]">{n.text}</p>
-            : <AutoText value={n.text} onChange={(v) => upd(n.id, v)} placeholder={ex[i]?.text || (placeholder ? T(placeholder) : T("Escribe una idea…"))} className="!px-0 !py-0 text-[13px] !leading-snug text-[#2b2438] hover:!border-transparent focus:!border-transparent focus:!bg-transparent" minRows={3} />}
-          {!readOnly && <button type="button" onClick={() => set(notes.filter((x) => x.id !== n.id))} className="absolute top-1 right-1 rounded p-0.5 text-[#2b2438]/50 opacity-0 group-hover:opacity-100 hover:text-bad print:hidden" aria-label={T("Eliminar")}><X size={12} /></button>}
+        <div key={n.id} className="note-paper group relative w-[calc(50%-5px)] min-w-[120px] rounded-md p-2.5 shadow-[0_2px_6px_rgba(22,25,31,.10)] sm:w-[148px]" style={{ background: NOTE_BG[color] }}>
+          {readOnly ? <p className="text-[13px] leading-snug whitespace-pre-line text-ink">{n.text}</p>
+            : <AutoText value={n.text} onChange={(v) => upd(n.id, v)} placeholder={ex[i]?.text || (placeholder ? T(placeholder) : T("Escribe una idea…"))} className="!px-0 !py-0 text-[13px] !leading-snug text-ink hover:!border-transparent focus:!border-transparent focus:!bg-transparent" minRows={3} />}
+          <CopyNote text={n.text} className={readOnly ? "top-1 right-1" : "top-1 right-6"} />
+          {!readOnly && <button type="button" onClick={() => set(notes.filter((x) => x.id !== n.id))} className="absolute top-1 right-1 rounded p-0.5 text-ink/60 opacity-0 group-hover:opacity-100 hover:text-bad print:hidden" aria-label={T("Eliminar")}><X size={12} /></button>}
         </div>
       ))}
       {!readOnly && (
@@ -151,7 +177,7 @@ function FieldsBody({ section, value, set, ex }: { section: Extract<Section, { t
 
 function ChipsBody({ chips, set, placeholder, ex }: { chips: string[]; set: SetFn; placeholder?: string; ex: string[] }) {
   const { T, readOnly } = useDoc();
-  const tones = ["bg-accent-soft text-accent-ink", "bg-[#FFE4CC] text-[#7c3d0a]", "bg-[#DBEAFE] text-[#1e3a8a]", "bg-[#DCFCE7] text-[#14532d]"];
+  const tones = ["bg-accent-soft text-accent-ink", "note-paper bg-note-orange text-ink", "note-paper bg-note-blue text-ink", "note-paper bg-note-green text-ink"];
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {chips.map((c, i) => (
@@ -196,21 +222,39 @@ function BarsBody({ bars: saved, set, placeholder, ex }: { bars: Bar[]; set: Set
 
 function ImageBody({ url, set, round }: { url?: string; set: SetFn; round?: boolean }) {
   const { T, readOnly } = useDoc();
-  if (readOnly || url) return url ? <img src={url} alt="" className={cx("w-full object-cover", round ? "aspect-square rounded-2xl" : "rounded-lg")} />
-    : <div className="flex aspect-square items-center justify-center rounded-2xl bg-paper text-ink-3">—</div>;
-  return <ImageDrop value={url} onChange={(u) => set(u ?? undefined)} label={T("Subir foto")} hint={T("Foto o ilustración representativa")} />;
+  if (readOnly) return url ? <img src={url} alt="" className={cx("w-full object-cover", round ? "aspect-square rounded-2xl" : "rounded-lg")} />
+    : <div className="flex aspect-square items-center justify-center rounded-2xl bg-paper text-line-2"><UserRound size={56} aria-hidden /></div>;
+  return (
+    <div>
+      <ImageDrop cover={round} value={url} onChange={(u) => set(u ?? undefined)} label={T("Subir foto")} hint={T("Foto o ilustración representativa")} />
+      {round && !url && (
+        <div className="mt-3 print:hidden">
+          <p className="text-[12px] text-ink-3">{T("O usa una ilustración")}</p>
+          <div className="mt-1.5 grid grid-cols-6 gap-1.5">
+            {AVATARS.map((a, i) => (
+              <button key={a} type="button" onClick={() => set(a)} aria-label={T("Ilustración {a}", { a: i + 1 })} title={T("Ilustración {a}", { a: i + 1 })}
+                className="focus-ring overflow-hidden rounded-lg border border-line transition hover:border-accent"><img src={a} alt="" className="block w-full" /></button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function GalleryBody({ items, set }: { items: { id: string; url: string; caption: string }[]; set: SetFn }) {
   const { T, readOnly } = useDoc();
   return (
     <div className="grid gap-3 sm:grid-cols-3">
+      {!readOnly && !items.length && [[<ExampleWall key="w" />, T("Ejemplo: pared de notas de una sesión")], [<ExampleSketch key="s" />, T("Ejemplo: boceto de una pantalla")]].map(([art, caption]) => (
+        <figure key={String(caption)} className="print:hidden">{art}<figcaption className="mt-1 text-[12px] text-ink-3 italic">{caption}</figcaption></figure>
+      ))}
       {items.map((it) => (
         <figure key={it.id} className="group relative">
           <img src={it.url} alt={it.caption} className="aspect-[4/3] w-full rounded-lg border border-line object-cover" />
           {readOnly ? <figcaption className="mt-1 text-[12px] text-ink-2">{it.caption}</figcaption>
             : <input value={it.caption} placeholder={T("Descripción…")} onChange={(e) => set(items.map((x) => (x.id === it.id ? { ...x, caption: e.target.value } : x)))} className="mt-1 w-full bg-transparent text-[12px] outline-none" />}
-          {!readOnly && <button type="button" onClick={() => set(items.filter((x) => x.id !== it.id))} className="absolute top-1.5 right-1.5 rounded bg-white/90 p-1 text-bad opacity-0 group-hover:opacity-100 print:hidden"><Trash2 size={12} /></button>}
+          {!readOnly && <button type="button" onClick={() => set(items.filter((x) => x.id !== it.id))} className="absolute top-1.5 right-1.5 rounded bg-surface/90 p-1 text-bad opacity-0 group-hover:opacity-100 print:hidden"><Trash2 size={12} /></button>}
         </figure>
       ))}
       {!readOnly && <div className="print:hidden"><ImageDrop compact value={null} onChange={(u) => u && set([...items, { id: uid(), url: u, caption: "" }])} label={T("Agregar foto")} /></div>}
@@ -227,7 +271,7 @@ function RowGroupsBody({ groups, set, addGroups, ex }: { groups: RowGroup[]; set
       {groups.map((g, gi) => (
         <div key={g.id} className="overflow-hidden rounded-xl border border-line break-inside-avoid">
           <div className="flex items-center gap-3 bg-accent-soft/60 px-3 py-2">
-            {g.letter && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-bold text-white">{g.letter}</span>}
+            {g.letter && <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-base font-bold text-on-accent">{g.letter}</span>}
             {readOnly ? <p className="font-semibold">{g.title}</p>
               : <input value={g.title} onChange={(e) => updG(g.id, { title: e.target.value })} className="flex-1 bg-transparent font-semibold outline-none" />}
             {!readOnly && addGroups && <button type="button" onClick={() => set(groups.filter((x) => x.id !== g.id))} className="text-ink-3 hover:text-bad print:hidden" aria-label={T("Eliminar")}><Trash2 size={14} /></button>}
@@ -287,7 +331,7 @@ function EntriesBody({ entries: saved, set, nameLabel, bodyLabel, addLabel, ex }
       {entries.map((e, i) => (
         <div key={e.id} className="group rounded-xl border border-line p-3 break-inside-avoid">
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-white">{i + 1}</span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-bold text-on-accent">{i + 1}</span>
             {readOnly ? <p className="font-semibold">{e.name}</p>
               : <input value={e.name} placeholder={ex[i]?.name || T(nameLabel)} onChange={(ev) => upd(e.id, { name: ev.target.value })} className="flex-1 bg-transparent font-semibold outline-none placeholder:font-normal placeholder:text-ink-3" />}
             {!readOnly && <button type="button" onClick={() => set(entries.filter((x) => x.id !== e.id))} className="text-ink-3 opacity-0 group-hover:opacity-100 hover:text-bad print:hidden"><Trash2 size={13} /></button>}

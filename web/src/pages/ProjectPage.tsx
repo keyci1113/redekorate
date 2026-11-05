@@ -41,7 +41,7 @@ export function ProjectPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-(--page-gutter) py-10">
       <Link to="/projects" className="text-sm text-ink-3 hover:text-ink">{t("← Proyectos")}</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">

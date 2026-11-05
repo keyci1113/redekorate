@@ -8,7 +8,7 @@ export { cx };
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 const variants: Record<Variant, string> = {
-  primary: "bg-ink text-paper hover:bg-ink/90 shadow-sm",
+  primary: "bg-accent text-on-accent hover:bg-accent/90 hover:-translate-y-px active:translate-y-0 motion-reduce:transform-none shadow-sm",
   secondary: "bg-surface text-ink border border-line hover:border-line-2 hover:bg-paper/60",
   ghost: "text-ink-2 hover:bg-ink/5 hover:text-ink",
   danger: "bg-bad text-white hover:bg-bad/90",

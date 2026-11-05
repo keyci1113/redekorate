@@ -6,6 +6,7 @@ export interface Project {
   id: string; name: string; description: string; color: string; archived: boolean;
   created_at: string; updated_at: string;
   study_count?: number; live_count?: number; response_count?: number; insight_count?: number;
+  started_count?: number; document_count?: number; participant_count?: number; share_count?: number;
 }
 
 export type StudyStatus = "draft" | "live" | "closed";
@@ -14,7 +15,7 @@ export interface Study {
   id: string; project_id: string; title: string; method: string; status: StudyStatus;
   blocks: Block[]; settings: Record<string, unknown>; public_slug: string;
   published_at: string | null; created_at: string; updated_at: string;
-  block_count?: number; response_count?: number;
+  block_count?: number; response_count?: number; started_count?: number;
 }
 
 export interface Session { id: string; participant?: Record<string, unknown>; device?: string | null; started_at: string; completed_at: string | null }

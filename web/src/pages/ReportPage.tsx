@@ -35,13 +35,13 @@ export function ReportPage() {
   return (
     <div className="min-h-full">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+        <div className="flex items-center justify-between px-(--page-gutter) py-4">
           <Logo />
           <span className="flex items-center gap-3"><LangSwitch />
           <Button size="sm" variant="ghost" icon={<Printer size={15} />} onClick={() => window.print()}>{t("Imprimir / PDF")}</Button></span>
         </div>
       </header>
-      <div className="mx-auto max-w-5xl px-6 py-12">
+      <div className="px-(--page-gutter) py-12">
         <p className="flex items-center gap-2 text-sm text-ink-2">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: study.project_color }} />{study.project_name}
           <span className="text-ink-3">· {templateByKey(study.method)?.name ?? study.method}</span>

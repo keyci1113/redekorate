@@ -139,7 +139,7 @@ function ChoiceView({ block, value, onChange }: { block: ChoiceBlock; value?: Ch
               className={cx("focus-ring flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left text-[15px] transition",
                 on ? "border-accent bg-accent-soft text-ink" : "border-line bg-surface hover:border-line-2")}>
               <span className={cx("flex h-5 w-5 shrink-0 items-center justify-center border transition", block.multiple ? "rounded-md" : "rounded-full",
-                on ? "border-accent bg-accent text-white" : "border-line-2")}>{on && <Check size={13} strokeWidth={3} />}</span>
+                on ? "border-accent bg-accent text-on-accent" : "border-line-2")}>{on && <Check size={13} strokeWidth={3} />}</span>
               <span className="flex-1">{o.label || t("Opción {a}", { a: i + 1 })}</span>
             </button>
             {o.id === "__other" && on && <input autoFocus className="field mt-2" placeholder={t("Especifica…")} maxLength={300} value={value?.other ?? ""} onChange={(e) => onChange({ selected, other: e.target.value })} />}
@@ -171,7 +171,7 @@ function ScaleView({ min, max, minLabel, maxLabel, style, value, onChange }: {
         ) : (
           <button key={n} type="button" onClick={() => onChange(n)}
             className={cx("focus-ring h-12 min-w-0 flex-1 rounded-lg border text-[15px] font-medium tabular-nums transition",
-              value === n ? "border-accent bg-accent text-white" : "border-line bg-surface hover:border-line-2")}>{n}</button>
+              value === n ? "border-accent bg-accent text-on-accent" : "border-line bg-surface hover:border-line-2")}>{n}</button>
         ))}
       </div>
       <div className="mt-2.5 flex justify-between text-[13px] text-ink-3"><span>{minLabel}</span><span>{maxLabel}</span></div>
@@ -191,7 +191,7 @@ function SusView({ product, value, onChange }: { product: string; value: (number
           <div className="grid grid-cols-5 gap-1.5">
             {[1, 2, 3, 4, 5].map((n) => (
               <button key={n} type="button" onClick={() => set(i, n)} title={SUS_LABELS()[n - 1]}
-                className={cx("focus-ring h-10 rounded-lg border text-sm font-medium transition", value[i] === n ? "border-accent bg-accent text-white" : "border-line hover:border-line-2")}>{n}</button>
+                className={cx("focus-ring h-10 rounded-lg border text-sm font-medium transition", value[i] === n ? "border-accent bg-accent text-on-accent" : "border-line hover:border-line-2")}>{n}</button>
             ))}
           </div>
           <div className="mt-1.5 flex justify-between text-xs text-ink-3"><span>{SUS_LABELS()[0]}</span><span>{SUS_LABELS()[4]}</span></div>
@@ -362,7 +362,7 @@ function TreeView({ block, value, onChange }: { block: TreeTestBlock; value?: Tr
                 <span className={cx(chosen && "font-semibold")}>{n.label}</span>
               </button>
               {focus === n.id && !chosen && (
-                <button type="button" onClick={() => choose(n.id)} className="focus-ring flex shrink-0 items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-white">
+                <button type="button" onClick={() => choose(n.id)} className="focus-ring flex shrink-0 items-center gap-1 rounded-md bg-accent px-2.5 py-1 text-xs font-medium text-on-accent">
                   {t("Lo encontraría aquí")} <CornerDownLeft size={12} />
                 </button>
               )}
@@ -399,7 +399,7 @@ function PreferenceView({ block, value, onChange }: { block: PreferenceBlock; va
               </button>
               <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2.5">
                 <button type="button" onClick={() => onChange({ choice: o.id, why: value?.why })} className="flex items-center gap-2 text-[14px] font-medium">
-                  <span className={cx("flex h-5 w-5 items-center justify-center rounded-full border-2", on ? "border-accent bg-accent text-white" : "border-line-2")}>{on && <Check size={11} strokeWidth={3} />}</span>
+                  <span className={cx("flex h-5 w-5 items-center justify-center rounded-full border-2", on ? "border-accent bg-accent text-on-accent" : "border-line-2")}>{on && <Check size={11} strokeWidth={3} />}</span>
                   {o.label || t("Opción {a}", { a: i + 1 })}
                 </button>
                 {o.image && <button type="button" onClick={() => setZoom(o)} className="rounded-md p-1 text-ink-3 hover:bg-ink/5 hover:text-ink" aria-label={t("Ver en grande")}><Maximize2 size={15} /></button>}
@@ -417,7 +417,7 @@ function PreferenceView({ block, value, onChange }: { block: PreferenceBlock; va
       {zoom && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6" onClick={() => setZoom(null)}>
           <img src={zoom.image} alt={zoom.label} className="max-h-full max-w-full rounded-lg bg-white object-contain" />
-          <button className="absolute top-4 right-4 rounded-full bg-white/90 p-2" aria-label={t("Cerrar")}><X size={18} /></button>
+          <button className="absolute top-4 right-4 rounded-full bg-white/90 p-2 text-[#16191F]" aria-label={t("Cerrar")}><X size={18} /></button>
         </div>
       )}
     </div>
@@ -440,7 +440,7 @@ function FiveSecondView({ block, onDone, preview }: { block: FiveSecondBlock; on
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink p-4">
         <img src={block.image.url} alt="" className="max-h-full max-w-full object-contain" />
-        <span className="absolute top-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg font-semibold tabular-nums shadow-lg">{left}</span>
+        <span className="absolute top-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg font-semibold text-[#16191F] tabular-nums shadow-lg">{left}</span>
       </div>
     );
   }
@@ -449,7 +449,7 @@ function FiveSecondView({ block, onDone, preview }: { block: FiveSecondBlock; on
       {phase === "ready" ? <>
         <p className="text-5xl font-semibold tabular-nums text-accent">{block.seconds}s</p>
         <p className="mt-2 text-sm text-ink-2">{t("La imagen aparecerá en pantalla completa y desaparecerá sola.")}</p>
-        <button type="button" onClick={() => { setLeft(block.seconds); setPhase("showing"); }} className="focus-ring mt-6 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-medium text-white">
+        <button type="button" onClick={() => { setLeft(block.seconds); setPhase("showing"); }} className="focus-ring mt-6 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent">
           {t("Estoy listo/a, mostrar imagen")}
         </button>
         {preview && <p className="mt-3 text-xs text-ink-3">{t("Vista previa")}</p>}

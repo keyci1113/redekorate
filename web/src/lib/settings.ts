@@ -19,7 +19,7 @@ export const defaultConsent = () =>
   "• Tus respuestas se usarán únicamente con fines de investigación y se analizarán de forma agregada.\n" +
   tc("• No compartiremos tus datos con terceros.");
 
-export const BRAND_COLORS = ["#7C3AED", "#9333EA", "#C026D3", "#DB2777", "#4F46E5", "#2563EB", "#0E7490", "#059669", "#EA580C", "#1F1633"];
+export const BRAND_COLORS = ["#5902A1", "#9333EA", "#C026D3", "#DB2777", "#4F46E5", "#2563EB", "#0E7490", "#059669", "#EA580C", "#1F1633"];
 
 /** Sobrescribe las variables de color del tema con el color de marca del estudio. */
 export function brandStyle(s: StudySettings): Record<string, string> {
@@ -27,6 +27,7 @@ export function brandStyle(s: StudySettings): Record<string, string> {
   if (!c || !/^#[0-9a-fA-F]{6}$/.test(c)) return {};
   return {
     "--color-accent": c,
+    "--color-on-accent": "#FFFFFF",
     "--color-accent-soft": `color-mix(in srgb, ${c} 11%, white)`,
     "--color-accent-ink": `color-mix(in srgb, ${c} 75%, black)`,
   };

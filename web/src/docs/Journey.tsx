@@ -55,10 +55,10 @@ export function Journey({ data, set, ex }: { data: JourneyData; set: (d: Journey
           <div />
           {stages.map((s, i) => (
             <div key={s.id} className="group px-1.5">
-              <div className="flex items-center gap-1 rounded-xl bg-accent px-3 py-2.5 text-white">
+              <div className="flex items-center gap-1 rounded-xl bg-accent px-3 py-2.5 text-on-accent">
                 {readOnly ? <p className="flex-1 text-center font-bold">{s.name}</p>
                   : <AutoText value={s.name} minRows={1} onChange={(v) => setStage(s.id, { name: v })} placeholder={exStr(ex, "stages", i, "name") ?? T("Nombre de la etapa")}
-                    className="flex-1 !p-0 text-center font-bold text-white placeholder:!text-white/70 hover:!border-transparent focus:!border-transparent focus:!bg-transparent" />}
+                    className="flex-1 !p-0 text-center font-bold text-on-accent placeholder:!text-on-accent/70 hover:!border-transparent focus:!border-transparent focus:!bg-transparent" />}
                 {!readOnly && (
                   <span className="flex opacity-0 group-hover:opacity-100 print:hidden">
                     <button type="button" onClick={() => move(i, -1)} className="p-0.5" aria-label={T("Mover a la izquierda")}><ArrowLeft size={13} /></button>

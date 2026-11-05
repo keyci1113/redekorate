@@ -1,5 +1,6 @@
-import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
-import { FolderKanban, Home, LogOut, Settings } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
+import { ChevronDown, LogOut, Plus, Settings } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
@@ -10,44 +11,124 @@ import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
 
 import { t } from "../lib/i18n";
+
+/** Botón con panel desplegable: se cierra con Escape, al hacer clic afuera o al cambiar de página. */
+function Disclosure({ button, buttonClass, label, align = "left", children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const { pathname, search } = useLocation();
+  useEffect(() => setOpen(false), [pathname, search]);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (!root.current?.contains(e.target as Node)) setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setOpen(false); trigger.current?.focus(); } };
+    window.addEventListener("mousedown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
+  }, [open]);
+  return (
+    <div ref={root} className="relative">
+      <button ref={trigger} type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} className={buttonClass}>{button}</button>
+      {open && (
+        <div className={cx("absolute top-full z-40 mt-1.5 w-72 rounded-xl border border-line bg-surface p-1.5 shadow-(--shadow-lift)", align === "right" ? "right-0" : "left-0")}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const menuItem = "focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-ink-2 hover:bg-ink/5 hover:text-ink";
+
+const primaryAction = "focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-2.5 text-sm font-medium text-on-accent transition hover:bg-accent/90 sm:px-3.5";
+
 export function Layout() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
   const { data } = useLoad(() => api.get<{ projects: Project[] }>("/projects"), [pathname]);
+  const projects = data?.projects.filter((p) => !p.archived) ?? [];
+  const current = useMatch("/projects/:id/*")?.params.id;
+  const currentProject = projects.find((p) => p.id === current);
+  const navClass = ({ isActive }: { isActive: boolean }) => cx("focus-ring rounded-lg px-2.5 py-1.5 text-sm font-medium transition", isActive ? "bg-ink/5 text-ink" : "text-ink-3 hover:text-ink");
   return (
-    <div className="flex min-h-full">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-paper px-3 py-4 md:flex">
-        <Link to="/" className="focus-ring mb-6 rounded-md px-2"><Logo /></Link>
-        {([["/", t("Inicio"), Home], ["/projects", t("Proyectos"), FolderKanban], ["/account", t("Mi cuenta"), Settings]] as const).map(([to, l, Icon]) => (
-          <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => cx("focus-ring mb-0.5 flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium", isActive ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-ink/5")}>
-            <Icon size={16} /> {l}
-          </NavLink>
-        ))}
-        <p className="label mt-6 mb-2 px-2.5">{t("Recientes")}</p>
-        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-          {data?.projects.filter((p) => !p.archived).slice(0, 12).map((p) => (
-            <NavLink key={p.id} to={`/projects/${p.id}`} className={({ isActive }) => cx("focus-ring flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px]", isActive ? "bg-surface font-medium text-ink shadow-sm ring-1 ring-line" : "text-ink-2 hover:bg-ink/5")}>
-              <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: p.color }} />
-              <span className="truncate">{p.name}</span>
-            </NavLink>
-          ))}
-        </nav>
-        <div className="mt-3 flex items-center justify-between px-2.5"><span className="text-xs text-ink-3">{t("Idioma")}</span><LangSwitch /></div>
-        <div className="mt-1.5 flex items-center justify-between px-2.5"><span className="text-xs text-ink-3">{t("Tema")}</span><ThemeSwitch /></div>
-        <div className="mt-3 flex items-center gap-2.5 border-t border-line px-1.5 pt-4">
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[#A855F7] to-[#6D28D9] text-[13px] font-semibold text-white">{user?.name.slice(0, 1).toUpperCase()}</span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium">{user?.name}</p>
-            <p className="truncate text-xs text-ink-3">{user?.email}</p>
+    <div className="flex min-h-full flex-col">
+      <header className="no-print">
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-(--page-gutter) py-3 sm:gap-x-4">
+          <Link to="/" className="focus-ring order-1 rounded-md"><Logo /></Link>
+          <nav className="order-3 flex w-full items-center gap-1 sm:order-2 sm:ml-2 sm:w-auto" aria-label={t("Navegación principal")}>
+            <NavLink to="/" end className={navClass}>{t("Inicio")}</NavLink>
+            <NavLink to="/projects" end className={navClass}>{t("Proyectos")}</NavLink>
+            <div className="ml-1">
+              <Disclosure
+                buttonClass="focus-ring flex max-w-52 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-ink-2 transition hover:border-line-2 hover:text-ink"
+                button={<>
+                  <span className="truncate" title={currentProject?.name}>{currentProject?.name ?? t("Cambiar de proyecto")}</span>
+                  <ChevronDown size={14} className="shrink-0" />
+                </>}
+              >
+                <p className="px-2.5 pt-1.5 pb-1 text-xs text-ink-3">{t("Recientes")}</p>
+                <div className="max-h-80 overflow-y-auto">
+                  {projects.length === 0 && <p className="px-2.5 py-2 text-sm text-ink-3">{t("Aún no tienes proyectos.")}</p>}
+                  {projects.slice(0, 12).map((p) => (
+                    <NavLink key={p.id} to={`/projects/${p.id}`} className={({ isActive }) => cx(menuItem, isActive && "bg-ink/5 font-medium text-ink")}>
+                      <span className="truncate" title={p.name}>{p.name}</span>
+                    </NavLink>
+                  ))}
+                </div>
+                <div className="mt-1 border-t border-line pt-1"><Link to="/projects" className={menuItem}>{t("Ver todos los proyectos")}</Link></div>
+              </Disclosure>
+            </div>
+          </nav>
+          <div className="order-2 ml-auto flex items-center gap-2 sm:order-3 sm:gap-3">
+            {current || !data ? (
+              // Dentro de un proyecto va directo. Si la lista aún no carga (o falló), Proyectos siempre sirve.
+              <Link to={current ? `/projects/${current}/new` : "/projects"} aria-label={t("Nuevo estudio")} className={primaryAction}>
+                <Plus size={16} /><span className="hidden sm:inline">{t("Nuevo estudio")}</span>
+              </Link>
+            ) : projects.length === 0 ? (
+              <Link to="/projects?crear=1" aria-label={t("Nuevo proyecto")} className={primaryAction}>
+                <Plus size={16} /><span className="hidden sm:inline">{t("Nuevo proyecto")}</span>
+              </Link>
+            ) : (
+              <Disclosure align="right" label={t("Nuevo estudio")} buttonClass={primaryAction} button={<><Plus size={16} /><span className="hidden sm:inline">{t("Nuevo estudio")}</span></>}>
+                <p className="px-2.5 pt-1.5 pb-1 text-xs text-ink-3">{t("¿En qué proyecto?")}</p>
+                <div className="max-h-80 overflow-y-auto">
+                  {projects.slice(0, 12).map((p) => (
+                    <Link key={p.id} to={`/projects/${p.id}/new`} className={menuItem}>
+                      <span className="truncate" title={p.name}>{p.name}</span>
+                    </Link>
+                  ))}
+                </div>
+                <div className="mt-1 border-t border-line pt-1">
+                  <Link to="/projects" className={menuItem}>{t("Ver todos los proyectos")}</Link>
+                  <Link to="/projects?crear=1" className={menuItem}><Plus size={15} /> {t("Nuevo proyecto")}</Link>
+                </div>
+              </Disclosure>
+            )}
+            <Disclosure
+              align="right"
+              label={t("Menú de la cuenta")}
+              buttonClass="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#BF7DF5] to-[#5902A1] text-[13px] font-semibold text-white transition hover:opacity-90"
+              button={user?.name.slice(0, 1).toUpperCase()}
+            >
+              <div className="px-2.5 py-1.5">
+                <p className="truncate text-sm font-medium">{user?.name}</p>
+                <p className="truncate text-xs text-ink-3">{user?.email}</p>
+              </div>
+              <div className="mt-1 border-t border-line pt-1">
+                <Link to="/account" className={menuItem}><Settings size={15} /> {t("Mi cuenta")}</Link>
+                <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Idioma")}<LangSwitch /></div>
+                <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Tema")}<ThemeSwitch /></div>
+              </div>
+              <div className="mt-1 border-t border-line pt-1">
+                <button type="button" onClick={logout} className={menuItem}><LogOut size={15} /> {t("Cerrar sesión")}</button>
+              </div>
+            </Disclosure>
           </div>
-          <button onClick={logout} title={t("Cerrar sesión")} className="focus-ring rounded-md p-1.5 text-ink-3 hover:bg-ink/5 hover:text-ink"><LogOut size={15} /></button>
         </div>
-      </aside>
+      </header>
       <main className="min-w-0 flex-1">
-        <div className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
-          <Link to="/"><Logo /></Link>
-          <span className="flex items-center gap-3"><LangSwitch /><ThemeSwitch /><button onClick={logout} className="text-ink-3"><LogOut size={16} /></button></span>
-        </div>
         <Outlet />
       </main>
     </div>

@@ -8,6 +8,8 @@ web
 
 ## Users
 
+**Usuario principal:** diseñadores UX/UI. Es un público exigente con la interfaz: la herramienta debe ser completamente fácil de usar.
+
 **Hoy:** la persona dueña del proyecto y su equipo usan redekorate como herramienta interna para planear, lanzar y analizar investigación de UX.
 
 **Más adelante:** se abrirá a otras personas, que crearán sus propias cuentas. Todavía no está definido a quién se dirigirá exactamente ni cuándo se abrirá.

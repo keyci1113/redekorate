@@ -1,34 +1,57 @@
 @import "tailwindcss";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/host-grotesk";
+@import "@fontsource-variable/instrument-sans";
 
-/* Spline Sans (títulos) · licencia OFL en assets/fonts/OFL.txt */
-@font-face {
-  font-family: "Spline Sans";
-  src: url("./assets/fonts/SplineSans-Variable.woff2") format("woff2");
-  font-weight: 300 700;
-  font-display: swap;
+@custom-variant print {
+  @media print { @slot; }
+  &:where(.pdf-frame, .pdf-frame *) { @slot; }
 }
 
-@theme {
-  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Spline Sans", "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+/* Host Grotesk (títulos y cifras) · Instrument Sans (texto y controles). Ambas OFL, servidas desde el proyecto. */
 
-  --color-paper: #F7F5FB;      /* lavanda muy suave */
+@theme {
+  --font-sans: "Instrument Sans Variable", sans-serif;
+  --font-display: "Host Grotesk Variable", sans-serif;
+  --radius-2xl: 12px;
+  --default-transition-duration: 160ms;
+  --default-transition-timing-function: ease-out;
+
+  --color-paper: #FCFCFD;      /* ground */
   --color-surface: #FFFFFF;
-  --color-ink: #1F1633;        /* texto principal */
-  --color-ink-2: #3F3654;
-  --color-ink-3: #625A78;
-  --color-line: #E7E2F0;
-  --color-line-2: #D5CDE4;
-  --color-accent: #7C3AED;     /* morado */
-  --color-accent-soft: #F1EAFE;
-  --color-accent-ink: #5B21B6;
+  --color-ink: #16191F;        /* texto principal */
+  --color-ink-2: #454C58;
+  --color-ink-3: #5B6270;
+  --color-line: #DDE0E6;
+  --color-line-2: #C6CAD3;
+  --color-accent: #5902A1;     /* morado: acciones, íconos pequeños y selección */
+  --color-accent-soft: #F3E9FD;
+  --color-accent-ink: #5902A1;
+  --color-on-accent: #FFFFFF;
   --color-good: #1E6B43;
   --color-good-soft: #E3F2E9;
   --color-warn: #87520A;
   --color-warn-soft: #FBF0DB;
   --color-bad: #A3302A;
   --color-bad-soft: #F9E4E1;
+  --color-paper-2: #F3F4F6;
+  --color-note-yellow: #FFF1A8;
+  --color-note-blue: #C4E2FB;
+  --color-note-green: #C9F0C6;
+  --color-note-orange: #FFD6AC;
+  --color-note-pink: #FFCCE0;
+  --color-note-lavender: #E3D0FC;
+  --color-note-muted: #454C58;
+
+  /* Familias de método: el único color vivo de la interfaz. Solo en puntos y figuras, nunca en texto. */
+  --color-family-usability: #E8590C;
+  --color-family-ia: #0F9D58;
+  --color-family-generative: #C2259E;
+  --color-family-synthesis: #0891B2;
+  --color-family-metrics: #1F6FEB;
+  --color-family-org: #A16207;
+
+  /* Capas suaves: borde fino en reposo; sombra en lo enfocado o lo que pide atención. */
+  --shadow-lift: 0 1px 2px rgb(22 25 31 / 0.05), 0 8px 24px rgb(22 25 31 / 0.08);
 }
 
 /* Modo oscuro: redefine los mismos tokens, así que ninguna clase bg-paper/text-ink/etc.
@@ -36,62 +59,155 @@
    Sin elección guardada sigue la preferencia del sistema; data-theme la anula. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    color-scheme: dark;
-    --color-paper: #140F1F;
-    --color-surface: #1D1730;
-    --color-ink: #F2EEFB;
-    --color-ink-2: #C7BEDE;
-    --color-ink-3: #948AB3;
-    --color-line: #342B49;
-    --color-line-2: #4A3F66;
-    --color-accent: #8B5CF6;
-    --color-accent-soft: #2B2147;
-    --color-accent-ink: #D8B4FE;
-    --color-good: #34D399;
-    --color-good-soft: #0E2A1F;
-    --color-warn: #FBBF24;
-    --color-warn-soft: #2E2308;
-    --color-bad: #F87171;
-    --color-bad-soft: #2E1618;
+      color-scheme: dark;
+      --color-paper: #100617;
+      --color-surface: #201429;
+      --color-ink: #FCFCFD;
+      --color-ink-2: #D3C4E4;
+      --color-ink-3: #A897BC;
+      --color-line: #331A47;
+      --color-line-2: #5E3182;
+      --color-accent: #BF7DF5;
+      --color-accent-soft: #331A47;
+      --color-accent-ink: #D6AEF9;
+      --color-on-accent: #100617;
+      --color-good: #34D399;
+      --color-good-soft: #0E2A1F;
+      --color-warn: #FBBF24;
+      --color-warn-soft: #2E2308;
+      --color-bad: #F87171;
+      --color-bad-soft: #2E1618;
+      --color-paper-2: #1A0F24;
+      --color-note-yellow: #F0DC8C;
+      --color-note-blue: #AFCFF0;
+      --color-note-green: #B3DFB6;
+      --color-note-orange: #F2C096;
+      --color-note-pink: #F0B6D0;
+      --color-note-lavender: #CFB6F2;
+      --color-note-muted: #454C58;
+      --color-family-usability: #FF8A4C;
+      --color-family-ia: #34D399;
+      --color-family-generative: #F06CD2;
+      --color-family-synthesis: #38BDD8;
+      --color-family-metrics: #6AA5FF;
+      --color-family-org: #D9A441;
+      --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 26px rgb(0 0 0 / 0.35);
   }
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #140F1F;
-  --color-surface: #1D1730;
-  --color-ink: #F2EEFB;
-  --color-ink-2: #C7BEDE;
-  --color-ink-3: #948AB3;
-  --color-line: #342B49;
-  --color-line-2: #4A3F66;
-  --color-accent: #8B5CF6;
-  --color-accent-soft: #2B2147;
-  --color-accent-ink: #D8B4FE;
+  --color-paper: #100617;
+  --color-surface: #201429;
+  --color-ink: #FCFCFD;
+  --color-ink-2: #D3C4E4;
+  --color-ink-3: #A897BC;
+  --color-line: #331A47;
+  --color-line-2: #5E3182;
+  --color-accent: #BF7DF5;
+  --color-accent-soft: #331A47;
+  --color-accent-ink: #D6AEF9;
+  --color-on-accent: #100617;
   --color-good: #34D399;
   --color-good-soft: #0E2A1F;
   --color-warn: #FBBF24;
   --color-warn-soft: #2E2308;
   --color-bad: #F87171;
   --color-bad-soft: #2E1618;
+  --color-paper-2: #1A0F24;
+  --color-note-yellow: #F0DC8C;
+  --color-note-blue: #AFCFF0;
+  --color-note-green: #B3DFB6;
+  --color-note-orange: #F2C096;
+  --color-note-pink: #F0B6D0;
+  --color-note-lavender: #CFB6F2;
+  --color-note-muted: #454C58;
+  --color-family-usability: #FF8A4C;
+  --color-family-ia: #34D399;
+  --color-family-generative: #F06CD2;
+  --color-family-synthesis: #38BDD8;
+  --color-family-metrics: #6AA5FF;
+  --color-family-org: #D9A441;
+  --shadow-lift: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 26px rgb(0 0 0 / 0.35);
 }
 
+:root { --page-gutter: max(1rem, 5vw); } /* margen lateral de todo el sitio */
+
+/* Campo oscuro: se ve igual en ambos temas, con los tokens del tema oscuro dentro. */
+.field-dark {
+  --color-surface: #201429; --color-ink: #FCFCFD; --color-ink-2: #D3C4E4; --color-ink-3: #A897BC; --color-line: #331A47; --color-line-2: #5E3182;
+  --color-accent: #BF7DF5; --color-on-accent: #100617; --color-warn: #FBBF24;
+  --color-family-usability: #FF8A4C; --color-family-ia: #34D399; --color-family-generative: #F06CD2; --color-family-synthesis: #38BDD8; --color-family-metrics: #6AA5FF; --color-family-org: #D9A441;
+  background: #201429; color: var(--color-ink);
+}
+
+/* Post-its clásicos: papel de color con tinta oscura en ambos temas; en oscuro el papel se atenúa para no deslumbrar. */
+.note-paper { --color-ink: #FCFCFD; --color-ink-3: var(--color-note-muted); --color-accent: #BF7DF5; --color-bad: #A3302A; color: var(--color-ink); border: 1px solid rgb(22 25 31 / 0.08); }
+
+/* Al imprimir siempre se usa el tema claro y se conservan los fondos, aunque la app esté en oscuro. */
+@media print {
+  :root:root:root {
+    color-scheme: light;
+    --color-paper: #FCFCFD;
+    --color-surface: #FFFFFF;
+    --color-ink: #16191F;
+    --color-ink-2: #454C58;
+    --color-ink-3: #5B6270;
+    --color-line: #DDE0E6;
+    --color-line-2: #C6CAD3;
+    --color-accent: #5902A1;
+    --color-accent-soft: #F3E9FD;
+    --color-accent-ink: #5902A1;
+    --color-on-accent: #FFFFFF;
+    --color-good: #1E6B43;
+    --color-good-soft: #E3F2E9;
+    --color-warn: #87520A;
+    --color-warn-soft: #FBF0DB;
+    --color-bad: #A3302A;
+    --color-bad-soft: #F9E4E1;
+    --color-paper-2: #F3F4F6;
+    --color-note-yellow: #FFF1A8;
+    --color-note-blue: #C4E2FB;
+    --color-note-green: #C9F0C6;
+    --color-note-orange: #FFD6AC;
+    --color-note-pink: #FFCCE0;
+    --color-note-lavender: #E3D0FC;
+    --color-note-muted: #454C58;
+    --color-family-usability: #E8590C;
+    --color-family-ia: #0F9D58;
+    --color-family-generative: #C2259E;
+    --color-family-synthesis: #0891B2;
+    --color-family-metrics: #1F6FEB;
+    --color-family-org: #A16207;
+    --shadow-lift: 0 1px 2px rgb(22 25 31 / 0.05), 0 8px 24px rgb(22 25 31 / 0.08);
+  }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+/* En el PDF nada se corta con scroll: las tablas anchas se ajustan al ancho de la página. */
+.pdf-frame { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.pdf-frame .overflow-x-auto { overflow: visible !important; }
+.pdf-frame table, .pdf-frame th { min-width: 0 !important; }
+
 html, body, #root { height: 100%; }
-body { @apply bg-paper text-ink font-sans antialiased; font-feature-settings: "cv11", "ss01"; }
-h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.015em; }
+body { @apply bg-paper text-ink font-sans antialiased; }
+::selection { background: var(--color-accent-soft); color: var(--color-ink); }
+html { scrollbar-color: var(--color-line-2) transparent; accent-color: var(--color-accent); }
+input, textarea { caret-color: var(--color-accent); }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
 
 @layer components {
-.display { font-family: var(--font-display); font-weight: 600; letter-spacing: -0.025em; }
+.display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08; }
 .label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
-.focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-1; }
+.focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-paper; }
 .field { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15; }
 }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @keyframes fall { 0% { top: -18%; opacity: 0; } 10% { opacity: 1; } 88% { opacity: 1; } 100% { top: 112%; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; } }
 @media print { aside, header button, .no-print { display: none !important; } body { background: white; } }
 
 /* Documentos: el texto de ejemplo (placeholder) se ve claramente como guía, no como contenido */
 article :is(input, textarea)::placeholder { font-style: italic; color: color-mix(in oklab, var(--color-ink-3) 75%, transparent); }
-article .bg-accent :is(input, textarea)::placeholder { color: rgb(255 255 255 / 0.7); }
+article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb, var(--color-on-accent) 70%, transparent); }
 /* Al imprimir/PDF no se muestran los textos de ejemplo */
 @media print { :is(input, textarea)::placeholder { color: transparent !important; } }

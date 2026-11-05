@@ -16,7 +16,7 @@ export function KanoRunner({ block, value, onChange }: { block: KanoBlock; value
       <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
         {KANO_ANSWERS.map((a, i) => (
           <button key={a} type="button" onClick={() => onPick(i + 1)}
-            className={cx("focus-ring rounded-lg border px-2 py-2 text-[13px] transition", val === i + 1 ? "border-accent bg-accent text-white" : "border-line bg-surface hover:border-line-2")}>{t(a)}</button>
+            className={cx("focus-ring rounded-lg border px-2 py-2 text-[13px] transition", val === i + 1 ? "border-accent bg-accent text-on-accent" : "border-line bg-surface hover:border-line-2")}>{t(a)}</button>
         ))}
       </div>
     </div>
@@ -33,7 +33,7 @@ export function KanoRunner({ block, value, onChange }: { block: KanoBlock; value
               <p className="mb-2 text-[14px] font-medium">{t("¿Qué tan importante es para ti?")}</p>
               <div className="flex gap-1">
                 {Array.from({ length: 10 }, (_, k) => k + 1).map((n) => (
-                  <button key={n} type="button" onClick={() => set(f.id, { imp: n })} className={cx("focus-ring h-9 min-w-0 flex-1 rounded-md border text-[13px] tabular-nums", v[f.id]?.imp === n ? "border-accent bg-accent text-white" : "border-line hover:border-line-2")}>{n}</button>
+                  <button key={n} type="button" onClick={() => set(f.id, { imp: n })} className={cx("focus-ring h-9 min-w-0 flex-1 rounded-md border text-[13px] tabular-nums", v[f.id]?.imp === n ? "border-accent bg-accent text-on-accent" : "border-line hover:border-line-2")}>{n}</button>
                 ))}
               </div>
               <div className="mt-1 flex justify-between text-[11px] text-ink-3"><span>{t("Nada")}</span><span>{t("Extremadamente")}</span></div>

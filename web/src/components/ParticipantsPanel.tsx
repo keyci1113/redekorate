@@ -157,7 +157,7 @@ function ParticipantForm({ studies, initial, onSubmit, onLinkChange }: {
               <select className="field h-9 w-32 py-0" value={status} onChange={(e) => setStatus(e.target.value as ParticipantStudyStatus)} aria-label={t("Estado")}>
                 {STATUSES().map(([k, l]) => <option key={k} value={k}>{l}</option>)}
               </select>
-              <button type="button" onClick={addLink} disabled={!studyId} className="flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white disabled:opacity-40"><Check size={13} /> {t("Vincular")}</button>
+              <button type="button" onClick={addLink} disabled={!studyId} className="flex items-center gap-1 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-on-accent disabled:opacity-40"><Check size={13} /> {t("Vincular")}</button>
             </div>
           )}
         </div>

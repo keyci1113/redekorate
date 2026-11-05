@@ -22,7 +22,7 @@ export function PublicDocPage() {
   return (
     <div className="min-h-full">
       <header className="border-b border-line bg-surface print:hidden">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
+        <div className="flex items-center justify-between px-(--page-gutter) py-3">
           <Logo />
           <span className="flex items-center gap-3 text-sm text-ink-2">
             <span className="hidden items-center gap-1.5 sm:flex"><span className="h-2.5 w-2.5 rounded-sm" style={{ background: doc.project_color }} />{doc.project_name}</span>
@@ -30,7 +30,7 @@ export function PublicDocPage() {
           </span>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 print:p-0">
+      <main className="px-(--page-gutter) py-10 print:p-0">
         <DocumentView tpl={tpl} title={doc.title} data={doc.data} lang={doc.language} readOnly showGuide={false} />
         <p className="mt-12 text-center text-xs text-ink-3 print:hidden">{t("Documento compartido con redekorate · solo lectura")}</p>
       </main>

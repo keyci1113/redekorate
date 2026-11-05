@@ -75,7 +75,7 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
           <li>{t("• Si la pantalla es larga, puedes desplazarte.")}</li>
           {block.allowGiveUp && <li>{t("• Si no encuentras cómo hacerlo, usa")} <b>{t("\"No puedo completarla\"")}</b>{t(". También nos sirve.")}</li>}
         </ul>
-        <button type="button" onClick={begin} className="focus-ring mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-medium text-white">
+        <button type="button" onClick={begin} className="focus-ring mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent">
           <Play size={16} /> {t("Empezar la tarea")}
         </button>
       </div>

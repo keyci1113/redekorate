@@ -23,6 +23,11 @@ dashboard.get("/", async (req, res) => {
                 from sessions se join studies s on s.id = se.study_id
                 where s.owner_id = $1 and se.completed_at > current_date - 14 group by 1) c on c.day = d::date
      order by d`, [uid]);
+  const study_trend = await query(
+    `select se.study_id, to_char(date_trunc('day', se.completed_at), 'YYYY-MM-DD') as day, count(*)::int as n
+     from sessions se join studies s on s.id = se.study_id
+     where s.owner_id = $1 and s.status = 'live' and se.completed_at > current_date - 14
+     group by 1, 2`, [uid]);
   const live = await query(
     `select s.id, s.title, s.method, s.public_slug, s.published_at, p.name as project_name, p.color as project_color,
        (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as responses,
@@ -35,11 +40,11 @@ dashboard.get("/", async (req, res) => {
      from studies s join projects p on p.id = s.project_id
      where s.owner_id = $1 and s.status = 'draft' order by s.updated_at desc limit 5`, [uid]);
   const activity = await query(
-    `select se.completed_at as at, s.id as study_id, s.title as study_title, p.color as project_color
-     from sessions se join studies s on s.id = se.study_id join projects p on p.id = s.project_id
+    `select se.completed_at as at, s.id as study_id, s.title as study_title, s.method
+     from sessions se join studies s on s.id = se.study_id
      where s.owner_id = $1 and se.completed_at is not null order by se.completed_at desc limit 8`, [uid]);
   const insights = await query(
     `select i.id, i.title, i.severity, i.created_at, i.project_id, p.name as project_name
      from insights i join projects p on p.id = i.project_id where p.owner_id = $1 order by i.created_at desc limit 5`, [uid]);
-  res.json({ totals, trend, live, drafts, activity, insights });
+  res.json({ totals, trend, study_trend, live, drafts, activity, insights });
 });

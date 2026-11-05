@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronDown, Download, ExternalLink, Link2, PenLine, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
@@ -23,14 +23,15 @@ type TabId = "summary" | "responses" | "insights" | "share";
 
 export function ResultsPage() {
   const { id } = useParams();
-  const [tab, setTab] = useState<TabId>("summary");
+  const [params] = useSearchParams();
+  const [tab, setTab] = useState<TabId>(params.get("tab") === "insights" ? "insights" : "summary");
   const { data, error, loading, reload } = useLoad(() => api.get<Results>(`/studies/${id}/results`), [id]);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
   const { study, sessions, answers, insights } = data;
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10">
+    <div className="px-(--page-gutter) py-10">
       <Link to={`/projects/${study.project_id}`} className="text-sm text-ink-3 hover:text-ink">{t("← Proyecto")}</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>

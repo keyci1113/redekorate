@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { uid } from "../lib/hooks";
 import { cx } from "../components/ui";
-import { AutoText, exStr, useDoc } from "./Sections";
+import { AutoText, CopyNote, exStr, useDoc } from "./Sections";
 
 export type TaskStatus = "pass" | "partial" | "fail" | "na";
 export interface UTask { id: string; name: string; success: string }
@@ -44,18 +44,18 @@ export function UsabilityMatrix({ data, set, ex }: { data: UsabilityData; set: (
       <div className="overflow-x-auto rounded-xl border border-line">
         <table className="w-full min-w-max text-[13px]">
           <thead>
-            <tr className="bg-accent text-left text-white">
+            <tr className="bg-accent text-left text-on-accent">
               <th className="p-2.5 font-semibold">#</th>
               <th className="min-w-48 p-2.5 font-semibold">{T("Tarea")}</th>
               <th className="min-w-56 p-2.5 font-semibold">{T("Descripción de éxito")}</th>
               {users.map((u, k) => (
                 <th key={u.id} className="group min-w-52 border-l border-white/20 p-2 align-top font-semibold">
-                  {readOnly ? <><p>{u.name || `${T("Participante")} ${k + 1}`}</p><p className="text-[11px] font-normal text-white/85">{u.profile}</p></> : <>
+                  {readOnly ? <><p>{u.name || `${T("Participante")} ${k + 1}`}</p><p className="text-[11px] font-normal text-on-accent/85">{u.profile}</p></> : <>
                     <div className="flex items-center gap-1">
-                      <input value={u.name} placeholder={exStr(ex, "users", k, "name") ?? `${T("Participante")} ${k + 1}`} onChange={(e) => upd({ users: users.map((x) => (x.id === u.id ? { ...x, name: e.target.value } : x)) })} className="w-full bg-transparent font-semibold outline-none placeholder:text-white/70" />
+                      <input value={u.name} placeholder={exStr(ex, "users", k, "name") ?? `${T("Participante")} ${k + 1}`} onChange={(e) => upd({ users: users.map((x) => (x.id === u.id ? { ...x, name: e.target.value } : x)) })} className="w-full bg-transparent font-semibold outline-none placeholder:text-on-accent/70" />
                       <button type="button" onClick={() => upd({ users: users.filter((x) => x.id !== u.id) })} className="opacity-0 group-hover:opacity-100 print:hidden" aria-label={T("Eliminar")}><Trash2 size={12} /></button>
                     </div>
-                    <input value={u.profile} placeholder={exStr(ex, "users", k, "profile") ?? T("Perfil / país / rol")} onChange={(e) => upd({ users: users.map((x) => (x.id === u.id ? { ...x, profile: e.target.value } : x)) })} className="w-full bg-transparent text-[11px] font-normal outline-none placeholder:text-white/70" />
+                    <input value={u.profile} placeholder={exStr(ex, "users", k, "profile") ?? T("Perfil / país / rol")} onChange={(e) => upd({ users: users.map((x) => (x.id === u.id ? { ...x, profile: e.target.value } : x)) })} className="w-full bg-transparent text-[11px] font-normal outline-none placeholder:text-on-accent/70" />
                   </>}
                 </th>
               ))}
@@ -89,8 +89,11 @@ export function UsabilityMatrix({ data, set, ex }: { data: UsabilityData; set: (
                           </button>
                         ))}
                       </div>
-                      {readOnly ? (r.note && <p className="mt-1 text-[12px] text-ink-2">{r.note}</p>)
+                      <div className="group relative">
+                      <CopyNote text={r.note} className="top-1.5 right-0.5" />
+                      {readOnly ? (r.note && <p className="mt-1 pr-5 text-[12px] text-ink-2">{r.note}</p>)
                         : <AutoText value={r.note} minRows={1} placeholder={exNote || T("Observaciones…")} onChange={(v) => setRes(tk.id, u.id, { note: v })} className="mt-1 text-[12px]" />}
+                      </div>
                     </td>
                   );
                 })}

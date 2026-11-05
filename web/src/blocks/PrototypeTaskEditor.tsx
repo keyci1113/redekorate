@@ -17,7 +17,7 @@ function ScreenGrid({ screens, selected, onPick, badge }: { screens: Screen[]; s
             className={cx("group relative overflow-hidden rounded-lg border-2 text-left transition", on ? "border-accent" : "border-line hover:border-line-2")}>
             <img src={s.image} alt="" className="aspect-[3/4] w-full bg-paper object-cover object-top" />
             <span className="block truncate px-1.5 py-1 text-[11px] font-medium">{s.name}</span>
-            {on && <span className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-white">{b ?? <Check size={11} strokeWidth={3} />}</span>}
+            {on && <span className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-on-accent">{b ?? <Check size={11} strokeWidth={3} />}</span>}
           </button>
         );
       })}

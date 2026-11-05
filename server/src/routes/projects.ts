@@ -30,6 +30,9 @@ projects.get("/", async (req, res) => {
        (select count(*)::int from studies s where s.project_id = p.id and s.status = 'live') as live_count,
        (select count(*)::int from sessions se join studies s on s.id = se.study_id
           where s.project_id = p.id and se.completed_at is not null) as response_count,
+       (select count(*)::int from sessions se join studies s on s.id = se.study_id where s.project_id = p.id) as started_count,
+       (select count(*)::int from participants pa where pa.project_id = p.id) as participant_count,
+       (select count(*)::int from report_shares rs where rs.project_id = p.id and rs.revoked_at is null) as share_count,
        (select count(*)::int from insights i where i.project_id = p.id) as insight_count,
        (select count(*)::int from documents d where d.project_id = p.id) as document_count
      from projects p where p.owner_id = $1 order by p.updated_at desc`,
@@ -75,7 +78,8 @@ projects.get("/:id/studies", async (req, res) => {
   const rows = await query(
     `select s.id, s.title, s.method, s.status, s.public_slug, s.created_at, s.updated_at, s.published_at,
        jsonb_array_length(s.blocks) as block_count,
-       (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as response_count
+       (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as response_count,
+       (select count(*)::int from sessions se where se.study_id = s.id) as started_count
      from studies s where s.project_id = $1 order by s.updated_at desc`,
     [req.params.id],
   );

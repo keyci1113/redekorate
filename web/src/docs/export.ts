@@ -108,9 +108,13 @@ function affinityBlocks(d: AffinityData, T: TF): Block[] {
   const cols: [string, string | null][] = [...d.groups.map((g) => [g.name || T("Sin nombre"), g.id] as [string, string | null]), [T("Sin agrupar"), null]];
   for (const [title, id] of cols) {
     const notes = d.notes.filter((n) => n.groupId === id && n.text.trim());
-    if (!notes.length) continue;
-    out.push({ t: "h", level: 2, text: title }, { t: "list", items: notes.map(line) });
+    const conclusion = d.groups.find((g) => g.id === id)?.conclusion?.trim();
+    if (!notes.length && !conclusion) continue;
+    out.push({ t: "h", level: 2, text: title });
+    if (notes.length) out.push({ t: "list", items: notes.map(line) });
+    if (conclusion) out.push({ t: "p", text: `${T("Conclusión")}: ${conclusion}` });
   }
+  if (d.conclusion?.trim()) out.push({ t: "h", level: 2, text: T("Conclusión general") }, { t: "p", text: d.conclusion.trim() });
   return out;
 }
 

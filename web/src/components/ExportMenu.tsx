@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FileCode2, FileSpreadsheet, FileText, Printer } from "lucide-react";
+import { PdfPreview } from "./PdfPreview";
 import { t, type Lang } from "../lib/i18n";
 import { Button } from "./ui";
 import { docBlocks, download, fileName, toCSV, toDocx, toMarkdown } from "../docs/export";
 import type { DocData, DocTemplate } from "../docs/types";
 
-/** Menú "Exportar": Word (.docx), PDF (impresión), Markdown y CSV. */
+/** Menú "Exportar": Word (.docx), PDF (con vista previa), Markdown y CSV. */
 export function ExportMenu({ tpl, title, data, lang, projectName, size = "sm" }: {
   tpl: DocTemplate; title: string; data: DocData; lang: Lang; projectName?: string; size?: "sm" | "md";
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -26,7 +28,7 @@ export function ExportMenu({ tpl, title, data, lang, projectName, size = "sm" }:
 
   const items = [
     { id: "docx", icon: <FileText size={15} />, label: t("Word (.docx)"), go: async () => download(`${name}.docx`, await toDocx(blocks())) },
-    { id: "pdf", icon: <Printer size={15} />, label: t("PDF"), hint: t("Elige «Guardar como PDF» al imprimir"), go: () => { setOpen(false); setTimeout(() => window.print(), 50); } },
+    { id: "pdf", icon: <Printer size={15} />, label: t("PDF"), hint: t("Vista previa antes de descargar"), go: () => setPreview(true) },
     { id: "md", icon: <FileCode2 size={15} />, label: t("Markdown (.md)"), go: () => download(`${name}.md`, toMarkdown(blocks()), "text/markdown") },
     { id: "csv", icon: <FileSpreadsheet size={15} />, label: t("CSV (.csv)"), hint: t("Para Excel o Google Sheets"), go: () => download(`${name}.csv`, toCSV(blocks(), lang), "text/csv") },
   ];
@@ -47,6 +49,7 @@ export function ExportMenu({ tpl, title, data, lang, projectName, size = "sm" }:
           ))}
         </div>
       )}
+      {preview && <PdfPreview tpl={tpl} title={title} data={data} lang={lang} projectName={projectName} onClose={() => setPreview(false)} />}
     </div>
   );
 }
