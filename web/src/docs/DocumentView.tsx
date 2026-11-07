@@ -8,7 +8,7 @@ import { Heuristic, type HeuristicData } from "./Heuristic";
 import { Blueprint, type BlueprintData } from "./Blueprint";
 import type { Lang } from "../lib/i18n";
 import { cx } from "../components/ui";
-import { LogoMark } from "../components/Logo";
+import { LogoMark, Wordmark } from "../components/Logo";
 
 const SPAN: Record<number, string> = { 3: "lg:col-span-3", 4: "lg:col-span-4", 5: "lg:col-span-5", 6: "lg:col-span-6", 7: "lg:col-span-7", 8: "lg:col-span-8", 12: "lg:col-span-12" };
 
@@ -39,7 +39,7 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
         {variant === "pdf" ? (
           <header>
             <div className="flex items-center justify-between gap-4 border-b border-line pb-2.5 text-[11px] text-ink-3">
-              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><LogoMark size={18} />redekorate</span>
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><LogoMark size={16} /><Wordmark height={12} /></span>
               <span className="truncate tabular-nums">{projectName && `${projectName} · `}{new Date().toLocaleDateString(lang === "en" ? "en-US" : "es", { day: "numeric", month: "long", year: "numeric" })}</span>
             </div>
             <div className="mt-6 flex items-center gap-3">

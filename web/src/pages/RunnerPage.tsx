@@ -7,7 +7,7 @@ import { blockDef } from "../blocks/registry";
 import { BlockView, isAnswered, isWide } from "../blocks/Runner";
 import { nextIndex } from "../blocks/logic";
 import { Button, ErrorNote, Spinner, cx } from "../components/ui";
-import { LogoMark } from "../components/Logo";
+import { LogoMark, Wordmark } from "../components/Logo";
 import { brandStyle, type StudySettings } from "../lib/settings";
 import { getLang, useLang } from "../lib/i18n";
 
@@ -169,7 +169,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
 
       <footer className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 text-xs text-ink-3">
         <span className="flex items-center gap-1.5"><Lock size={11} /> {t("Datos protegidos · solo el equipo de investigación ve tus respuestas")}</span>
-        {!settings.hideCredit && <span className="flex shrink-0 items-center gap-1.5">{t("Hecho con")} <LogoMark size={16} /> {t("redekorate")}</span>}
+        {!settings.hideCredit && <span className="flex shrink-0 items-center gap-1.5">{t("Hecho con")} <LogoMark size={13} /><Wordmark height={10} /></span>}
       </footer>
     </div>
   );
