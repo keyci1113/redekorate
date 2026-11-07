@@ -32,6 +32,30 @@ export const tc = (key: string, vars?: Record<string, string | number | null | u
 /** Fechas y números con el formato del idioma activo. */
 export const locale = () => (current === "en" ? "en-US" : "es");
 
+/** Número con separadores del idioma activo. */
+export const fmtNum = (n: number) => new Intl.NumberFormat(locale()).format(n);
+/** Proporción 0–1 como porcentaje del idioma activo ("87 %" en es, "87%" en en). */
+export const fmtPct = (r: number) => new Intl.NumberFormat(locale(), { style: "percent", maximumFractionDigits: 0 }).format(r);
+
+export type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
+/**
+ * Plural con Intl.PluralRules. Cada forma es una clave traducible que recibe {n} ya formateado:
+ * plural(3, { one: "{n} respuesta", other: "{n} respuestas" }).
+ */
+export function plural(n: number, forms: PluralForms, vars?: Record<string, string | number | null | undefined>) {
+  const rule = new Intl.PluralRules(locale()).select(n);
+  return t(forms[rule] ?? forms.other, { n: fmtNum(n), ...vars });
+}
+
+const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [["year", 31536000], ["month", 2592000], ["week", 604800], ["day", 86400], ["hour", 3600], ["minute", 60]];
+/** Tiempo relativo con Intl.RelativeTimeFormat ("hace 20 min", "20 min ago"). */
+export function relTime(iso: string | number | Date, now = Date.now()) {
+  const diff = (new Date(iso).getTime() - now) / 1000;
+  const f = new Intl.RelativeTimeFormat(locale(), { numeric: "auto", style: "short" });
+  for (const [unit, secs] of UNITS) if (Math.abs(diff) >= secs) return f.format(Math.round(diff / secs), unit);
+  return f.format(0, "second");
+}
+
 interface Ctx { lang: Lang; setLang: (l: Lang, persist?: boolean) => void }
 const LangCtx = createContext<Ctx>({ lang: current, setLang: () => {} });
 

@@ -549,6 +549,13 @@ if (del.length) console.log(`Borrados ${del.length} proyectos [Test] anteriores`
   console.log("\n[Test] Proyecto vacío · [Test] Proyecto archivado");
 }
 
+// Revisión: los hallazgos bajos y uno alto ya están revisados; los críticos quedan pendientes
+await q(`update insights i set reviewed_at = now() - interval '1 day', reviewed_by = $1
+  from projects p where p.id = i.project_id and p.owner_id = $1 and p.name like '[Test]%' and i.severity = 'low'`, [OWNER]);
+await q(`update insights set reviewed_at = now() - interval '2 hours', reviewed_by = $1 where id = (
+  select i.id from insights i join projects p on p.id = i.project_id
+  where p.owner_id = $1 and p.name like '[Test]%' and i.severity = 'high' order by i.created_at limit 1)`, [OWNER]);
+
 const [c] = await q(`select (select count(*) from projects where owner_id=$1 and name like '[Test]%') p, (select count(*) from studies s join projects p on p.id=s.project_id where p.owner_id=$1 and p.name like '[Test]%') s,
   (select count(*) from sessions se join studies s on s.id=se.study_id join projects p on p.id=s.project_id where p.owner_id=$1 and p.name like '[Test]%') se`, [OWNER]);
 console.log(`\nListo: ${c.p} proyectos, ${c.s} estudios, ${c.se} sesiones.`);

@@ -8,3 +8,4 @@ server/uploads/
 .DS_Store
 uploads/
 .seed-img/
+scripts/seed/qa-user.local.json

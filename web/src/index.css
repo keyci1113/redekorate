@@ -34,6 +34,9 @@
   --color-warn-soft: #FBF0DB;
   --color-bad: #A3302A;
   --color-bad-soft: #F9E4E1;
+  --color-caution: #C2410C;      /* naranja: completado bajo (≥3:1 en gráficas) */
+  --color-caution-soft: #FFEDD5;
+  --color-caution-ink: #9A3412; /* texto sobre caution-soft (≥4.5:1) */
   --color-paper-2: #F3F4F6;
   --color-note-yellow: #FFF1A8;
   --color-note-blue: #C4E2FB;
@@ -79,6 +82,9 @@
       --color-warn-soft: #2E2308;
       --color-bad: #F87171;
       --color-bad-soft: #2E1618;
+      --color-caution: #FB923C;
+      --color-caution-soft: #3A1D0B;
+      --color-caution-ink: #FDBA74;
       --color-paper-2: #1A0F24;
       --color-note-yellow: #F0DC8C;
       --color-note-blue: #AFCFF0;
@@ -116,6 +122,9 @@
   --color-warn-soft: #2E2308;
   --color-bad: #F87171;
   --color-bad-soft: #2E1618;
+  --color-caution: #FB923C;
+  --color-caution-soft: #3A1D0B;
+  --color-caution-ink: #FDBA74;
   --color-paper-2: #1A0F24;
   --color-note-yellow: #F0DC8C;
   --color-note-blue: #AFCFF0;
@@ -167,6 +176,9 @@
     --color-warn-soft: #FBF0DB;
     --color-bad: #A3302A;
     --color-bad-soft: #F9E4E1;
+    --color-caution: #C2410C;      /* naranja: completado bajo (≥3:1 en gráficas) */
+    --color-caution-soft: #FFEDD5;
+    --color-caution-ink: #9A3412; /* texto sobre caution-soft (≥4.5:1) */
     --color-paper-2: #F3F4F6;
     --color-note-yellow: #FFF1A8;
     --color-note-blue: #C4E2FB;
@@ -217,3 +229,29 @@ article :is(input, textarea)::placeholder { font-style: italic; color: color-mix
 article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb, var(--color-on-accent) 70%, transparent); }
 /* Al imprimir/PDF no se muestran los textos de ejemplo */
 @media print { :is(input, textarea)::placeholder { color: transparent !important; } }
+
+/* ── Home: movimiento (solo transform y opacity) ───────────────────── */
+:root { --ease-out: cubic-bezier(0.23, 1, 0.32, 1); }
+/* Popover de vista: escala desde el botón */
+.view-pop {
+  position: fixed; inset: auto; margin: 0;
+  opacity: 0; transform: scale(0.96);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out), display 150ms allow-discrete, overlay 150ms allow-discrete;
+}
+.view-pop:popover-open { opacity: 1; transform: scale(1); }
+@starting-style { .view-pop:popover-open { opacity: 0; transform: scale(0.96); } }
+/* Cambio de vista y fila expandida en Inline */
+@keyframes rk-view-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes rk-expand-in { from { opacity: 0; transform: translateY(-4px); } }
+.anim-view { animation: rk-view-in 200ms var(--ease-out); }
+.anim-expand { animation: rk-expand-in 180ms var(--ease-out); }
+/* Botones principales al presionar */
+.press { transition: transform 160ms var(--ease-out); }
+.press:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  @keyframes rk-fade { from { opacity: 0; } }
+  .view-pop, .view-pop:popover-open { transform: none; transition: opacity 150ms linear, display 150ms allow-discrete, overlay 150ms allow-discrete; }
+  @starting-style { .view-pop:popover-open { transform: none; } }
+  .anim-view, .anim-expand { animation: rk-fade 150ms linear; }
+  .press:active { transform: none; }
+}

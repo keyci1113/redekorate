@@ -1,5 +1,5 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Lightbulb, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Check, Lightbulb, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import type { Confidence, Insight, Severity, Study } from "../lib/types";
@@ -15,9 +15,17 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange 
   const [editing, setEditing] = useState<Insight | "new" | null>(null);
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
+  const [review, setReview] = useState<"all" | "pending" | "reviewed">("all");
+  const pendingCount = insights.filter((i) => !i.reviewed_at).length;
   const allTags = useMemo(() => [...new Set(insights.flatMap((i) => i.tags))].sort(), [insights]);
   const list = insights.filter((i) =>
+    (review === "all" || (review === "pending" ? !i.reviewed_at : !!i.reviewed_at)) &&
     (!tag || i.tags.includes(tag)) && (!q || `${i.title} ${i.body}`.toLowerCase().includes(q.toLowerCase())));
+
+  async function toggleReviewed(i: Insight) {
+    await api.patch(`/insights/${i.id}`, { reviewed: !i.reviewed_at });
+    onChange();
+  }
 
   async function remove(i: Insight) {
     if (!confirm(t("¿Eliminar el insight \"{a}\"?", { a: i.title }))) return;
@@ -31,6 +39,12 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange 
         <div className="relative min-w-52 flex-1">
           <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input className="field pl-9" placeholder={t("Buscar insights…")} value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
+        <div role="radiogroup" aria-label={t("Revisión")} className="inline-flex rounded-lg bg-ink/5 p-0.5">
+          {([["all", t("Todos")], ["pending", t("Pendientes ({a})", { a: pendingCount })], ["reviewed", t("Revisados")]] as const).map(([v, l]) => (
+            <button key={v} type="button" role="radio" aria-checked={review === v} onClick={() => setReview(v)}
+              className={cx("focus-ring min-h-9 rounded-md px-3 text-sm font-medium", review === v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink")}>{l}</button>
+          ))}
         </div>
         <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Nuevo insight")}</Button>
       </div>
@@ -63,6 +77,10 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange 
               {i.body && <p className="mt-2 line-clamp-4 text-sm leading-relaxed whitespace-pre-line text-ink-2">{i.body}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                 <SeverityBadge severity={i.severity} />
+                <button type="button" aria-pressed={!!i.reviewed_at} onClick={() => toggleReviewed(i)}
+                  className={cx("focus-ring inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", i.reviewed_at ? "border-good/40 bg-good-soft text-good" : "border-line text-ink-2 hover:border-line-2")}>
+                  <Check size={12} aria-hidden />{i.reviewed_at ? t("Revisado") : t("Marcar como revisado")}
+                </button>
                 <span className="text-xs text-ink-3">{t("Confianza")} {CONFIDENCES().find((c) => c[0] === i.confidence)?.[1].toLowerCase()}</span>
                 {i.tags.map((t) => <Tag key={t}>#{t}</Tag>)}
               </div>

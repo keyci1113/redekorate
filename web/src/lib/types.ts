@@ -28,6 +28,7 @@ export interface Insight {
   id: string; project_id?: string; study_id?: string | null; study_title?: string | null;
   title: string; body: string; tags: string[]; severity: Severity; confidence: Confidence;
   created_at: string;
+  reviewed_at?: string | null;   // null = pendiente de revisar
 }
 
 export interface Share { id: string; token: string; created_at: string }

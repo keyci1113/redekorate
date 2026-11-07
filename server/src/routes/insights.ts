@@ -40,7 +40,10 @@ async function ownInsight(id: string, userId: string) {
 
 insights.patch("/:id", async (req, res) => {
   await ownInsight(req.params.id, req.user!.id);
-  const b = Fields.partial().parse(req.body);
+  const b = Fields.partial().extend({ reviewed: z.boolean().optional() }).parse(req.body);
+  // Marcar o desmarcar como revisado
+  if (b.reviewed === true) await query("update insights set reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, $2) where id = $1", [req.params.id, req.user!.id]);
+  if (b.reviewed === false) await query("update insights set reviewed_at = null, reviewed_by = null where id = $1", [req.params.id]);
   const i = await one(
     `update insights set title = coalesce($2,title), body = coalesce($3,body), tags = coalesce($4,tags),
        severity = coalesce($5,severity), confidence = coalesce($6,confidence), evidence = coalesce($7,evidence),
