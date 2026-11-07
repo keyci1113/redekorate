@@ -1,18 +1,20 @@
 import { useMemo, useState } from "react";
-import { ArrowRight, Flag, MousePointerClick, Route, Timer } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, PrototypeTaskValue } from "./prototype";
 import { isDirect, screenName } from "./prototype";
 import type { Answer } from "../lib/types";
 import { mean, median } from "../lib/analytics";
 import { formatDuration } from "../lib/hooks";
-import { cx } from "../components/ui";
+import { Stat, cx, toneFor } from "../components/ui";
+import { usePrint } from "../lib/print";
 
 import { t } from "../lib/i18n";
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
 export function PrototypeResult({ block, answers, proto }: { block: PrototypeTaskBlock; answers: Answer[]; proto?: Prototype }) {
   const vals = answers.map((a) => a.value as PrototypeTaskValue).filter((v) => v?.path);
+  const print = usePrint();
   const [tab, setTab] = useState<"paths" | "screens">("paths");
   const n = vals.length;
   const success = vals.filter((v) => v.outcome === "success");
@@ -26,10 +28,10 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Kpi icon={<Flag size={14} />} label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={t("{a} de {b}", { a: success.length, b: n })} />
-        <Kpi icon={<Route size={14} />} label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} />
-        <Kpi icon={<Timer size={14} />} label={t("Tiempo mediano")} value={formatDuration(median(success.map((v) => v.ms)))} sub={t("en tareas exitosas")} />
-        <Kpi icon={<MousePointerClick size={14} />} label={t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} />
+        <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
+        <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} tone={toneFor(pct(direct, n), 60, 40, { n })} />
+        <Stat label={t("Tiempo mediano")} value={formatDuration(median(success.map((v) => v.ms)))} sub={t("en tareas exitosas")} />
+        <Stat label={t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />
       </div>
 
       <div>
@@ -45,22 +47,19 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
         </div>
       </div>
 
-      <div className="flex gap-1 rounded-lg bg-paper p-1">
+      <div className="flex gap-1 rounded-lg bg-paper p-1 print:hidden">
         {([["paths", t("Rutas")], ["screens", t("Mapas de calor por pantalla")]] as const).map(([id, l]) => (
           <button key={id} onClick={() => setTab(id)} className={cx("flex-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition", tab === id ? "bg-surface shadow-sm" : "text-ink-3 hover:text-ink")}>{l}</button>
         ))}
       </div>
-      {tab === "paths" ? <Paths block={block} vals={vals} proto={proto} /> : <Screens vals={vals} proto={proto} />}
-    </div>
-  );
-}
-
-function Kpi({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub: string }) {
-  return (
-    <div className="rounded-lg bg-paper px-3 py-2.5">
-      <p className="flex items-center gap-1.5 text-xs text-ink-2">{icon}{label}</p>
-      <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      <p className="text-[11px] text-ink-3">{sub}</p>
+      {print ? (
+        <>
+          <h4 className="text-[15px] font-semibold">{t("Rutas")}</h4>
+          <Paths block={block} vals={vals} proto={proto} />
+          <h4 className="pt-2 text-[15px] font-semibold break-after-avoid">{t("Mapas de calor por pantalla")}</h4>
+          <ScreensGrid vals={vals} proto={proto} />
+        </>
+      ) : tab === "paths" ? <Paths block={block} vals={vals} proto={proto} /> : <Screens vals={vals} proto={proto} />}
     </div>
   );
 }
@@ -112,7 +111,7 @@ function Paths({ block, vals, proto }: { block: PrototypeTaskBlock; vals: Protot
         <p className="mb-3 text-[13px] font-medium text-ink-2">{t("Rutas más comunes")}</p>
         <ul className="space-y-2">
           {groups.slice(0, 6).map((g, i) => (
-            <li key={i} className="flex items-start gap-3 rounded-lg border border-line p-3">
+            <li key={i} className="flex items-start gap-3 rounded-lg border border-line p-3 break-inside-avoid">
               <span className="w-12 shrink-0 text-right">
                 <span className="block text-lg font-semibold tabular-nums">{pct(g.count, n)}%</span>
                 <span className="text-[11px] text-ink-3">{g.count} {t("pers.")}</span>
@@ -183,6 +182,35 @@ function Screens({ vals, proto }: { vals: PrototypeTaskValue[]; proto: Prototype
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-bad" />{t("Clic fuera de zona (posible confusión)")}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Para el PDF: todas las pantallas visitadas con su mapa de calor, en cuadrícula. */
+function ScreensGrid({ vals, proto }: { vals: PrototypeTaskValue[]; proto: Prototype }) {
+  const stats = proto.screens.map((s) => {
+    const clicks = vals.flatMap((v) => v.clicks.filter((c) => c.s === s.id));
+    const visits = vals.reduce((n, v) => n + v.path.filter((x) => x.s === s.id).length, 0);
+    return { s, clicks, visits, miss: clicks.filter((c) => !c.h).length };
+  }).filter((x) => x.visits > 0);
+  return (
+    <div className={cx("grid gap-4", proto.device === "mobile" ? "grid-cols-3" : "grid-cols-2")}>
+      {stats.map((x) => (
+        <figure key={x.s.id} className="break-inside-avoid">
+          <div className="relative overflow-hidden rounded-lg border border-line">
+            <img src={x.s.image} alt="" className="block w-full" />
+            <div className="absolute inset-0 bg-black/30" />
+            {x.clicks.map((c, i) => (
+              <span key={i} className="pointer-events-none absolute h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full mix-blend-screen"
+                style={{ left: `${c.x * 100}%`, top: `${c.y * 100}%`, background: c.h ? "radial-gradient(circle, rgba(250,204,21,.85) 0%, rgba(249,115,22,.45) 30%, rgba(124,58,237,0) 70%)" : "radial-gradient(circle, rgba(248,113,113,.9) 0%, rgba(220,38,38,.4) 30%, rgba(220,38,38,0) 70%)" }} />
+            ))}
+          </div>
+          <figcaption className="mt-1.5 text-[12px]">
+            <b className="font-semibold">{x.s.name}</b>
+            <span className="block text-ink-2">{x.visits} {t("visitas ·")} {x.clicks.length} {t("clics ·")} <span className={x.miss ? "text-bad" : ""}>{pct(x.miss, x.clicks.length)}{t("% fuera de zona")}</span></span>
+          </figcaption>
+        </figure>
+      ))}
     </div>
   );
 }

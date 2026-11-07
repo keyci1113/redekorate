@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 import { t, type Lang } from "../lib/i18n";
@@ -7,7 +7,7 @@ import { DocumentView } from "../docs/DocumentView";
 import { fileName } from "../docs/export";
 import type { DocData, DocTemplate } from "../docs/types";
 
-type Orientation = "portrait" | "landscape";
+export type Orientation = "portrait" | "landscape";
 
 // Márgenes de la hoja en mm: los usa @page al imprimir y el relleno de la hoja en pantalla.
 const PAGE = { portrait: 210, landscape: 297 };
@@ -32,20 +32,19 @@ function pageCss(orientation: Orientation, footer: string) {
 }
 
 /**
- * Vista previa del PDF. El documento se dibuja en un iframe del ancho exacto del área imprimible:
+ * Vista previa de PDF genérica. El contenido se dibuja en un iframe del ancho exacto del área imprimible:
  * así los media queries, el tema claro y los saltos responden igual en pantalla y en el PDF,
  * y al descargar se imprime ese mismo iframe.
  */
-export function PdfPreview({ tpl, title, data, lang, projectName, onClose }: {
-  tpl: DocTemplate; title: string; data: DocData; lang: Lang; projectName?: string; onClose: () => void;
+export function PdfFrame({ title, lang, initialOrientation = "portrait", controls, children, onClose }: {
+  title: string; lang: Lang; initialOrientation?: Orientation; controls?: ReactNode; children: ReactNode; onClose: () => void;
 }) {
-  const [orientation, setOrientation] = useState<Orientation>(() => (isWide(tpl) ? "landscape" : "portrait"));
-  const [guide, setGuide] = useState(false);
+  const [orientation, setOrientation] = useState<Orientation>(initialOrientation);
   const [mount, setMount] = useState<HTMLElement | null>(null);
   const [height, setHeight] = useState(600);
   const frame = useRef<HTMLIFrameElement>(null);
   const pageStyle = useRef<HTMLStyleElement | null>(null);
-  const footer = `redekorate · ${title}`;
+  const footer = `Redekorate · ${title}`;
 
   const setup = () => {
     const doc = frame.current?.contentDocument;
@@ -98,6 +97,8 @@ export function PdfPreview({ tpl, title, data, lang, projectName, onClose }: {
     const win = frame.current?.contentWindow;
     if (!win) return;
     await win.document.fonts.ready;
+    // Espera a que carguen las imágenes (pantallas, mapas de calor) antes de imprimir
+    await Promise.all([...win.document.images].map((img) => (img.complete ? null : new Promise((r) => { img.onload = img.onerror = r; }))));
     win.focus();
     win.print();
   }, []);
@@ -117,10 +118,7 @@ export function PdfPreview({ tpl, title, data, lang, projectName, onClose }: {
     <div role="dialog" aria-modal="true" aria-label={t("Vista previa del PDF")} className="fixed inset-0 z-50 flex flex-col bg-paper print:hidden">
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line bg-surface px-(--page-gutter) py-3">
         <h2 className="mr-auto min-w-0 truncate text-[15px] font-semibold">{t("Vista previa del PDF")}</h2>
-        <label className="flex items-center gap-2 text-[13px] text-ink-2">
-          <input type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
-          {t("Incluir instrucciones")}
-        </label>
+        {controls}
         <div role="group" aria-label={t("Orientación")} className="flex rounded-lg bg-ink/5 p-0.5 text-xs font-semibold">
           {(["portrait", "landscape"] as const).map((o) => (
             <button key={o} type="button" aria-pressed={orientation === o} onClick={() => setOrientation(o)}
@@ -140,8 +138,26 @@ export function PdfPreview({ tpl, title, data, lang, projectName, onClose }: {
             className="block border-0" style={{ width: `${PAGE[orientation] - MARGIN.x * 2}mm`, height }} />
         </div>
       </div>
-      {mount && createPortal(<DocumentView tpl={tpl} title={title} data={data} lang={lang} readOnly showGuide={guide} variant="pdf" projectName={projectName} />, mount)}
+      {mount && createPortal(children, mount)}
     </div>,
     document.body,
+  );
+}
+
+/** Vista previa del PDF de un documento (plantillas llenables). */
+export function PdfPreview({ tpl, title, data, lang, projectName, onClose }: {
+  tpl: DocTemplate; title: string; data: DocData; lang: Lang; projectName?: string; onClose: () => void;
+}) {
+  const [guide, setGuide] = useState(false);
+  return (
+    <PdfFrame title={title} lang={lang} initialOrientation={isWide(tpl) ? "landscape" : "portrait"} onClose={onClose}
+      controls={(
+        <label className="flex items-center gap-2 text-[13px] text-ink-2">
+          <input type="checkbox" checked={guide} onChange={(e) => setGuide(e.target.checked)} />
+          {t("Incluir instrucciones")}
+        </label>
+      )}>
+      <DocumentView tpl={tpl} title={title} data={data} lang={lang} readOnly showGuide={guide} variant="pdf" projectName={projectName} />
+    </PdfFrame>
   );
 }

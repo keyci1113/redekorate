@@ -20,7 +20,7 @@ export function PublicDocPage() {
   const tpl = doc && docTemplate(doc.kind);
   if (error || !doc || !tpl) return <div className="mx-auto max-w-lg p-10"><ErrorNote>{t("Este documento no existe o el link fue revocado.")}</ErrorNote></div>;
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-paper-2">
       <header className="border-b border-line bg-surface print:hidden">
         <div className="flex items-center justify-between px-(--page-gutter) py-3">
           <Logo />
@@ -30,7 +30,7 @@ export function PublicDocPage() {
           </span>
         </div>
       </header>
-      <main className="px-(--page-gutter) py-10 print:p-0">
+      <main className="page print:p-0">
         <DocumentView tpl={tpl} title={doc.title} data={doc.data} lang={doc.language} readOnly showGuide={false} />
         <p className="mt-12 text-center text-xs text-ink-3 print:hidden">{t("Documento compartido con redekorate · solo lectura")}</p>
       </main>

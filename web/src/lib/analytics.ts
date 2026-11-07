@@ -94,7 +94,7 @@ export function rankingSummary(items: { id: string; label: string }[], values: s
 }
 
 // ── Card sorting ───────────────────────────────────────────────
-const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
+export const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, " ");
 
 export function cardSortSummary(cards: { id: string; label: string }[], values: CardSortValue[]) {
   const n = values.length;

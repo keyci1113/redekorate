@@ -40,8 +40,8 @@ export function AccountPage() {
   const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm();
 
   return (
-    <div className="px-(--page-gutter) py-10">
-      <h1 className="display text-5xl">{t("Mi cuenta")}</h1>
+    <div className="page">
+      <h1 className="page-title">{t("Mi cuenta")}</h1>
       <p className="mt-2 text-sm text-ink-2">{t("Administra tu perfil, tu seguridad y tus datos.")}</p>
       <div className="mt-8 max-w-4xl space-y-4">
         <Section icon={<UserRound size={16} />} title={t("Perfil")}>

@@ -128,7 +128,7 @@ export function Layout() {
           </div>
         </div>
       </header>
-      <main className="min-w-0 flex-1">
+      <main className="min-w-0 flex-1 bg-paper-2">
         <Outlet />
       </main>
     </div>

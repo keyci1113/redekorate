@@ -41,13 +41,13 @@ export function ProjectPage() {
   }
 
   return (
-    <div className="px-(--page-gutter) py-10">
+    <div className="page">
       <Link to="/projects" className="text-sm text-ink-3 hover:text-ink">{t("← Proyectos")}</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded" style={{ background: p.color }} />
-            <h1 className="display text-5xl leading-tight">{p.name}</h1>
+            <h1 className="page-title">{p.name}</h1>
           </div>
           {p.description && <p className="mt-2 text-[15px] whitespace-pre-line text-ink-2">{p.description}</p>}
         </div>
@@ -85,7 +85,7 @@ export function ProjectPage() {
           <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} />
         )}
         {tab === "report" && (
-          <ReportsPanel projectId={p.id} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} />
+          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} />
         )}
       </div>
 

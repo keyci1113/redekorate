@@ -1,5 +1,5 @@
 import { useEffect, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { X } from "lucide-react";
+import { CheckCircle2, TriangleAlert, X } from "lucide-react";
 import type { StudyStatus, Severity } from "../lib/types";
 
 import { t } from "../lib/i18n";
@@ -127,13 +127,38 @@ export function ErrorNote({ children }: { children: ReactNode }) {
   return <div className="rounded-lg border border-bad/20 bg-bad-soft px-3 py-2 text-sm text-bad">{children}</div>;
 }
 
-export function Stat({ label, value, sub }: { label: string; value: ReactNode; sub?: ReactNode }) {
+export type StatTone = "good" | "warn" | "bad";
+const STAT_TONE: Record<StatTone, { box: string; value: string; Icon: typeof X }> = {
+  good: { box: "border-good/30 bg-good-soft", value: "text-good", Icon: CheckCircle2 },
+  warn: { box: "border-warn/30 bg-warn-soft", value: "text-warn", Icon: TriangleAlert },
+  bad: { box: "border-bad/30 bg-bad-soft", value: "text-bad", Icon: TriangleAlert },
+};
+
+/** Tono según umbrales: ≥ good → verde, ≥ warn → ámbar, menos → rojo. Con `lowerIsBetter` se invierte. Sin datos, sin tono. */
+export function toneFor(value: number, good: number, warn: number, { n = 1, lowerIsBetter = false }: { n?: number; lowerIsBetter?: boolean } = {}): StatTone | undefined {
+  if (!n || !Number.isFinite(value)) return undefined;
+  if (lowerIsBetter) return value <= good ? "good" : value <= warn ? "warn" : "bad";
+  return value >= good ? "good" : value >= warn ? "warn" : "bad";
+}
+
+/** Indicador grande. `tone` lo pinta en verde, ámbar o rojo cuando el dato es bueno o malo. */
+export function Stat({ label, value, sub, tone, note }: { label: string; value: ReactNode; sub?: ReactNode; tone?: StatTone; note?: string }) {
+  const s = tone ? STAT_TONE[tone] : null;
   return (
-    <Card className="p-4">
-      <p className="label">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tabular-nums tracking-tight">{value}</p>
-      {sub && <p className="mt-0.5 text-xs text-ink-3">{sub}</p>}
-    </Card>
+    <div className={cx("rounded-xl border p-5 break-inside-avoid", s ? s.box : "border-line bg-surface")}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="label">{label}</p>
+        {s && <s.Icon size={16} aria-hidden className={cx("shrink-0", s.value)} />}
+      </div>
+      <p className={cx("display mt-3 text-[40px] leading-none tabular-nums", s?.value)}>{value}</p>
+      {(sub || note) && (
+        <p className="mt-2 text-[13px] text-ink-2">
+          {note && <span className={cx("font-semibold", s?.value)}>{note}</span>}
+          {note && sub && " · "}
+          {sub}
+        </p>
+      )}
+    </div>
   );
 }
 

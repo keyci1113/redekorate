@@ -14,6 +14,8 @@ import { susScore, answeredBlocks } from "../lib/analytics";
 import { Button, Card, Empty, ErrorNote, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
 import { BlockResults, Overview } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
+import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
+import type { Project } from "../lib/types";
 import { ShareLink, studyUrl } from "./BuilderPage";
 import { templateByKey } from "../templates/catalog";
 
@@ -31,19 +33,23 @@ export function ResultsPage() {
   const { study, sessions, answers, insights } = data;
 
   return (
-    <div className="px-(--page-gutter) py-10">
+    <div className="page">
       <Link to={`/projects/${study.project_id}`} className="text-sm text-ink-3 hover:text-ink">{t("← Proyecto")}</Link>
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="label">{templateByKey(study.method)?.name ?? study.method}</p>
           <div className="mt-1 flex items-center gap-3">
-            <h1 className="display text-5xl leading-tight">{study.title}</h1>
+            <h1 className="page-title">{study.title}</h1>
             <StatusBadge status={study.status} />
           </div>
         </div>
         <div className="flex gap-2">
           <Link to={`/studies/${study.id}/edit`}><Button variant="ghost" icon={<PenLine size={15} />}>{t("Editar")}</Button></Link>
           <Button icon={<Download size={15} />} onClick={() => exportCsv(study, sessions, answers)} disabled={!sessions.length}>{t("CSV")}</Button>
+          <ReportPdfButton title={study.title} load={async () => {
+            const { project } = await api.get<{ project: Project }>(`/projects/${study.project_id}`).catch(() => ({ project: null as Project | null }));
+            return <StudyReportPdf r={{ study, sessions, answers, insights }} projectName={project?.name} projectColor={project?.color} />;
+          }} />
           <Button variant="primary" icon={<Link2 size={15} />} onClick={() => setTab("share")}>{t("Compartir reporte")}</Button>
         </div>
       </div>

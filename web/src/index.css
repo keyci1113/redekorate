@@ -26,6 +26,7 @@
   --color-accent: #5902A1;     /* morado: acciones, íconos pequeños y selección */
   --color-accent-soft: #F3E9FD;
   --color-accent-ink: #5902A1;
+  --color-brand: #501A93;      /* color de los logos */
   --color-on-accent: #FFFFFF;
   --color-good: #1E6B43;
   --color-good-soft: #E3F2E9;
@@ -70,6 +71,7 @@
       --color-accent: #BF7DF5;
       --color-accent-soft: #331A47;
       --color-accent-ink: #D6AEF9;
+      --color-brand: #D6AEF9;
       --color-on-accent: #100617;
       --color-good: #34D399;
       --color-good-soft: #0E2A1F;
@@ -106,6 +108,7 @@
   --color-accent: #BF7DF5;
   --color-accent-soft: #331A47;
   --color-accent-ink: #D6AEF9;
+  --color-brand: #D6AEF9;
   --color-on-accent: #100617;
   --color-good: #34D399;
   --color-good-soft: #0E2A1F;
@@ -195,6 +198,9 @@ input, textarea { caret-color: var(--color-accent); }
 h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
 
 @layer components {
+/* Contenedor y título comunes de todas las páginas: mismo margen lateral y vertical en todo el sitio. */
+.page { @apply px-(--page-gutter) pt-8 pb-14; }
+.page-title { @apply text-[36px] leading-tight sm:text-[44px]; font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; }
 .display { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.03em; line-height: 1.08; }
 .label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
 .focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-paper; }

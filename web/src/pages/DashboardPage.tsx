@@ -98,6 +98,9 @@ const trendLabel = (days: Day[]) => {
   return t(sum === 1 ? "1 respuesta en 14 días. Máximo: {b} el {c}." : "{a} respuestas en 14 días. Máximo: {b} el {c}.", { a: sum, b: peak.n, c: fmtDay(peak.day) });
 };
 
+/** Tarjeta de cada elemento de las listas del inicio. */
+const itemCard = "focus-ring block w-full rounded-xl border bg-surface px-4 py-3 text-left transition hover:border-line-2";
+
 const primaryLink = "focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-accent px-5 text-[15px] font-medium whitespace-nowrap text-on-accent shadow-sm transition hover:-translate-y-px hover:bg-accent/90 active:translate-y-0 motion-reduce:transform-none";
 
 function StudyDetail({ study, unit, days }: { study: LiveStudy; unit: number; days: Day[] }) {
@@ -135,7 +138,7 @@ function StudyDetail({ study, unit, days }: { study: LiveStudy; unit: number; da
 function DashboardSkeleton() {
   const bar = "animate-pulse rounded-md bg-ink/5";
   return (
-    <div className="grid gap-8 px-(--page-gutter) py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]" aria-busy aria-label={t("Cargando…")}>
+    <div className="page grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]" aria-busy aria-label={t("Cargando…")}>
       <div className="space-y-3"><div className={cx(bar, "h-10 w-32")} />{[0, 1, 2, 3].map((i) => <div key={i} className={cx(bar, "h-16 rounded-xl")} />)}</div>
       <div className={cx(bar, "h-[560px] rounded-xl")} />
     </div>
@@ -149,7 +152,7 @@ export function DashboardPage() {
   const { data, error, loading, reload } = useLoad(() => api.get<Dash>("/dashboard"), []);
   if (loading) return <DashboardSkeleton />;
   if (error || !data) return (
-    <div className="px-(--page-gutter) py-5">
+    <div className="page">
       <ErrorNote>{error ?? t("No se pudo cargar el inicio.")}</ErrorNote>
       <Button className="mt-3" onClick={reload}>{t("Reintentar")}</Button>
     </div>
@@ -158,8 +161,8 @@ export function DashboardPage() {
 
   if (totals.projects === 0) {
     return (
-      <div className="px-(--page-gutter) py-14">
-        <h1 className="display text-[38px] leading-tight">{t("Bienvenida a redekorate")}</h1>
+      <div className="page">
+        <h1 className="page-title">{t("Bienvenida a redekorate")}</h1>
         <p className="mt-3 text-[15px] text-ink-2">{t("Tu espacio para planear, lanzar y analizar investigación de UX. Así funciona:")}</p>
         <ol className="mt-8 grid gap-3 sm:grid-cols-3">
           {[["1", t("Crea un proyecto"), t("Agrupa estudios por producto o cliente.")], ["2", t("Elige un método"), t("Encuestas, card sorting, tree test, first click, preference test…")], ["3", t("Comparte y analiza"), t("Envía un link, mira resultados en vivo y comparte un reporte.")]].map(([n, title, d]) => (
@@ -194,31 +197,37 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="grid grid-cols-1 items-start gap-x-8 gap-y-8 px-(--page-gutter) py-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
+      <div className="grid grid-cols-1 items-start gap-x-8 gap-y-8 page lg:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
         <div className="min-w-0">
-          <h1 className="display text-[40px]">{t("Inicio")}</h1>
-          <section className="mt-5" aria-labelledby="next-step">
-            <h2 id="next-step" className="text-[15px] font-semibold">{t("Tu próximo paso")}</h2>
-            <Link to={lead.to} className="focus-ring group -mx-2 mt-1 flex items-start justify-between gap-3 rounded-lg px-2 py-1.5 transition hover:bg-ink/5">
-              <span className="min-w-0">
-                <span className="block text-[15px] leading-snug font-medium [overflow-wrap:anywhere]">{lead.title}</span>
-                <span className="mt-0.5 flex items-center gap-1.5 text-[13px] text-ink-2">{lead.family && <Dot family={lead.family} size="h-2 w-2" />}{lead.detail}</span>
-              </span>
-              <ArrowRight size={16} aria-hidden className="mt-0.5 shrink-0 text-accent transition group-hover:translate-x-0.5 motion-reduce:transform-none" />
-            </Link>
-          </section>
+          <h1 className="page-title">{t("Inicio")}</h1>
+          {drafts.length > 0 && (
+            <section className="mt-5">
+              <h2 className="mb-2 text-[17px] font-semibold">{t("Borradores para continuar")}</h2>
+              <ul className="space-y-3">
+                {drafts.map((d) => (
+                  <li key={d.id}>
+                    <Link to={`/studies/${d.id}/edit`} className={cx(itemCard, "border-line")}>
+                      <span className="block truncate text-[15px] font-semibold" title={d.title}>{d.title}</span>
+                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2"><Dot family={familyOf(d.method)} size="h-2 w-2" /><span className="truncate">{d.project_name} {t("· editado")} {timeAgo(d.updated_at)}</span></span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
 
           <section className="mt-7">
             <h2 className="mb-2 text-[17px] font-semibold">{t("Estudios activos")}</h2>
             {studies.length === 0 ? <p className="text-sm text-ink-2">{t("Al publicar un estudio, aquí verás quién terminó y quién no.")}</p> : (
-              <ul className="space-y-1.5">
+              <ul className="space-y-3">
                 {studies.map((s) => {
                   const on = s.id === selected?.id;
                   const alert = highDropoff(s);
                   return (
                     <li key={s.id}>
                       <button type="button" aria-current={on || undefined} onClick={() => select(s.id)}
-                        className={cx("focus-ring block w-full rounded-xl border px-3.5 py-3 text-left transition", on ? "border-accent bg-surface shadow-(--shadow-lift)" : "border-transparent hover:bg-ink/5")}>
+                        className={cx(itemCard, on ? "border-accent ring-1 ring-accent" : "border-line")}>
                         <span className="block truncate text-[15px] font-semibold" title={s.title}>{s.title}</span>
                         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2">
                           <Dot family={familyOf(s.method)} size="h-2 w-2" />
@@ -233,22 +242,6 @@ export function DashboardPage() {
             )}
           </section>
 
-          {drafts.length > 0 && (
-            <section className="mt-7">
-              <h2 className="mb-2 text-[17px] font-semibold">{t("Borradores para continuar")}</h2>
-              <ul className="space-y-0.5">
-                {drafts.map((d) => (
-                  <li key={d.id}>
-                    <Link to={`/studies/${d.id}/edit`} className="focus-ring block rounded-xl px-3.5 py-2.5 transition hover:bg-ink/5">
-                      <span className="block truncate text-[15px] font-semibold" title={d.title}>{d.title}</span>
-                      <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[13px] text-ink-2"><Dot family={familyOf(d.method)} size="h-2 w-2" /><span className="truncate">{d.project_name} {t("· editado")} {timeAgo(d.updated_at)}</span></span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
           <section className="mt-7">
             <h2 className="mb-2 text-[17px] font-semibold">{t("Insights recientes")}</h2>
             {insights.length === 0 ? (
@@ -261,10 +254,10 @@ export function DashboardPage() {
                 )}
               </div>
             ) : (
-              <ul className="space-y-0.5">
+              <ul className="space-y-3">
                 {insights.map((i) => (
                   <li key={i.id}>
-                    <Link to={`/projects/${i.project_id}?tab=insights`} className="focus-ring block rounded-xl px-3.5 py-2.5 transition hover:bg-ink/5">
+                    <Link to={`/projects/${i.project_id}?tab=insights`} className={cx(itemCard, "border-line")}>
                       <span className="block text-sm leading-snug font-medium">{i.title}</span>
                       <span className="mt-1 flex items-center gap-2 text-xs text-ink-2"><SeverityBadge severity={i.severity} /> {i.project_name} · {timeAgo(i.created_at)}</span>
                     </Link>
@@ -275,7 +268,7 @@ export function DashboardPage() {
           </section>
         </div>
 
-        <section ref={detail} className="field-dark min-w-0 scroll-mt-4 rounded-xl p-6 shadow-(--shadow-lift) sm:p-8" aria-live="polite">
+        <section ref={detail} className="field-dark min-w-0 scroll-mt-4 rounded-xl p-6 shadow-(--shadow-lift) sm:p-8 lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto" aria-live="polite">
           {selected ? <StudyDetail study={selected} unit={unit} days={selectedDays} /> : (
             <>
               <ParticipantFigures height={44} started={8} done={0} unit={1} color="var(--color-line-2)" label={t("Sin participantes")} />
@@ -287,13 +280,13 @@ export function DashboardPage() {
         </section>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 bg-paper-2 px-(--page-gutter) py-8 lg:grid-cols-3">
-        <section className="rounded-xl border border-line bg-surface p-5 shadow-(--shadow-lift)">
+      <div className="grid grid-cols-1 gap-6 border-t border-line px-(--page-gutter) py-8 lg:grid-cols-3">
+        <section className="rounded-xl border border-line bg-surface p-5">
           <h2 className="mb-2.5 text-[17px] font-semibold">{t("Respuestas · últimos 14 días")}</h2>
           <TrendChart days={trend} label={trendLabel(trend)} />
           {peak.n > 0 && <p className="mt-2 text-[13px] text-ink-2 tabular-nums">{t("Máximo: {a} · {b}", { a: peak.n, b: fmtDay(peak.day) })}</p>}
         </section>
-        <section className="rounded-xl border border-line bg-surface p-5 shadow-(--shadow-lift)">
+        <section className="rounded-xl border border-line bg-surface p-5">
           <h2 className="mb-2.5 text-[17px] font-semibold">{t("Actividad reciente")}</h2>
           {activity.length === 0 ? <p className="text-sm text-ink-2">{t("Aún no hay respuestas.")}</p> : (
             <ol className="space-y-2.5">
@@ -307,7 +300,7 @@ export function DashboardPage() {
             </ol>
           )}
         </section>
-        <section className="rounded-xl border border-line bg-surface p-5 shadow-(--shadow-lift)">
+        <section className="rounded-xl border border-line bg-surface p-5">
           <h2 className="mb-1.5 text-[17px] font-semibold">{t("Resumen")}</h2>
           <dl className="divide-y divide-line text-sm">
             {summary.map(([label, value]) => (

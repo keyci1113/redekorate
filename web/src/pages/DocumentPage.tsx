@@ -58,7 +58,7 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   }
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-paper-2">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface/95 px-(--page-gutter) backdrop-blur print:hidden">
         <Link to={`/projects/${project.id}?tab=docs`} className="focus-ring flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-ink-3 hover:text-ink">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: project.color }} /><span className="hidden max-w-40 truncate sm:inline">{project.name}</span>
@@ -79,7 +79,7 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
         <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>
       </header>
 
-      <main className="px-(--page-gutter) py-8 print:p-0">
+      <main className="page print:p-0">
         <div className="mb-4 flex justify-end print:hidden">
           <button onClick={() => setGuide(!guide)} className="text-xs font-medium text-accent">{guide ? t("Ocultar instrucciones") : t("Mostrar instrucciones")}</button>
         </div>

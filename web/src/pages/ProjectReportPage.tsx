@@ -1,11 +1,11 @@
 import { useParams } from "react-router-dom";
-import { Printer } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
-import type { Answer, Insight, Session, Severity } from "../lib/types";
+import type { Answer, Insight, Session } from "../lib/types";
 import type { Block } from "../blocks/types";
-import { BlockResults, Overview } from "../components/ReportBody";
-import { Button, Card, ErrorNote, SeverityBadge, Spinner, Tag } from "../components/ui";
+import { BlockResults, KeyFindings, Overview } from "../components/ReportBody";
+import { ProjectReportPdf, ReportPdfButton } from "../components/ReportPdf";
+import { ErrorNote, Spinner } from "../components/ui";
 import { Logo } from "../components/Logo";
 import { templateByKey } from "../templates/catalog";
 import type { StudySettings } from "../lib/settings";
@@ -17,7 +17,6 @@ interface StudyReport {
   sessions: Session[]; answers: Answer[]; insights: Insight[];
 }
 interface Report { project: { name: string; color: string }; reports: StudyReport[] }
-const ORDER: Severity[] = ["critical", "high", "medium", "low"];
 
 export function ProjectReportPage() {
   const { token } = useParams();
@@ -27,15 +26,16 @@ export function ProjectReportPage() {
   const { project, reports } = data;
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full bg-paper-2">
       <header className="border-b border-line bg-surface">
         <div className="flex items-center justify-between px-(--page-gutter) py-4">
           <Logo />
           <span className="flex items-center gap-3"><LangSwitch />
-          <Button size="sm" variant="ghost" icon={<Printer size={15} />} onClick={() => window.print()}>{t("Imprimir / PDF")}</Button></span>
+          <ReportPdfButton size="sm" variant="primary" label={t("Descargar PDF")} title={project.name}
+            content={<ProjectReportPdf projectName={project.name} projectColor={project.color} reports={reports} />} /></span>
         </div>
       </header>
-      <div className="px-(--page-gutter) py-12">
+      <div className="page">
         <p className="flex items-center gap-2 text-sm text-ink-2">
           <span className="h-2.5 w-2.5 rounded-sm" style={{ background: project.color }} />{project.name}
           <span className="text-ink-3">· {t("{a} estudios", { a: reports.length })}</span>
@@ -43,7 +43,6 @@ export function ProjectReportPage() {
         <h1 className="display mt-2 text-5xl leading-tight sm:text-6xl">{t("Reporte de proyecto")}</h1>
 
         {reports.map((r, i) => {
-          const sorted = [...r.insights].sort((a, b) => ORDER.indexOf(a.severity) - ORDER.indexOf(b.severity));
           return (
             <section key={r.study.id} className={i === 0 ? "mt-14" : "mt-20 border-t border-line pt-14"}>
               <p className="text-sm text-ink-3">{templateByKey(r.study.method)?.name ?? r.study.method}</p>
@@ -52,24 +51,10 @@ export function ProjectReportPage() {
 
               <div className="mt-8"><Overview sessions={r.sessions} /></div>
 
-              {sorted.length > 0 && (
+              {r.insights.length > 0 && (
                 <div className="mt-12">
-                  <h3 className="display text-2xl">{t("Hallazgos clave")}</h3>
-                  <div className="mt-4 space-y-3">
-                    {sorted.map((ins, n) => (
-                      <Card key={ins.id} className="flex gap-4 p-5">
-                        <span className="display w-8 shrink-0 text-3xl leading-none text-ink-3">{n + 1}</span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="font-semibold">{ins.title}</h4>
-                            <SeverityBadge severity={ins.severity} />
-                          </div>
-                          {ins.body && <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-line text-ink-2">{ins.body}</p>}
-                          {ins.tags.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{ins.tags.map((tag) => <Tag key={tag}>#{tag}</Tag>)}</div>}
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                  <h3 className="display mb-4 text-2xl">{t("Hallazgos clave")}</h3>
+                  <KeyFindings insights={r.insights} heading="h4" />
                 </div>
               )}
 

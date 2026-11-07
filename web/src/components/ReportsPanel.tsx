@@ -5,13 +5,19 @@ import { timeAgo } from "../lib/hooks";
 import type { ProjectShare, Study } from "../lib/types";
 import { Button, Card, Empty, Tag } from "./ui";
 import { ShareLink } from "../pages/BuilderPage";
+import { ProjectReportPdf, ReportPdfButton, type ReportStudy } from "./ReportPdf";
 
 import { t } from "../lib/i18n";
 export const projectReportUrl = (token: string) => `${window.location.origin}/pr/${token}`;
 
-export function ReportsPanel({ projectId, studies, shares, onChange }: {
-  projectId: string; studies: Pick<Study, "id" | "title">[]; shares: ProjectShare[]; onChange: () => void;
+export function ReportsPanel({ projectId, projectName, projectColor, studies, shares, onChange }: {
+  projectId: string; projectName: string; projectColor?: string; studies: Pick<Study, "id" | "title">[]; shares: ProjectShare[]; onChange: () => void;
 }) {
+  // Trae los resultados de cada estudio y arma el PDF del proyecto
+  const pdf = (ids: string[]) => async () => {
+    const reports = await Promise.all(ids.map((id) => api.get<ReportStudy>(`/studies/${id}/results`)));
+    return <ProjectReportPdf projectName={projectName} projectColor={projectColor} reports={reports} />;
+  };
   const [picking, setPicking] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -57,6 +63,7 @@ export function ReportsPanel({ projectId, studies, shares, onChange }: {
             </div>
             <div className="mt-3 flex items-center gap-2">
               <Button variant="primary" disabled={!selected.size || busy} onClick={create}>{busy ? t("Creando…") : t("Crear link con {a} estudio(s)", { a: selected.size })}</Button>
+              <ReportPdfButton title={projectName} label={t("Solo descargar PDF")} load={pdf([...selected])} />
               <Button variant="ghost" onClick={() => { setPicking(false); setSelected(new Set()); }}>{t("Cancelar")}</Button>
             </div>
           </div>
@@ -70,7 +77,8 @@ export function ReportsPanel({ projectId, studies, shares, onChange }: {
               <div className="flex flex-wrap gap-1.5">{sh.study_titles.map((title, i) => <Tag key={i}>{title}</Tag>)}</div>
               <div className="mt-2.5"><ShareLink url={projectReportUrl(sh.token)} /></div>
               <div className="mt-2 flex items-center justify-between">
-                <p className="text-xs text-ink-3">{t("Creado")} {timeAgo(sh.created_at)}</p>
+                <span className="flex items-center gap-3"><p className="text-xs text-ink-3">{t("Creado")} {timeAgo(sh.created_at)}</p>
+                  <ReportPdfButton size="sm" variant="ghost" title={projectName} label={t("PDF")} load={pdf(sh.study_ids)} /></span>
                 <button onClick={() => revoke(sh.id)} className="flex items-center gap-1 text-xs font-medium text-bad hover:underline"><Trash2 size={12} /> {t("Revocar")}</button>
               </div>
             </Card>

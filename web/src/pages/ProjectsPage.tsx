@@ -129,10 +129,10 @@ export function ProjectsPage() {
   const selected = projects.find((p) => p.id === params.get("project")) ?? projects[0];
 
   return (
-    <div className="px-(--page-gutter) py-6">
+    <div className="page">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="display text-[40px]">{t("Proyectos")}</h1>
+          <h1 className="page-title">{t("Proyectos")}</h1>
           <p className="mt-2 text-[15px] text-ink-2 tabular-nums">
             {t("Hola,")} {user?.name.split(" ")[0]}
             {projects.length > 0 && <> · {count(projects.length, "{a} proyecto", "{a} proyectos")} · {count(totals.studies, "{a} estudio", "{a} estudios")} · {count(totals.live, "{a} activo", "{a} activos")} · {count(totals.responses, "{a} respuesta", "{a} respuestas")}</>}

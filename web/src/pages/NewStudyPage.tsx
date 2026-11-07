@@ -42,7 +42,7 @@ export function NewStudyPage() {
   const shown = CATEGORIES.filter((c) => filtered.some((tpl) => tpl.category === c.id));
 
   return (
-    <div className="px-(--page-gutter) py-10">
+    <div className="page">
       <Link to={`/projects/${id}`} className="text-sm text-ink-3 hover:text-ink">← {project.data?.project.name ?? t("Proyecto")}</Link>
 
       {firstTime && (
@@ -58,7 +58,7 @@ export function NewStudyPage() {
         <span className="h-px w-6 bg-line-2" />
         <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-line text-[11px]">3</span>{t("Publica y comparte")}</span>
       </div>
-      <h1 className="display mt-3 text-5xl">{t("¿Qué vas a investigar?")}</h1>
+      <h1 className="page-title mt-3">{t("¿Qué vas a investigar?")}</h1>
       <p className="mt-2 text-[15px] text-ink-2">{TEMPLATES.length} {t("métodos ·")} {ready} {t("listos para usar. Cada uno trae su template, su guía y su análisis automático.")}</p>
 
       {/* Ayuda para elegir */}
@@ -74,7 +74,7 @@ export function NewStudyPage() {
         </div>
       </div>
 
-      <div className="sticky top-0 z-10 -mx-(--page-gutter) mt-6 flex flex-wrap items-center gap-2 bg-paper/90 px-(--page-gutter) py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 -mx-(--page-gutter) mt-6 flex flex-wrap items-center gap-2 bg-paper-2/90 px-(--page-gutter) py-3 backdrop-blur">
         <div className="relative w-56">
           <Search size={14} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input className="field h-8 py-1 pl-8 text-[13px]" placeholder={t("Buscar método…")} value={q} onChange={(e) => setQ(e.target.value)} />

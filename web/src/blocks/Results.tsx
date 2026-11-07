@@ -7,8 +7,9 @@ import { KanoResults } from "./KanoViews";
 import type { StudySettings } from "../lib/settings";
 import type { Answer } from "../lib/types";
 import { blockDef, SUS_ITEMS } from "./registry";
-import { cardSortSummary, choiceCounts, distribution, mean, median, nps, rankingSummary, susGrade, susScore } from "../lib/analytics";
-import { Card, cx } from "../components/ui";
+import { cardSortSummary, norm, choiceCounts, distribution, mean, median, nps, rankingSummary, susGrade, susScore } from "../lib/analytics";
+import { Card, Stat, cx, toneFor } from "../components/ui";
+import { usePrint } from "../lib/print";
 import { formatDuration } from "../lib/hooks";
 
 import { t } from "../lib/i18n";
@@ -54,12 +55,12 @@ export function BlockResult({ block, answers, index, settings }: { block: Block;
   const med = median(answers.map((a) => a.duration_ms ?? 0).filter(Boolean));
   return (
     <Card className="p-5">
-      <div className="mb-5 flex items-start justify-between gap-4">
+      <div className="mb-5 flex items-start justify-between gap-4 break-after-avoid">
         <div>
-          <p className="label flex items-center gap-1.5">{def?.icon}<span>{index}. {def?.label}</span></p>
-          <h3 className="mt-1.5 text-[15px] font-semibold leading-snug">{block.title}</h3>
+          <p className="label flex items-center gap-1.5 !text-[12px]">{def?.icon}<span>{index}. {def?.label}</span></p>
+          <h3 className="display mt-2 text-[22px] leading-snug text-balance [overflow-wrap:anywhere] sm:text-[26px]">{block.title}</h3>
         </div>
-        <div className="shrink-0 text-right text-xs text-ink-3">
+        <div className="shrink-0 text-right text-[13px] text-ink-3">
           <p className="tabular-nums"><span className="font-semibold text-ink">{n}</span> {t("respuestas")}</p>
           {med > 0 && <p className="tabular-nums">{t("mediana")} {formatDuration(med)}</p>}
         </div>
@@ -70,6 +71,7 @@ export function BlockResult({ block, answers, index, settings }: { block: Block;
 }
 
 function Body({ block, answers, settings }: { block: Block; answers: Answer[]; settings?: StudySettings }) {
+  const print = usePrint();
   switch (block.type) {
     case "choice": {
       const { rows, others, n } = choiceCounts(block, answers.map((a) => a.value as ChoiceValue));
@@ -86,12 +88,10 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
       const vals = answers.map((a) => a.value as number);
       const lo = block.style === "emoji" ? 1 : block.min, hi = block.style === "emoji" ? 5 : block.max;
       return (
-        <div className="grid gap-6 sm:grid-cols-[140px_1fr]">
-          <div>
-            <p className="text-4xl font-semibold tabular-nums tracking-tight">{mean(vals).toFixed(1)}</p>
-            <p className="text-sm text-ink-3">{t("promedio de")} {lo}–{hi}</p>
-            <p className="mt-2 text-xs text-ink-3">{t("Mediana")} {median(vals)}</p>
-          </div>
+        <div className="grid items-start gap-6 sm:grid-cols-[220px_1fr]">
+          {/* Posición del promedio en la escala: arriba del 70% bien, 50–70% atención, abajo mal */}
+          <Stat label={`${t("promedio de")} ${lo}–${hi}`} value={mean(vals).toFixed(1)} sub={`${t("Mediana")} ${median(vals)}`}
+            tone={toneFor((mean(vals) - lo) / Math.max(1, hi - lo), 0.7, 0.5, { n: vals.length })} />
           <div>
             <Columns rows={distribution(lo, hi, vals)} total={vals.length} />
             <div className="mt-1 flex justify-between text-xs text-ink-3"><span>{block.minLabel}</span><span>{block.maxLabel}</span></div>
@@ -109,9 +109,9 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
       ];
       return (
         <div className="space-y-5">
-          <div className="flex items-end gap-4">
-            <p className="text-5xl font-semibold tabular-nums tracking-tight">{r.score > 0 ? "+" : ""}{r.score}</p>
-            <p className="pb-1.5 text-sm text-ink-3">{t("NPS · rango −100 a +100")}</p>
+          <div className="max-w-xs">
+            <Stat label={t("NPS · rango −100 a +100")} value={`${r.score > 0 ? "+" : ""}${r.score}`} tone={toneFor(r.score, 30, 0, { n: r.n })}
+              note={r.score >= 30 ? t("Bueno") : r.score >= 0 ? t("Mejorable") : t("Más detractores que promotores")} />
           </div>
           <div className="flex h-3 gap-[2px] overflow-hidden rounded-full">
             {seg.filter((s) => s.v).map((s) => <div key={s.k} className={s.cls} style={{ flex: s.v }} title={`${s.k}: ${s.v}`} />)}
@@ -136,19 +136,16 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
       const itemMeans = SUS_ITEMS.map((_, i) => mean(all.map((v) => v[i])));
       return (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-            <p className="text-5xl font-semibold tabular-nums tracking-tight">{avg.toFixed(1)}</p>
-            <div className="pb-1.5 text-sm">
-              <p><span className="font-semibold">{g.grade}</span> · {g.adjective}</p>
-              <p className="text-ink-3">{avg >= 68 ? t("Por encima") : t("Por debajo")} {t("del promedio de la industria (68)")}</p>
-            </div>
+          <div className="max-w-sm">
+            <Stat label={t("Puntaje SUS")} value={avg.toFixed(1)} tone={toneFor(avg, 68, 51, { n: scores.length })} note={`${g.grade} · ${g.adjective}`}
+              sub={`${avg >= 68 ? t("Por encima") : t("Por debajo")} ${t("del promedio de la industria (68)")}`} />
           </div>
           <div className="relative h-2 rounded-full bg-gradient-to-r from-bad/25 via-warn/25 to-good/30">
             <div className="absolute top-1/2 h-4 w-0.5 -translate-y-1/2 bg-ink-3" style={{ left: "68%" }} title={t("Promedio 68")} />
             <div className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-ink shadow" style={{ left: `${avg}%` }} />
           </div>
           <div className="flex justify-between text-xs text-ink-3"><span>0</span><span>{t("68 · promedio")}</span><span>100</span></div>
-          <details className="group">
+          <details className="group" open={print || undefined}>
             <summary className="cursor-pointer text-sm font-medium text-accent">{t("Ver promedio por ítem")}</summary>
             <div className="mt-3 space-y-2">
               {SUS_ITEMS.map((item, i) => (
@@ -219,17 +216,19 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
 }
 
 function TextList({ title, items }: { title?: string; items: string[] }) {
+  const print = usePrint();
   const [all, setAll] = useState(false);
-  const shown = all ? items : items.slice(0, 6);
+  const shown = print ? items.slice(0, 8) : all ? items : items.slice(0, 6);
   return (
     <div>
       {title && <p className="mb-2 text-[13px] font-medium text-ink-2">{title}</p>}
       <ul className="space-y-2">
         {shown.map((t, i) => (
-          <li key={i} className="rounded-lg border-l-2 border-accent/40 bg-paper px-3 py-2 text-sm leading-relaxed text-ink">“{t}”</li>
+          <li key={i} className="rounded-lg border-l-2 border-accent/40 bg-paper px-3 py-2 text-sm leading-relaxed text-ink break-inside-avoid">“{t}”</li>
         ))}
       </ul>
-      {items.length > 6 && (
+      {print && items.length > 8 && <p className="mt-2 text-xs text-ink-3">{t("… y {a} respuestas más (ver el CSV o el reporte en línea)", { a: items.length - 8 })}</p>}
+      {!print && items.length > 6 && (
         <button onClick={() => setAll(!all)} className="mt-3 text-sm font-medium text-accent">
           {all ? t("Ver menos") : t("Ver las {a} respuestas", { a: items.length })}
         </button>
@@ -273,62 +272,173 @@ function MatrixResult({ block, answers }: { block: MatrixBlock; answers: Answer[
   );
 }
 
+/** Grupos naturales: recorre el orden del clustering y corta donde la similitud con la tarjeta anterior cae. */
+function naturalGroups(order: number[], sim: number[][], cut = 0.4) {
+  const groups: number[][] = [];
+  order.forEach((i, k) => {
+    if (k === 0 || sim[order[k - 1]][i] < cut) groups.push([i]);
+    else groups[groups.length - 1].push(i);
+  });
+  return groups.map((g) => {
+    const pairs: number[] = [];
+    for (let a = 0; a < g.length; a++) for (let b = a + 1; b < g.length; b++) pairs.push(sim[g[a]][g[b]]);
+    return { members: g, cohesion: pairs.length ? pairs.reduce((x, y) => x + y, 0) / pairs.length : 0 };
+  });
+}
+
+const agreeColor = (a: number) => (a >= 0.7 ? "bg-good" : a >= 0.4 ? "bg-accent/70" : "bg-warn");
+// Misma normalización que cardSortSummary, para que los conteos coincidan con las categorías
+const normName = (x: string) => norm(x || t("(sin nombre)"));
+
 function CardSortResult({ block, answers }: { block: CardSortBlock; answers: Answer[] }) {
-  const [view, setView] = useState<"cards" | "matrix" | "categories">("cards");
-  const r = cardSortSummary(block.cards, answers.map((a) => a.value as CardSortValue));
+  const print = usePrint();
+  const [current, setView] = useState<"cards" | "matrix" | "categories">("cards");
+  const show = (v: typeof current) => print || current === v;
+  const view = current;
+  const printHead = (label: string) => (print ? <h4 className="mb-3 text-[15px] font-semibold">{label}</h4> : null);
+  const values = answers.map((a) => a.value as CardSortValue);
+  const r = cardSortSummary(block.cards, values);
   const label = (i: number) => block.cards[i].label;
+  const byId = new Map(block.cards.map((c, i) => [c.id, i]));
+  const avgAgreement = r.perCard.length ? r.perCard.reduce((x, c) => x + c.agreement, 0) / r.perCard.length : 0;
+  const lowCards = r.perCard.filter((c) => c.agreement < 0.4);
+  const clusters = naturalGroups(r.order, r.sim);
+  const groups = clusters.filter((g) => g.members.length > 1);
+  const loners = clusters.filter((g) => g.members.length === 1).map((g) => g.members[0]);
+  // Pares de tarjetas que más se agruparon juntas
+  const pairs: { a: number; b: number; v: number }[] = [];
+  for (let i = 0; i < block.cards.length; i++) for (let j = i + 1; j < block.cards.length; j++) pairs.push({ a: i, b: j, v: r.sim[i][j] });
+  const topPairs = pairs.sort((x, y) => y.v - x.v).slice(0, 6);
+  // Qué tarjetas cayeron en cada categoría
+  const catCards = new Map<string, Map<string, number>>();
+  for (const v of values) for (const g of v.groups) {
+    const k = normName(g.name || "");
+    const m = catCards.get(k) ?? new Map<string, number>();
+    for (const id of g.cardIds) m.set(id, (m.get(id) ?? 0) + 1);
+    catCards.set(k, m);
+  }
+  const topCategory = (members: number[]) => {
+    const votes = new Map<string, number>();
+    for (const i of members) { const c = r.perCard.find((p) => p.id === block.cards[i].id)?.top; if (c) votes.set(c.name, (votes.get(c.name) ?? 0) + 1); }
+    return [...votes.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
+  };
   return (
-    <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-3">
-        {[[t("Participantes"), r.n], [t("Grupos promedio"), r.avgGroups.toFixed(1)], [block.mode === "closed" ? t("Categorías usadas") : t("Categorías distintas"), r.categories.length]].map(([l, v]) => (
-          <div key={l as string} className="rounded-lg bg-paper px-3 py-2.5"><p className="text-xl font-semibold tabular-nums">{v}</p><p className="text-xs text-ink-3">{l}</p></div>
-        ))}
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label={t("Participantes")} value={r.n} />
+        <Stat label={t("Grupos promedio")} value={r.avgGroups.toFixed(1)} />
+        <Stat label={block.mode === "closed" ? t("Categorías usadas") : t("Categorías distintas")} value={r.categories.length} />
+        <Stat label={t("Acuerdo promedio")} value={`${Math.round(avgAgreement * 100)}%`} tone={toneFor(avgAgreement, 0.7, 0.4, { n: r.n })}
+          sub={lowCards.length ? t("{a} tarjetas con acuerdo bajo", { a: lowCards.length }) : t("Ninguna tarjeta con acuerdo bajo")} />
       </div>
-      <div className="flex gap-1 rounded-lg bg-paper p-1">
+      <div className="flex gap-1 rounded-lg bg-paper p-1 print:hidden">
         {([["cards", t("Por tarjeta")], ["matrix", t("Matriz de similitud")], ["categories", t("Categorías")]] as const).map(([id, l]) => (
-          <button key={id} onClick={() => setView(id)} className={cx("flex-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition", view === id ? "bg-surface shadow-sm" : "text-ink-3 hover:text-ink")}>{l}</button>
+          <button key={id} onClick={() => setView(id)} className={cx("flex-1 rounded-md px-3 py-2 text-sm font-medium transition", view === id ? "bg-surface shadow-sm" : "text-ink-3 hover:text-ink")}>{l}</button>
         ))}
       </div>
-      {view === "cards" && (
-        <div className="space-y-2.5">
+
+      {show("cards") && (
+        <div className="space-y-3">
+          {printHead(t("Por tarjeta"))}
+          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)] gap-x-6 border-b border-line pb-2 text-xs font-semibold text-ink-3 lg:grid">
+            <span>{t("Tarjeta")}</span><span>{t("Categoría más elegida")}</span><span>{t("Acuerdo y otras categorías")}</span>
+          </div>
           {r.perCard.map((c) => (
-            <div key={c.id} className="grid items-center gap-x-4 gap-y-1 sm:grid-cols-[1fr_1fr_120px]" title={c.all.map((a) => `${a.name}: ${a.count}`).join("\n")}>
-              <span className="text-sm font-medium">{c.label}</span>
-              <span className="text-sm text-ink-2">→ {c.top?.name ?? "—"}</span>
-              <div className="flex items-center gap-2">
-                <div className="h-2 flex-1 rounded-full bg-ink/[0.05]"><div className={cx("h-2 rounded-full", c.agreement >= 0.7 ? "bg-good" : c.agreement >= 0.4 ? "bg-accent/70" : "bg-warn")} style={{ width: `${c.agreement * 100}%`, minWidth: 4 }} /></div>
-                <span className="w-9 text-right text-xs tabular-nums">{Math.round(c.agreement * 100)}%</span>
+            <div key={c.id} className="grid break-inside-avoid items-center gap-x-6 gap-y-1.5 border-b border-line pb-3 last:border-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1.6fr)]">
+              <span className="text-[15px] font-semibold">{c.label}</span>
+              <span className="text-[15px] text-ink-2">→ {c.top?.name ?? "—"}</span>
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="h-2.5 flex-1 rounded-full bg-ink/[0.06]"><div className={cx("h-2.5 rounded-full", agreeColor(c.agreement))} style={{ width: `${c.agreement * 100}%`, minWidth: 4 }} /></div>
+                  <span className="w-11 text-right text-sm font-semibold tabular-nums">{Math.round(c.agreement * 100)}%</span>
+                </div>
+                {c.all.length > 1 && <p className="mt-1 truncate text-xs text-ink-3" title={c.all.map((a) => `${a.name}: ${a.count}`).join("\n")}>{c.all.slice(1, 4).map((a) => `${a.name} ${Math.round((a.count / Math.max(1, r.n)) * 100)}%`).join(" · ")}</p>}
               </div>
             </div>
           ))}
           <Legend items={[["bg-good", t("Acuerdo alto ≥70%")], ["bg-accent/70", t("Medio 40–69%")], ["bg-warn", t("Bajo <40% · revisar")]]} />
         </div>
       )}
-      {view === "matrix" && (
-        <div className="overflow-x-auto">
-          <table className="text-[11px]">
-            <tbody>
-              {r.order.map((i) => (
-                <tr key={i}>
-                  <td className="max-w-40 truncate py-0.5 pr-2 text-right text-ink-2">{label(i)}</td>
-                  {r.order.map((j) => {
-                    const v = i === j ? 1 : r.sim[i][j];
-                    return <td key={j} className="p-[1px]" title={i === j ? label(i) : `${label(i)} + ${label(j)}: ${Math.round(v * 100)}%`}>
-                      <div className="flex h-7 w-7 items-center justify-center rounded-[3px] tabular-nums" style={{ background: i === j ? "var(--color-line)" : `color-mix(in srgb, var(--color-accent) ${Math.round(v * 90)}%, var(--color-paper))`, color: v > 0.5 && i !== j ? "var(--color-on-accent)" : "var(--color-ink-3)" }}>
-                        {i !== j && v > 0 ? Math.round(v * 100) : ""}
-                      </div>
-                    </td>;
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="mt-2 text-xs text-ink-3">{t("% de participantes que agruparon ambas tarjetas juntas. Los bloques oscuros revelan grupos naturales.")}</p>
+
+      {show("matrix") && (
+        <div className="grid gap-8 xl:grid-cols-[auto_minmax(0,1fr)]">
+          {print && <div className="xl:col-span-2 -mb-5">{printHead(t("Matriz de similitud"))}</div>}
+          <div className="overflow-x-auto">
+            <table className="text-xs">
+              <tbody>
+                {r.order.map((i) => (
+                  <tr key={i}>
+                    <td className="max-w-48 truncate py-0.5 pr-3 text-right text-[13px] text-ink-2">{label(i)}</td>
+                    {r.order.map((j) => {
+                      const v = i === j ? 1 : r.sim[i][j];
+                      return <td key={j} className="p-[1.5px]" title={i === j ? label(i) : `${label(i)} + ${label(j)}: ${Math.round(v * 100)}%`}>
+                        <div className="flex h-9 w-9 items-center justify-center rounded tabular-nums" style={{ background: i === j ? "var(--color-line)" : `color-mix(in srgb, var(--color-accent) ${Math.round(v * 90)}%, var(--color-paper))`, color: v > 0.5 && i !== j ? "var(--color-on-accent)" : "var(--color-ink-3)" }}>
+                          {i !== j && v > 0 ? Math.round(v * 100) : ""}
+                        </div>
+                      </td>;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="mt-3 max-w-xl text-xs text-ink-3">{t("% de participantes que agruparon ambas tarjetas juntas. Los bloques oscuros revelan grupos naturales.")}</p>
+          </div>
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-[15px] font-semibold">{t("Grupos naturales")}</h4>
+              <p className="mt-0.5 text-xs text-ink-3">{t("Tarjetas que la mayoría puso juntas, con el nombre más usado para ellas.")}</p>
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {groups.map((g, k) => (
+                  <div key={k} className="rounded-xl border border-line bg-paper p-3.5 break-inside-avoid">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="truncate font-semibold">{topCategory(g.members)}</p>
+                      <span className="shrink-0 text-xs text-ink-3 tabular-nums">{t("cohesión")} {Math.round(g.cohesion * 100)}%</span>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-1.5">{g.members.map((i) => <span key={i} className="rounded-md border border-line bg-surface px-2 py-0.5 text-[13px]">{label(i)}</span>)}</div>
+                  </div>
+                ))}
+              </div>
+              {loners.length > 0 && <p className="mt-3 text-sm text-ink-2"><span className="font-semibold text-warn">{t("Sin grupo claro:")}</span> {loners.map(label).join(", ")}</p>}
+            </div>
+            <div>
+              <h4 className="text-[15px] font-semibold">{t("Pares más fuertes")}</h4>
+              <ul className="mt-2 divide-y divide-line">
+                {topPairs.map((p) => (
+                  <li key={`${p.a}-${p.b}`} className="flex items-center justify-between gap-3 py-2 text-sm">
+                    <span className="min-w-0 truncate">{label(p.a)} <span className="text-ink-3">+</span> {label(p.b)}</span>
+                    <span className="shrink-0 font-semibold tabular-nums">{Math.round(p.v * 100)}%</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
         </div>
       )}
-      {view === "categories" && (
-        <div className="flex flex-wrap gap-2">
-          {r.categories.map((c) => <span key={c.name} className="rounded-lg border border-line bg-paper px-2.5 py-1.5 text-sm">{c.name} <span className="text-ink-3 tabular-nums">· {c.people}</span></span>)}
+
+      {show("categories") && printHead(t("Categorías"))}
+      {show("categories") && (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {r.categories.map((c) => {
+            const placed = [...(catCards.get(normName(c.name)) ?? new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const share = c.people / Math.max(1, r.n);
+            return (
+              <div key={c.name} className="rounded-xl border border-line bg-paper p-4 break-inside-avoid">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="truncate text-[15px] font-semibold">{c.name}</p>
+                  <span className="shrink-0 text-sm tabular-nums"><b>{Math.round(share * 100)}%</b> <span className="text-ink-3">· {c.people}</span></span>
+                </div>
+                <div className="mt-2 h-1.5 rounded-full bg-ink/[0.06]"><div className="h-1.5 rounded-full bg-accent" style={{ width: `${share * 100}%` }} /></div>
+                {placed.length > 0 && (
+                  <>
+                    <p className="mt-3 text-xs text-ink-3">{t("Tarjetas que más pusieron aquí")}</p>
+                    <ul className="mt-1.5 space-y-1">
+                      {placed.map(([id, n]) => <li key={id} className="flex justify-between gap-2 text-[13px]"><span className="truncate">{label(byId.get(id) ?? 0)}</span><span className="shrink-0 text-ink-3 tabular-nums">{n}</span></li>)}
+                    </ul>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -349,7 +459,11 @@ function TreeResult({ block, answers }: { block: TreeTestBlock; answers: Answer[
     <div className="space-y-5">
       {block.correct.length === 0 ? <p className="text-sm text-warn">{t("No se definió respuesta correcta: se muestran solo los destinos elegidos.")}</p> : (
         <>
-          <div className="flex items-end gap-4"><p className="text-5xl font-semibold tracking-tight tabular-nums">{pct(ok.length, n)}%</p><p className="pb-1.5 text-sm text-ink-3">{t("tasa de éxito")}</p></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <Stat label={t("Tasa de éxito")} value={`${pct(ok.length, n)}%`} sub={t("{a} de {b}", { a: ok.length, b: n })} tone={toneFor(pct(ok.length, n), 70, 50, { n })} />
+            <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={t("sin regresar en el menú")} tone={toneFor(pct(direct, n), 60, 40, { n })} />
+            <Stat label={t("Fallo")} value={`${pct(n - ok.length, n)}%`} sub={t("eligió un destino incorrecto")} tone={toneFor(pct(n - ok.length, n), 30, 50, { n, lowerIsBetter: true })} />
+          </div>
           <div className="flex h-3 gap-[2px] overflow-hidden rounded-full">
             {direct > 0 && <div className="bg-good" style={{ flex: direct }} />}
             {ok.length - direct > 0 && <div className="bg-good/45" style={{ flex: ok.length - direct }} />}
@@ -369,6 +483,7 @@ function TreeResult({ block, answers }: { block: TreeTestBlock; answers: Answer[
 function PreferenceResult({ block, answers }: { block: PreferenceBlock; answers: Answer[] }) {
   const vals = answers.map((a) => a.value as PreferenceValue);
   const rows = block.options.map((o, i) => ({ ...o, label: o.label || t("Diseño {a}", { a: i + 1 }), count: vals.filter((v) => v.choice === o.id).length })).sort((a, b) => b.count - a.count);
+  const print = usePrint();
   const [tab, setTab] = useState(rows[0]?.id);
   const whys = vals.filter((v) => v.choice === tab && v.why?.trim()).map((v) => v.why!);
   return (
@@ -385,7 +500,11 @@ function PreferenceResult({ block, answers }: { block: PreferenceBlock; answers:
           </button>
         ))}
       </div>
-      {block.askWhy && <TextList title={t("Por qué eligieron \"{a}\" ({b})", { a: rows.find((r) => r.id === tab)?.label, b: whys.length })} items={whys} />}
+      {block.askWhy && !print && <TextList title={t("Por qué eligieron \"{a}\" ({b})", { a: rows.find((r) => r.id === tab)?.label, b: whys.length })} items={whys} />}
+      {block.askWhy && print && rows.map((o) => {
+        const w = vals.filter((v) => v.choice === o.id && v.why?.trim()).map((v) => v.why!);
+        return w.length ? <TextList key={o.id} title={t("Por qué eligieron \"{a}\" ({b})", { a: o.label, b: w.length })} items={w} /> : null;
+      })}
     </div>
   );
 }
@@ -396,9 +515,9 @@ function FirstClickResult({ block, answers }: { block: FirstClickBlock; answers:
   const a = block.area;
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-6">
-        {ok !== null && <div><p className="text-4xl font-semibold tabular-nums">{pct(ok, vals.length)}%</p><p className="text-sm text-ink-3">{t("hizo clic en el área correcta")}</p></div>}
-        <div><p className="text-4xl font-semibold tabular-nums">{formatDuration(median(vals.map((v) => v.ms)))}</p><p className="text-sm text-ink-3">{t("tiempo mediano al primer clic")}</p></div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:max-w-3xl">
+        {ok !== null && <Stat label={t("hizo clic en el área correcta")} value={`${pct(ok, vals.length)}%`} sub={t("{a} de {b}", { a: ok, b: vals.length })} tone={toneFor(pct(ok, vals.length), 70, 50, { n: vals.length })} />}
+        <Stat label={t("tiempo mediano al primer clic")} value={formatDuration(median(vals.map((v) => v.ms)))} />
       </div>
       {block.image?.url && (
         <div className="relative overflow-hidden rounded-xl border border-line">
