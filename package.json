@@ -1,11 +1,15 @@
 {
   "name": "redekorate",
   "private": true,
-  "workspaces": ["server", "web"],
+  "workspaces": [
+    "server",
+    "web"
+  ],
   "scripts": {
     "dev": "npm run dev -w server & npm run dev -w web",
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
-    "migrate": "npm run migrate -w server"
+    "migrate": "npm run migrate -w server",
+    "seed:test": "python scripts/seed/make_images.py .seed-img && tsx --tsconfig web/tsconfig.json scripts/seed/seed-test.mts .seed-img"
   }
 }
