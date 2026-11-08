@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import multer from "multer";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,6 +7,7 @@ import { one } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError } from "../lib/http.js";
 import { uploadLimiter } from "../lib/security.js";
+import { injectTracker, looksLikeHtml } from "../lib/protoTracker.js";
 
 export const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? "uploads");
 const MAX_MB = Number(process.env.UPLOAD_MAX_MB ?? 10);
@@ -26,13 +27,15 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: MAX
 
 export const uploads = Router();
 
-uploads.post("/", requireAuth, uploadLimiter, (req, res, next) => {
+const receive = (what: string): RequestHandler => (req, res, next) => {
   upload.single("file")(req, res, (err: unknown) => {
-    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") return next(new HttpError(413, `La imagen supera ${MAX_MB} MB`));
+    if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE") return next(new HttpError(413, `${what} supera ${MAX_MB} MB`));
     if (err) return next(err);
     next();
   });
-}, async (req, res) => {
+};
+
+uploads.post("/", requireAuth, uploadLimiter, receive("La imagen"), async (req, res) => {
   const f = req.file;
   if (!f) throw new HttpError(400, "No se recibió ningún archivo");
   const kind = sniff(f.buffer);
@@ -41,5 +44,19 @@ uploads.post("/", requireAuth, uploadLimiter, (req, res, next) => {
   const filename = `${fileId()}.${kind.ext}`;
   await writeFile(path.join(UPLOAD_DIR, filename), f.buffer, { mode: 0o640 });
   await one("insert into uploads(owner_id, filename, mime, size) values ($1,$2,$3,$4)", [req.user!.id, filename, kind.mime, f.size]);
+  res.status(201).json({ url: `/uploads/${filename}` });
+});
+
+// Prototipos HTML (por ejemplo, descargados de Claude). Se guardan con el script de seguimiento
+// ya inyectado y se sirven con CSP "sandbox" (origen opaco): no pueden leer cookies ni llamar a la API.
+uploads.post("/prototype", requireAuth, uploadLimiter, receive("El archivo"), async (req, res) => {
+  const f = req.file;
+  if (!f) throw new HttpError(400, "No se recibió ningún archivo");
+  if (!looksLikeHtml(f.buffer)) throw new HttpError(415, "El archivo no parece HTML. Descarga el prototipo como .html.");
+  await mkdir(UPLOAD_DIR, { recursive: true });
+  const filename = `${fileId()}.html`;
+  const html = injectTracker(f.buffer.toString("utf8").replace(/^﻿/, ""));
+  await writeFile(path.join(UPLOAD_DIR, filename), html, { mode: 0o640 });
+  await one("insert into uploads(owner_id, filename, mime, size) values ($1,$2,$3,$4)", [req.user!.id, filename, "text/html", Buffer.byteLength(html)]);
   res.status(201).json({ url: `/uploads/${filename}` });
 });

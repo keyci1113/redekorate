@@ -39,10 +39,22 @@ app.use("/api/uploads", uploads);
 app.use("/api/public", publicLimiter, publicApi);
 app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no encontrada", req.get("x-lang")) }));
 
-// Imágenes subidas: nombres aleatorios, sin listado de directorio, sin ejecución
+// Archivos subidos: nombres aleatorios, sin listado de directorio.
+// Las imágenes no ejecutan nada. Los prototipos HTML corren en un sandbox con origen opaco
+// (sin acceso a cookies, almacenamiento ni a la API) y solo se pueden incrustar desde la app.
+const PROTOTYPE_CSP = [
+  "sandbox allow-scripts allow-forms allow-modals allow-popups",
+  "default-src * data: blob: 'unsafe-inline' 'unsafe-eval'",
+  "frame-ancestors 'self'",
+  "form-action 'none'",
+  "base-uri 'none'",
+].join("; ");
 app.use("/uploads", express.static(UPLOAD_DIR, {
   index: false, dotfiles: "deny", maxAge: "30d", immutable: true,
-  setHeaders: (res) => { res.set("X-Content-Type-Options", "nosniff"); res.set("Content-Security-Policy", "default-src 'none'"); },
+  setHeaders: (res, file) => {
+    res.set("X-Content-Type-Options", "nosniff");
+    res.set("Content-Security-Policy", file.endsWith(".html") ? PROTOTYPE_CSP : "default-src 'none'");
+  },
 }));
 
 // Frontend compilado

@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, PrototypeTaskValue } from "./prototype";
-import { isDirect, screenName } from "./prototype";
+import { isDirect, isHtml, screenName } from "./prototype";
 import type { Answer } from "../lib/types";
 import { mean, median } from "../lib/analytics";
 import { formatDuration } from "../lib/hooks";
@@ -24,6 +24,8 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
   const misclicks = allClicks.filter((c) => !c.h).length;
 
   if (!proto) return <p className="text-sm text-warn">{t("El prototipo de esta tarea fue eliminado del estudio.")}</p>;
+  const html = isHtml(proto);
+  const screensLabel = html ? t("Clics por pantalla") : t("Mapas de calor por pantalla");
 
   return (
     <div className="space-y-6">
@@ -31,7 +33,7 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
         <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
         <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} tone={toneFor(pct(direct, n), 60, 40, { n })} />
         <Stat label={t("Tiempo mediano")} value={formatDuration(median(success.map((v) => v.ms)))} sub={t("en tareas exitosas")} />
-        <Stat label={t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />
+        <Stat label={html ? t("Clics sin respuesta") : t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />
       </div>
 
       <div>
@@ -48,7 +50,7 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
       </div>
 
       <div className="flex gap-1 rounded-lg bg-paper p-1 print:hidden">
-        {([["paths", t("Rutas")], ["screens", t("Mapas de calor por pantalla")]] as const).map(([id, l]) => (
+        {([["paths", t("Rutas")], ["screens", screensLabel]] as const).map(([id, l]) => (
           <button key={id} onClick={() => setTab(id)} className={cx("flex-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition", tab === id ? "bg-surface shadow-sm" : "text-ink-3 hover:text-ink")}>{l}</button>
         ))}
       </div>
@@ -56,10 +58,10 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
         <>
           <h4 className="text-[15px] font-semibold">{t("Rutas")}</h4>
           <Paths block={block} vals={vals} proto={proto} />
-          <h4 className="pt-2 text-[15px] font-semibold break-after-avoid">{t("Mapas de calor por pantalla")}</h4>
-          <ScreensGrid vals={vals} proto={proto} />
+          <h4 className="pt-2 text-[15px] font-semibold break-after-avoid">{screensLabel}</h4>
+          {html ? <HtmlScreens vals={vals} proto={proto} /> : <ScreensGrid vals={vals} proto={proto} />}
         </>
-      ) : tab === "paths" ? <Paths block={block} vals={vals} proto={proto} /> : <Screens vals={vals} proto={proto} />}
+      ) : tab === "paths" ? <Paths block={block} vals={vals} proto={proto} /> : html ? <HtmlScreens vals={vals} proto={proto} /> : <Screens vals={vals} proto={proto} />}
     </div>
   );
 }
@@ -211,6 +213,55 @@ function ScreensGrid({ vals, proto }: { vals: PrototypeTaskValue[]; proto: Proto
           </figcaption>
         </figure>
       ))}
+    </div>
+  );
+}
+
+/** Prototipos HTML: no hay imagen de cada pantalla, así que mostramos qué elementos tocaron. */
+function HtmlScreens({ vals, proto }: { vals: PrototypeTaskValue[]; proto: Prototype }) {
+  const stats = useMemo(() => {
+    const m = new Map<string, { id: string; visits: number; times: number[]; clicks: number; miss: number; els: Map<string, { n: number; hit: boolean }> }>();
+    const get = (id: string) => { let x = m.get(id); if (!x) { x = { id, visits: 0, times: [], clicks: 0, miss: 0, els: new Map() }; m.set(id, x); } return x; };
+    for (const v of vals) {
+      v.path.forEach((p, i) => { const x = get(p.s); x.visits++; x.times.push((v.path[i + 1]?.t ?? v.ms) - p.t); });
+      for (const c of v.clicks) {
+        if (!c.s) continue;
+        const x = get(c.s); x.clicks++; if (!c.h) x.miss++;
+        const k = c.l || "—"; const e = x.els.get(k) ?? { n: 0, hit: !!c.h }; e.n++; x.els.set(k, e);
+      }
+    }
+    return [...m.values()].sort((a, b) => b.visits - a.visits);
+  }, [vals]);
+  if (!stats.length) return <p className="text-sm text-ink-3">{t("Sin datos de navegación todavía.")}</p>;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {stats.map((x) => {
+        const els = [...x.els.entries()].sort((a, b) => b[1].n - a[1].n).slice(0, 8);
+        return (
+          <div key={x.id} className="rounded-xl border border-line p-4 break-inside-avoid">
+            <p className="font-semibold">{screenName(proto, x.id)}</p>
+            <p className="text-[12px] text-ink-2">{x.visits} {t("visitas ·")} {formatDuration(mean(x.times))} {t("en promedio ·")} {x.clicks} {t("clics")}
+              {x.miss > 0 && <> · <span className="text-bad">{pct(x.miss, x.clicks)}{t("% sin respuesta")}</span></>}</p>
+            {els.length > 0 && (
+              <ul className="mt-3 space-y-1.5">
+                {els.map(([label, e]) => (
+                  <li key={label} className="grid grid-cols-[1fr_auto] items-center gap-3 text-[13px]">
+                    <div className="relative h-6 overflow-hidden rounded-md bg-ink/[0.05]">
+                      <div className={cx("absolute inset-y-0 left-0 rounded-md", e.hit ? "bg-accent/30" : "bg-bad/25")} style={{ width: `${pct(e.n, x.clicks)}%` }} />
+                      <span className="relative block truncate px-2 leading-6" title={label}>{label}</span>
+                    </div>
+                    <span className="w-14 text-right text-ink-2 tabular-nums">{e.n} · {pct(e.n, x.clicks)}%</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+      <p className="flex flex-wrap gap-4 text-xs text-ink-2 sm:col-span-2">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-accent/60" />{t("Elemento interactivo")}</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-bad/60" />{t("Clic sin respuesta (posible confusión)")}</span>
+      </p>
     </div>
   );
 }

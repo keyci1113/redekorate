@@ -54,6 +54,10 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
     if (b.type === "prototype_task") {
       const p = settings.prototypes?.find((x) => x.id === b.prototypeId);
       if (!p) err(b, t("{a}: elige o crea el prototipo que se usará.", { a: name }));
+      else if (p.kind === "html") {
+        if (!p.html?.url) err(b, t("{a}: sube el archivo HTML del prototipo \"{b}\".", { a: name, b: p.name }));
+        else if (!b.goalScreens.length) warn(b, t("{a}: sin pantalla meta, el participante indicará cuándo terminó (el éxito no se verifica).", { a: name }));
+      }
       else if (!p.screens.length) err(b, t("{a}: el prototipo \"{b}\" no tiene pantallas.", { a: name, b: p.name }));
       else {
         const ids = new Set(p.screens.map((s) => s.id));
@@ -68,7 +72,7 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
   // Revisión de cada prototipo usado
   const used = new Set(blocks.flatMap((b) => (b.type === "prototype_task" ? [b.prototypeId] : [])));
   for (const p of settings.prototypes ?? []) {
-    if (!used.has(p.id)) continue;
+    if (!used.has(p.id) || p.kind === "html") continue;
     const ids = new Set(p.screens.map((s) => s.id));
     const goals = new Set(blocks.flatMap((b) => (b.type === "prototype_task" && b.prototypeId === p.id ? b.goalScreens : [])));
     for (const s of p.screens) {

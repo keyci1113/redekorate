@@ -1,6 +1,7 @@
-import { ArrowRight, Check, Pencil, Plus, Smartphone, Undo2, X } from "lucide-react";
+import { ArrowRight, Check, FileCode2, Pencil, Plus, Smartphone, Undo2, X } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, Screen } from "./prototype";
+import { isHtml } from "./prototype";
 import { Button, Field, cx } from "../components/ui";
 import { Tip, Toggle } from "../components/editing";
 
@@ -15,7 +16,8 @@ function ScreenGrid({ screens, selected, onPick, badge }: { screens: Screen[]; s
         return (
           <button key={s.id} type="button" onClick={() => onPick(s.id)} title={s.name}
             className={cx("group relative overflow-hidden rounded-lg border-2 text-left transition", on ? "border-accent" : "border-line hover:border-line-2")}>
-            <img src={s.image} alt="" className="aspect-[3/4] w-full bg-paper object-cover object-top" />
+            {s.image ? <img src={s.image} alt="" className="aspect-[3/4] w-full bg-paper object-cover object-top" />
+              : <span className="flex aspect-[4/3] w-full items-center justify-center bg-paper"><FileCode2 size={16} className="text-accent/70" /></span>}
             <span className="block truncate px-1.5 py-1 text-[11px] font-medium">{s.name}</span>
             {on && <span className="absolute top-1 right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-on-accent">{b ?? <Check size={11} strokeWidth={3} />}</span>}
           </button>
@@ -29,6 +31,8 @@ export function PrototypeTaskEditor({ block, set, ctx }: { block: PrototypeTaskB
   const proto = ctx.prototypes.find((p) => p.id === block.prototypeId);
   const screens = proto?.screens ?? [];
   const name = (id: string) => screens.find((s) => s.id === id)?.name ?? "?";
+  const html = isHtml(proto);
+  const n = (i: number) => (html ? i - 1 : i);   // en HTML no hay paso "pantalla inicial"
 
   return (
     <div className="space-y-5">
@@ -50,20 +54,26 @@ export function PrototypeTaskEditor({ block, set, ctx }: { block: PrototypeTaskB
         )}
       </Field>
 
-      {proto && screens.length === 0 && (
+      {proto && html && !proto.html && (
+        <Tip>{t("Este prototipo todavía no tiene archivo HTML. Haz clic en")} <b>{t("Editar")}</b> {t("para subirlo.")}</Tip>
+      )}
+      {proto && html && proto.html && screens.length === 0 && (
+        <Tip>{t("Abre el prototipo con")} <b>{t("Editar")}</b> {t("y navégalo: las pantallas que visites aparecerán aquí para elegir la meta. Sin meta, el participante indicará cuándo terminó.")}</Tip>
+      )}
+      {proto && !html && screens.length === 0 && (
         <Tip>{t("Este prototipo todavía no tiene pantallas. Haz clic en")} <b>{t("Editar")}</b> {t("para subirlas y conectar las zonas clicables.")}</Tip>
       )}
 
       {proto && screens.length > 0 && <>
-        <Field group label={t("1 · Pantalla inicial")} hint={t("Donde empieza el participante.")}>
+        {!html && <Field group label={t("1 · Pantalla inicial")} hint={t("Donde empieza el participante.")}>
           <ScreenGrid screens={screens} selected={block.startScreen ? [block.startScreen] : []}
             onPick={(id) => set({ startScreen: id, expectedPath: block.expectedPath.length ? [id, ...block.expectedPath.slice(1)] : [] })} />
-        </Field>
-        <Field group label={t("2 · Pantalla(s) meta")} hint={t("Al llegar aquí, la tarea se marca como completada.")}>
+        </Field>}
+        <Field group label={t("{a} · Pantalla(s) meta", { a: n(2) })} hint={html ? t("Al llegar aquí, la tarea se marca como completada. Si no eliges ninguna, el participante toca \"Terminé la tarea\".") : t("Al llegar aquí, la tarea se marca como completada.")}>
           <ScreenGrid screens={screens} selected={block.goalScreens}
             onPick={(id) => set({ goalScreens: block.goalScreens.includes(id) ? block.goalScreens.filter((g) => g !== id) : [...block.goalScreens, id] })} />
         </Field>
-        <Field group label={t("3 · Ruta esperada (opcional)")} hint={t("Haz clic en las pantallas en orden. Sirve para medir el éxito directo y ver dónde se desvían.")}>
+        <Field group label={t("{a} · Ruta esperada (opcional)", { a: n(3) })} hint={t("Haz clic en las pantallas en orden. Sirve para medir el éxito directo y ver dónde se desvían.")}>
           {block.expectedPath.length > 0 && (
             <div className="mb-2 flex flex-wrap items-center gap-1 rounded-lg bg-paper p-2 text-[12px]">
               {block.expectedPath.map((id, i) => (

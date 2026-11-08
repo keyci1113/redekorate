@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft, Check, ImagePlus, Loader2, Monitor, MousePointer2, Play, Plus, Smartphone, SquareDashedMousePointer, Trash2, Upload, X,
+  ArrowLeft, Check, Code2, FileCode2, ImagePlus, Loader2, Monitor, MousePointer2, Play, Plus, RotateCw, Smartphone, SquareDashedMousePointer, Trash2, Upload, X,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { uid } from "../lib/hooks";
 import type { Hotspot, Prototype, Screen } from "../blocks/prototype";
-import { naturalSort } from "../blocks/prototype";
+import { HTML_SANDBOX, asTrackerMsg, htmlScreenId, isHtml, naturalSort } from "../blocks/prototype";
 import { Button, cx } from "./ui";
 import { Toggle, useSortable } from "./editing";
 
@@ -37,6 +37,7 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
   const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const htmlInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === "Escape" && !hotId) onClose(); };
@@ -83,6 +84,20 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
     if (added.length) { setScreens([...proto.screens, ...added]); if (!screen) setScreenId(added[0].id); }
   }
 
+  async function addHtml(f: File | undefined) {
+    if (!f) return;
+    if (!/\.html?$/i.test(f.name) && f.type !== "text/html") { setErr(t("Usa un archivo .html.")); return; }
+    setErr(null); setUploading({ done: 0, total: 1 });
+    try {
+      const url = await api.uploadPrototype(f);
+      const keep = proto.kind === "html";   // al reemplazar el archivo se conservan las pantallas detectadas
+      setProto({ kind: "html", html: { url, file: f.name }, screens: keep ? proto.screens : [] });
+      setPlay(false); setHotId(null);
+    } catch (e) { setErr(`${f.name}: ${(e as Error).message}`); }
+    setUploading(null);
+  }
+  const html = isHtml(proto);
+
   const hot = screen?.hotspots.find((h) => h.id === hotId) ?? null;
   const setHot = (id: string, p: Partial<Hotspot>) => screen && setScreen(screen.id, { hotspots: screen.hotspots.map((h) => (h.id === id ? { ...h, ...p } : h)) });
   const removeHot = (id: string) => { if (!screen) return; setScreen(screen.id, { hotspots: screen.hotspots.filter((h) => h.id !== id) }); setHotId(null); };
@@ -103,9 +118,9 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="sm" variant={play ? "primary" : "secondary"} icon={play ? <SquareDashedMousePointer size={14} /> : <Play size={14} />} onClick={() => { setPlay(!play); setHotId(null); }} disabled={!proto.screens.length}>
+          {!html && <Button size="sm" variant={play ? "primary" : "secondary"} icon={play ? <SquareDashedMousePointer size={14} /> : <Play size={14} />} onClick={() => { setPlay(!play); setHotId(null); }} disabled={!proto.screens.length}>
             {play ? t("Volver a editar") : t("Probar")}
-          </Button>
+          </Button>}
           <Button size="sm" variant="primary" icon={<Check size={14} />} onClick={onClose}>{t("Listo")}</Button>
         </div>
       </header>
@@ -113,6 +128,14 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
       <div className="flex min-h-0 flex-1">
         {/* Pantallas */}
         <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-paper">
+          <input ref={htmlInput} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { addHtml(e.target.files?.[0]); e.target.value = ""; }} />
+          <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
+          {html ? (
+            <HtmlFilePanel proto={proto} uploading={!!uploading} err={err} onReplace={() => htmlInput.current?.click()}
+              onRemoveScreen={(id) => setScreens(proto.screens.filter((s) => s.id !== id))} />
+          ) : !proto.screens.length ? (
+            <p className="m-3 rounded-lg bg-surface p-3 text-xs text-ink-2">{t("Elige en el centro cómo quieres armar este prototipo.")}</p>
+          ) : <>
           <div className="p-3">
             <button onClick={() => fileInput.current?.click()}
               onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
@@ -121,25 +144,37 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
               <span className="text-[13px] font-medium">{uploading ? t("Subiendo {a}/{b}…", { a: uploading.done, b: uploading.total }) : t("Subir pantallas")}</span>
               <span className="text-[11px] text-ink-3">{t("Arrastra varias a la vez · el nombre del archivo será el de la pantalla")}</span>
             </button>
-            <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
             {err && <p className="mt-2 text-xs text-bad">{err}</p>}
           </div>
           <p className="label px-4 pb-2">{t("Pantallas ·")} {proto.screens.length}</p>
           <ScreenList proto={proto} selected={screen?.id} onSelect={(id) => { setScreenId(id); setHotId(null); }} onReorder={setScreens} onRename={(id, name) => setScreen(id, { name })} onRemove={removeScreen} />
+          </>}
         </aside>
 
         {/* Lienzo */}
         <section className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(#E7E2F0_1px,transparent_1px)] [background-size:18px_18px] p-8">
-          {!screen ? (
-            <div className="mx-auto mt-16 max-w-lg rounded-2xl border border-line bg-surface p-8 text-center">
-              <ImagePlus size={28} className="mx-auto text-accent" />
-              <h3 className="mt-3 font-semibold">{t("Sube las pantallas de tu prototipo")}</h3>
-              <ol className="mx-auto mt-4 max-w-sm list-decimal space-y-1.5 pl-5 text-left text-sm text-ink-2">
-                <li>{t("En Figma, selecciona todos los frames del flujo.")}</li>
-                <li>{t("En el panel derecho,")} <b>{t("Export → PNG 2x")}</b> {t("y exporta.")}</li>
-                <li>{t("Arrastra todos los archivos al botón")} <b>{t("Subir pantallas")}</b>.</li>
-                <li>{t("Dibuja zonas clicables sobre cada pantalla y elige a dónde llevan.")}</li>
-              </ol>
+          {html ? (
+            <HtmlCanvas proto={proto} onScreen={(name) => {
+              const id = htmlScreenId(name);
+              if (!proto.screens.some((s) => s.id === id)) setScreens([...proto.screens, { id, name, image: "", hotspots: [] }]);
+            }} />
+          ) : !screen ? (
+            <div className="mx-auto mt-10 max-w-3xl">
+              <h2 className="text-center text-xl font-semibold">{t("¿Cómo quieres armar tu prototipo?")}</h2>
+              <p className="mt-1 text-center text-sm text-ink-2">{t("Elige una de las dos opciones. Ambas registran rutas, clics y tiempos.")}</p>
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                <OptionCard icon={<ImagePlus size={20} />} title={t("Pantallas exportadas")} tag={t("Figma, Sketch, XD…")}
+                  onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
+                  steps={[t("En Figma, selecciona los frames del flujo y usa Export → PNG 2x."), t("Sube todas las imágenes a la vez."), t("Dibuja zonas clicables y elige a dónde lleva cada una.")]}
+                  action={<Button variant="primary" className="w-full" disabled={!!uploading} icon={uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />} onClick={() => fileInput.current?.click()}>
+                    {uploading ? t("Subiendo {a}/{b}…", { a: uploading.done, b: uploading.total }) : t("Subir pantallas")}</Button>}
+                  foot={t("También puedes arrastrar las imágenes aquí.")} />
+                <OptionCard icon={<Code2 size={20} />} title={t("HTML de Claude")} tag={t("Prototipo interactivo")}
+                  steps={[t("Pídele a Claude el prototipo como un solo archivo .html y descárgalo."), t("Súbelo aquí. No hay zonas que dibujar."), t("Navégalo para detectar las pantallas y elegir la meta.")]}
+                  action={<Button variant="primary" className="w-full" disabled={!!uploading} icon={uploading ? <Loader2 size={15} className="animate-spin" /> : <FileCode2 size={15} />} onClick={() => htmlInput.current?.click()}>{t("Subir HTML")}</Button>}
+                  foot={t("Con un link de Claude no se puede: claude.ai no deja mostrarlo en otros sitios.")} />
+              </div>
+              {err && <p className="mt-3 text-center text-sm text-bad">{err}</p>}
             </div>
           ) : play ? (
             <PlayMode proto={proto} startId={screen.id} />
@@ -155,7 +190,9 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
 
         {/* Propiedades */}
         <aside className="w-80 shrink-0 overflow-y-auto border-l border-line bg-surface p-5">
-          {play ? (
+          {html ? (
+            <HtmlHelp proto={proto} />
+          ) : play ? (
             <div className="space-y-3 text-sm text-ink-2">
               <p className="font-semibold text-ink">{t("Modo probar")}</p>
               <p>{t("Navega como lo haría un participante. Si haces clic fuera de una zona,")} {proto.showHints ? t("se resaltarán las zonas clicables") : t("no pasará nada")}.</p>
@@ -349,6 +386,119 @@ function PlayMode({ proto, startId }: { proto: Prototype; startId: string }) {
             style={{ left: `${h.x * 100}%`, top: `${h.y * 100}%`, width: `${h.w * 100}%`, height: `${h.h * 100}%` }} aria-label={t("Zona clicable")} />
         ))}
       </div>
+    </div>
+  );
+}
+
+/** Prototipo HTML: archivo actual y pantallas detectadas al navegarlo. */
+function HtmlFilePanel({ proto, uploading, err, onReplace, onRemoveScreen }: {
+  proto: Prototype; uploading: boolean; err: string | null; onReplace: () => void; onRemoveScreen: (id: string) => void;
+}) {
+  return <>
+    <div className="p-3">
+      <div className="rounded-xl border border-line bg-surface p-3">
+        <p className="flex items-center gap-2 text-[13px] font-medium"><FileCode2 size={15} className="shrink-0 text-accent" /><span className="truncate" title={proto.html?.file}>{proto.html?.file}</span></p>
+        <Button size="sm" variant="ghost" className="mt-2 w-full" icon={uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />} disabled={uploading} onClick={onReplace}>{t("Reemplazar archivo")}</Button>
+      </div>
+      {err && <p className="mt-2 text-xs text-bad">{err}</p>}
+    </div>
+    <p className="label px-4 pb-2">{t("Pantallas detectadas ·")} {proto.screens.length}</p>
+    {proto.screens.length === 0 ? (
+      <p className="mx-3 rounded-lg bg-surface p-3 text-xs text-ink-2">{t("Navega el prototipo en el centro: cada pantalla que visites aparecerá aquí para que puedas elegirla como meta de una tarea.")}</p>
+    ) : (
+      <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-3">
+        {proto.screens.map((s, i) => (
+          <li key={s.id} className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-ink/[0.04]">
+            <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={s.name}>{s.name}</span>
+            <button onClick={() => onRemoveScreen(s.id)} className="rounded p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-bad" aria-label={t("Quitar pantalla")}><Trash2 size={13} /></button>
+          </li>
+        ))}
+      </ol>
+    )}
+  </>;
+}
+
+/** El HTML corre en un iframe aislado; el script inyectado nos dice en qué pantalla está. */
+function HtmlCanvas({ proto, onScreen }: { proto: Prototype; onScreen: (name: string) => void }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [key, setKey] = useState(0);
+  const [cur, setCur] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+  const cb = useRef(onScreen); cb.current = onScreen;
+  useEffect(() => {
+    const h = (e: MessageEvent) => {
+      if (e.source !== frame.current?.contentWindow) return;
+      const m = asTrackerMsg(e.data); if (!m) return;
+      if (m.type === "ready") setReady(true);
+      if (m.type === "screen" && typeof m.name === "string" && m.name) { const n = m.name.slice(0, 80); setCur(n); cb.current(n); }
+    };
+    window.addEventListener("message", h); return () => window.removeEventListener("message", h);
+  }, []);
+  const mobile = proto.device === "mobile";
+  return (
+    <div className="mx-auto" style={{ maxWidth: mobile ? 400 : 1100 }}>
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-ink-3">
+        <span className="truncate">{cur ? <>{t("Pantalla actual:")} <b className="text-ink">{cur}</b></> : t("Cargando prototipo…")}</span>
+        <button onClick={() => { setKey((k) => k + 1); setCur(null); setReady(false); }} className="flex shrink-0 items-center gap-1 font-medium text-accent"><RotateCw size={12} /> {t("Reiniciar")}</button>
+      </div>
+      <div className={cx("overflow-hidden bg-white shadow-xl", mobile ? "mx-auto rounded-[2rem] ring-8 ring-black" : "rounded-xl border border-line")}
+        style={mobile ? { width: 390, height: 844, maxWidth: "100%" } : { aspectRatio: "16 / 10" }}>
+        {proto.html && <iframe key={key} ref={frame} src={proto.html.url} sandbox={HTML_SANDBOX} title={proto.name} className="block h-full w-full border-0" referrerPolicy="no-referrer" />}
+      </div>
+      {!ready && cur === null && <p className="mt-3 text-center text-xs text-ink-3">{t("Si el prototipo no carga, revisa que sea un archivo HTML completo (no un componente .jsx).")}</p>}
+    </div>
+  );
+}
+
+const CLAUDE_PROMPT = "Agrega el atributo data-screen=\"Nombre de la pantalla\" al contenedor principal de cada pantalla o vista de este prototipo (por ejemplo data-screen=\"Carrito\"), con nombres cortos y únicos. Entrégamelo como un solo archivo .html que funcione sin servidor.";
+
+function HtmlHelp({ proto }: { proto: Prototype }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="space-y-4 text-sm text-ink-2">
+      <p className="font-semibold text-ink">{t("Prototipo HTML")}</p>
+      <p>{t("Navégalo en el centro como lo haría un participante. No hace falta dibujar zonas: se registra cada clic y si cayó en un elemento interactivo.")}</p>
+      <div>
+        <p className="mb-1.5 text-[13px] font-medium text-ink">{t("Cómo se detectan las pantallas")}</p>
+        <ol className="list-decimal space-y-1 pl-5 text-[13px]">
+          <li>{t("El atributo")} <code className="rounded bg-paper px-1 text-[12px]">data-screen</code> {t("(lo más preciso).")}</li>
+          <li>{t("El # de la URL, si el prototipo lo usa.")}</li>
+          <li>{t("El título")} <code className="rounded bg-paper px-1 text-[12px]">&lt;h1&gt;</code> {t("visible.")}</li>
+        </ol>
+      </div>
+      <div className="rounded-xl bg-paper p-3">
+        <p className="text-[13px] font-medium text-ink">{t("¿Los nombres no son claros?")}</p>
+        <p className="mt-1 text-[12px]">{t("Pídele esto a Claude y vuelve a subir el archivo:")}</p>
+        <p className="mt-2 rounded-lg bg-surface p-2 text-[12px] leading-relaxed ring-1 ring-line">{t(CLAUDE_PROMPT)}</p>
+        <Button size="sm" variant="ghost" className="mt-2" icon={copied ? <Check size={14} /> : undefined}
+          onClick={() => { navigator.clipboard?.writeText(t(CLAUDE_PROMPT)).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {}); }}>
+          {copied ? t("Copiado") : t("Copiar instrucción")}
+        </Button>
+      </div>
+      <p className="text-[12px] text-ink-3">{t("Cada pantalla que visites aparece a la izquierda. Después, en la tarea, eliges cuál es la meta. Si no eliges ninguna, el participante indicará cuándo terminó.")}</p>
+    </div>
+  );
+}
+
+function OptionCard({ icon, title, tag, steps, action, foot, onDrop }: {
+  icon: React.ReactNode; title: string; tag: string; steps: string[]; action: React.ReactNode; foot: string; onDrop?: (e: React.DragEvent) => void;
+}) {
+  return (
+    <div onDragOver={onDrop && ((e) => e.preventDefault())} onDrop={onDrop}
+      className="flex flex-col rounded-2xl border border-line bg-surface p-6 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">{icon}</span>
+        <div>
+          <h3 className="font-semibold">{title}</h3>
+          <p className="text-xs text-ink-3">{tag}</p>
+        </div>
+      </div>
+      <ol className="mt-4 flex-1 list-decimal space-y-1.5 pl-5 text-sm text-ink-2">
+        {steps.map((x) => <li key={x}>{x}</li>)}
+      </ol>
+      <div className="mt-5">{action}</div>
+      <p className="mt-2 min-h-[2.2rem] text-center text-[11px] text-ink-3">{foot}</p>
     </div>
   );
 }

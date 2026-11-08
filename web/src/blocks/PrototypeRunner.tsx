@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, Flag, Play, RotateCcw, Target } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, ProtoClick, ProtoStep, PrototypeTaskValue } from "./prototype";
+import { HTML_SANDBOX, asTrackerMsg, htmlScreenId, isHtml } from "./prototype";
 import { cx } from "../components/ui";
 
 import { t } from "../lib/i18n";
@@ -19,6 +20,9 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   const scroller = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const area = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const [run, setRun] = useState(0);   // cambia en cada intento para recargar el HTML desde cero
+  const html = isHtml(proto);
   const [avail, setAvail] = useState({ w: 1200, h: 800 });
   useEffect(() => {
     if (!area.current) return;
@@ -27,9 +31,31 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   }, [phase]);
 
   // Precarga de todas las pantallas para que la navegación sea instantánea
-  useEffect(() => { proto?.screens.forEach((s) => { const i = new Image(); i.src = s.image; }); }, [proto]);
+  useEffect(() => { if (!html) proto?.screens.forEach((s) => { const i = new Image(); i.src = s.image; }); }, [proto, html]);
 
-  if (!proto || !proto.screens.length || !proto.screens.some((s) => s.id === block.startScreen)) {
+  // Prototipo HTML: el script inyectado nos avisa de cada pantalla y cada clic
+  useEffect(() => {
+    if (!html || phase !== "running") return;
+    const onMsg = (e: MessageEvent) => {
+      if (e.source !== frameRef.current?.contentWindow) return;
+      const m = asTrackerMsg(e.data); if (!m) return;
+      const t = Math.round(performance.now() - start.current);
+      if (m.type === "screen" && typeof m.name === "string" && m.name) {
+        const id = htmlScreenId(m.name.slice(0, 80));
+        if (path.current[path.current.length - 1]?.s === id) return;
+        path.current.push({ s: id, t: path.current.length ? t : 0 });
+        if (block.goalScreens.includes(id)) finishRef.current("success");
+      } else if (m.type === "click" && clicks.current.length < 2000) {
+        const s = m.screen ? htmlScreenId(String(m.screen).slice(0, 80)) : path.current[path.current.length - 1]?.s ?? "";
+        const n = (v: unknown) => (typeof v === "number" && isFinite(v) ? +Math.min(1, Math.max(0, v)).toFixed(4) : 0);
+        clicks.current.push({ s, x: n(m.x), y: n(m.y), t, h: m.hit ? "el" : null, l: String(m.label ?? "").slice(0, 80) });
+      }
+    };
+    window.addEventListener("message", onMsg); return () => window.removeEventListener("message", onMsg);
+  }, [html, phase, block.goalScreens]);
+  const finishRef = useRef<(o: PrototypeTaskValue["outcome"]) => void>(() => {});
+
+  if (!proto || (html ? !proto.html?.url : !proto.screens.length || !proto.screens.some((s) => s.id === block.startScreen))) {
     return <p className="rounded-xl bg-warn-soft p-4 text-sm text-warn">{preview ? t("Configura el prototipo y la pantalla inicial de esta tarea en el panel derecho.") : t("Esta tarea no está disponible.")}</p>;
   }
   const cur = proto.screens.find((s) => s.id === hist[hist.length - 1]);
@@ -42,14 +68,18 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
     : (() => { const w = Math.min(1280, avail.w, avail.h * 1.6); return { width: w, height: Math.min(avail.h, w / 1.6) }; })();
 
   const begin = () => {
-    start.current = performance.now(); path.current = [{ s: block.startScreen, t: 0 }]; clicks.current = [];
-    setHist([block.startScreen]); setPhase("running"); setShowTask(false);
+    start.current = performance.now(); clicks.current = [];
+    path.current = html ? [] : [{ s: block.startScreen, t: 0 }];
+    setHist(html ? [] : [block.startScreen]); setRun((r) => r + 1); setPhase("running"); setShowTask(false);
   };
   const finish = (outcome: PrototypeTaskValue["outcome"]) => {
     const v: PrototypeTaskValue = { outcome, path: path.current, clicks: clicks.current, ms: Math.round(performance.now() - start.current) };
     onChange(v); setPhase("done");
     if (!preview) setTimeout(() => onAdvance?.(v), outcome === "success" ? 1100 : 300);
   };
+  finishRef.current = finish;
+  // En HTML sin pantalla meta, el participante indica cuándo terminó
+  const selfReport = html && block.goalScreens.length === 0;
   const now = () => Math.round(performance.now() - start.current);
   const rel = (e: React.MouseEvent) => {
     const r = imgRef.current!.getBoundingClientRect();
@@ -73,6 +103,7 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
         <ul className="mx-auto mt-4 max-w-sm space-y-1 text-left text-[13px] text-ink-2">
           <li>{t("• Toca los elementos como lo harías normalmente.")}</li>
           <li>{t("• Si la pantalla es larga, puedes desplazarte.")}</li>
+          {selfReport && <li>{t("• Cuando creas que lo lograste, toca")} <b>{t("\"Terminé la tarea\"")}</b>.</li>}
           {block.allowGiveUp && <li>{t("• Si no encuentras cómo hacerlo, usa")} <b>{t("\"No puedo completarla\"")}</b>{t(". También nos sirve.")}</li>}
         </ul>
         <button type="button" onClick={begin} className="focus-ring mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-[15px] font-medium text-on-accent">
@@ -103,6 +134,11 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
           <span className={cx("text-sm font-medium", !showTask && "truncate")}>{block.title}</span>
         </button>
         {preview && <button onClick={() => setPhase("intro")} className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium text-ink-3 hover:text-ink">{t("Salir de la vista previa")}</button>}
+        {selfReport && (
+          <button onClick={() => finish("success")} className="focus-ring shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent">
+            {t("Terminé la tarea")}
+          </button>
+        )}
         {block.allowGiveUp && (
           <button onClick={() => finish("gave_up")} className="focus-ring shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 hover:border-bad hover:text-bad">
             {t("No puedo completarla")}
@@ -114,9 +150,13 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
       {/* Prototipo */}
       <div ref={area} className={cx("flex min-h-0 flex-1 items-center justify-center", bare ? "p-0" : "p-3 sm:p-6")}>
         <div ref={scroller}
-          className={cx("relative overflow-y-auto overscroll-contain bg-white shadow-2xl", bare ? "" : mobile ? "rounded-[2rem] ring-8 ring-black" : "rounded-lg")}
+          className={cx("relative overscroll-contain bg-white shadow-2xl", html ? "overflow-hidden" : "overflow-y-auto", bare ? "" : mobile ? "rounded-[2rem] ring-8 ring-black" : "rounded-lg")}
           style={frame}>
-          {cur && (
+          {html && proto.html && (
+            <iframe key={run} ref={frameRef} src={proto.html.url} sandbox={HTML_SANDBOX} title={proto.name}
+              className="block h-full w-full border-0 bg-white" referrerPolicy="no-referrer" />
+          )}
+          {!html && cur && (
             <div className="relative" onClick={(e) => {
               clicks.current.push({ s: cur.id, ...rel(e), t: now(), h: null });
               if (proto.showHints) { setFlash(true); setTimeout(() => setFlash(false), 650); }

@@ -34,4 +34,11 @@ export const api = {
     const res = await fetch("/api/uploads", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
     return (await handle<{ url: string }>(res)).url;
   },
+  /** Prototipo HTML (p. ej. descargado de Claude): el servidor le agrega el script de seguimiento. */
+  async uploadPrototype(file: File): Promise<string> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/uploads/prototype", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
+    return (await handle<{ url: string }>(res)).url;
+  },
 };

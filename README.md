@@ -31,6 +31,15 @@ Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de
 4. En cada tarea eliges la pantalla inicial, la pantalla meta y, si quieres, la ruta esperada.
 5. El participante ve la tarea, navega el prototipo en un marco de teléfono o escritorio (a pantalla completa en su celular) y puede marcar "No puedo completarla". Se guardan cada clic con coordenadas, la ruta y los tiempos.
 
+**Prototipos HTML (por ejemplo, hechos con Claude):**
+1. Pídele a Claude el prototipo como **un solo archivo .html** y descárgalo (un componente `.jsx` no sirve).
+2. En **Prototipos**, crea uno nuevo y usa **Subir HTML**. No hay zonas que dibujar.
+3. Navégalo en el editor: cada pantalla que visitas aparece en **Pantallas detectadas**. Se reconocen por el atributo `data-screen="Nombre"`, por el `#` de la URL o por el `<h1>` visible. El editor trae una instrucción lista para copiar y pedirle a Claude que agregue `data-screen`.
+4. En la tarea eliges la pantalla meta y, si quieres, la ruta esperada. Sin meta, el participante toca "Terminé la tarea" (es éxito autodeclarado, no se verifica).
+5. Se guardan la ruta, los tiempos y cada clic con el texto del elemento. En vez de mapas de calor, los resultados muestran los elementos más tocados por pantalla y los **clics sin respuesta** (en algo que no es interactivo).
+
+> ¿Por qué no basta con pegar el link de Claude? claude.ai no permite que otros sitios muestren sus artifacts dentro de un iframe (`frame-ancestors`), así que el prototipo se sube como archivo. El servidor le agrega un script de seguimiento y lo sirve con CSP `sandbox` (origen opaco): el HTML no puede leer la sesión ni llamar a la API, y solo se puede incrustar desde la app.
+
 > ¿Por qué no se conecta directo con Figma? La Embed API de Figma es gratuita, pero solo envía eventos si el participante tiene sesión iniciada en Figma (confirmado por el soporte de Figma en enero de 2026), y además da los clics relativos a la capa tocada, no a la pantalla. Con pantallas subidas, cualquier participante anónimo funciona y los mapas de calor son precisos.
 
 **Lógica condicional:** reglas en lenguaje natural, por ejemplo "si la respuesta es menor que 7 → ir a…". Funciona con opciones, Sí/No, escalas, NPS, preferencia y acierto/fallo en tree test y first click. Solo se puede saltar hacia adelante, así que nunca se forman ciclos.
