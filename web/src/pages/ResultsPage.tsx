@@ -3,6 +3,8 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ChevronDown, Download, ExternalLink, Link2, PenLine, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
+import { rememberStudy } from "../lib/recent";
+import { useEffect } from "react";
 import type { Answer, Insight, Session, Share, Study } from "../lib/types";
 import type { Block, CardSortValue, ChoiceValue, FirstClickValue, PreferenceValue, TreeTestValue } from "../blocks/types";
 import { isSuccess } from "../blocks/logic";
@@ -15,12 +17,12 @@ import { Button, Card, Empty, ErrorNote, Spinner, StatusBadge, Tabs, cx } from "
 import { BlockResults, Overview } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
-import type { Project } from "../lib/types";
+import type { Project, ProjectRole } from "../lib/types";
 import { ShareLink, studyUrl } from "./BuilderPage";
 import { templateByKey } from "../templates/catalog";
 
 import { t } from "../lib/i18n";
-interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[] }
+interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole }
 type TabId = "summary" | "responses" | "insights" | "share";
 
 export function ResultsPage() {
@@ -28,9 +30,12 @@ export function ResultsPage() {
   const [params] = useSearchParams();
   const [tab, setTab] = useState<TabId>(params.get("tab") === "insights" ? "insights" : "summary");
   const { data, error, loading, reload } = useLoad(() => api.get<Results>(`/studies/${id}/results`), [id]);
+  const st = data?.study;
+  useEffect(() => { if (st) rememberStudy({ id: st.id, title: st.title, method: st.method, project_id: st.project_id, where: "results" }); }, [st]);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
   const { study, sessions, answers, insights } = data;
+  const canEdit = data.role !== "viewer";   // solo lectura: sin editar, descartar ni compartir
 
   return (
     <div className="page">
@@ -44,13 +49,13 @@ export function ResultsPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to={`/studies/${study.id}/edit`}><Button variant="ghost" icon={<PenLine size={15} />}>{t("Editar")}</Button></Link>
+          {canEdit && <Link to={`/studies/${study.id}/edit`}><Button variant="ghost" icon={<PenLine size={15} />}>{t("Editar")}</Button></Link>}
           <Button icon={<Download size={15} />} onClick={() => exportCsv(study, sessions, answers)} disabled={!sessions.length}>{t("CSV")}</Button>
           <ReportPdfButton title={study.title} load={async () => {
             const { project } = await api.get<{ project: Project }>(`/projects/${study.project_id}`).catch(() => ({ project: null as Project | null }));
             return <StudyReportPdf r={{ study, sessions, answers, insights }} projectName={project?.name} projectColor={project?.color} />;
           }} />
-          <Button variant="primary" icon={<Link2 size={15} />} onClick={() => setTab("share")}>{t("Compartir reporte")}</Button>
+          {canEdit && <Button variant="primary" icon={<Link2 size={15} />} onClick={() => setTab("share")}>{t("Compartir reporte")}</Button>}
         </div>
       </div>
 
@@ -68,14 +73,14 @@ export function ResultsPage() {
           { id: "summary", label: t("Resultados") },
           { id: "responses", label: t("Participantes"), count: sessions.length },
           { id: "insights", label: t("Insights"), count: insights.length },
-          { id: "share", label: t("Compartir") },
+          ...(canEdit ? [{ id: "share" as const, label: t("Compartir") }] : []),
         ]} />
       </div>
       <div className="mt-6">
         {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings} />}
-        {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} onChange={reload} />}
+        {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} onChange={reload} canEdit={canEdit} />}
         {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} />}
-        {tab === "share" && <SharePanel study={study} />}
+        {tab === "share" && canEdit && <SharePanel study={study} />}
       </div>
     </div>
   );
@@ -117,7 +122,7 @@ export function formatAnswer(block: Block, value: unknown, settings?: StudySetti
   }
 }
 
-function Responses({ study, sessions, answers, onChange }: { study: Study; sessions: Session[]; answers: Answer[]; onChange: () => void }) {
+function Responses({ study, sessions, answers, onChange, canEdit }: { study: Study; sessions: Session[]; answers: Answer[]; onChange: () => void; canEdit: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const qs = answeredBlocks(study.blocks);
   if (!sessions.length) return <Empty icon={<Plus size={20} />} title={t("Aún no hay participantes")} text={t("Comparte el link del estudio para empezar a recibir respuestas.")} />;
@@ -151,10 +156,10 @@ function Responses({ study, sessions, answers, onChange }: { study: Study; sessi
                   })}
                 </dl>
                 <div className="mt-4 flex justify-end">
-                  <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {
+                  {canEdit && <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {
                     if (!confirm(t("¿Eliminar esta respuesta? Úsalo para descartar pruebas o respuestas inválidas."))) return;
                     await api.del(`/studies/${study.id}/sessions/${s.id}`); onChange();
-                  }}>{t("Descartar respuesta")}</Button>
+                  }}>{t("Descartar respuesta")}</Button>}
                 </div>
               </div>
             )}

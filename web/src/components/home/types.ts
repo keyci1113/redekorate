@@ -6,12 +6,14 @@ export interface LiveStudy {
   responses: number; started: number; last_response_at: string | null;
 }
 export interface Draft { id: string; title: string; method: string; updated_at: string; project_name: string; project_color: string }
+export interface RecentOpen { id: string; title: string; method: string; status: string; project_id: string; project_name: string; project_color: string; opened_at: string; where: "edit" | "results" }
 export interface HomeInsight {
   id: string; title: string; severity: Severity; created_at: string; reviewed_at: string | null;
   project_id: string; study_id: string | null; project_name: string; method: string | null;
 }
 export interface Dash {
   totals: { projects: number; studies: number; live: number; projects_live: number; responses: number; responses_week: number; insights: number };
+  recent?: RecentOpen | null;   // último estudio abierto por esta persona
   trend: Day[];
   study_trend: { study_id: string; day: string; n: number }[];
   live: LiveStudy[];

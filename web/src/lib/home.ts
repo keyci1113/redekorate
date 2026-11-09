@@ -66,19 +66,35 @@ export function peakDay(days: Day[]): Day | null {
 }
 
 // ── Estudios activos ────────────────────────────────────────────────
-export interface LiveLike { id: string; responses: number; started: number; last_response_at: string | null }
-export type LiveSort = "recent" | "lowest";
+export interface LiveLike { id: string; responses: number; started: number; last_response_at: string | null; title?: string; method?: string }
+export type LiveSortKey = "recent" | "completion" | "title" | "method";
+export interface LiveSort { key: LiveSortKey; dir: "asc" | "desc" }
+/** Atajos del selector: "Más reciente" y "Menor completado". */
+export const LIVE_SORT_PRESETS: Record<"recent" | "lowest", LiveSort> = { recent: { key: "recent", dir: "desc" }, lowest: { key: "completion", dir: "asc" } };
+export const presetOf = (s: LiveSort): "recent" | "lowest" | "custom" =>
+  s.key === "recent" && s.dir === "desc" ? "recent" : s.key === "completion" && s.dir === "asc" ? "lowest" : "custom";
+/** Clic en una columna: misma columna invierte la dirección; otra columna empieza por el orden natural (texto asc, números desc). */
+export function toggleSort(cur: LiveSort, key: LiveSortKey): LiveSort {
+  if (cur.key === key) return { key, dir: cur.dir === "asc" ? "desc" : "asc" };
+  return { key, dir: key === "title" || key === "method" ? "asc" : "desc" };
+}
 
 /** "recent": última respuesta primero. "lowest": menor completado primero (sin datos al final). */
 export function sortLive<T extends LiveLike>(list: T[], by: LiveSort): T[] {
   const time = (s: T) => (s.last_response_at ? new Date(s.last_response_at).getTime() : -Infinity);
+  const sign = by.dir === "asc" ? 1 : -1;
+  const text = (s: T) => (by.key === "title" ? s.title : s.method) ?? "";
   return [...list].sort((a, b) => {
-    if (by === "recent") return time(b) - time(a);
-    const ra = completion(a.responses, a.started), rb = completion(b.responses, b.started);
-    if (ra === null && rb === null) return time(b) - time(a);
-    if (ra === null) return 1;
-    if (rb === null) return -1;
-    return ra - rb || time(b) - time(a);
+    let d = 0;
+    if (by.key === "recent") d = time(a) - time(b);
+    else if (by.key === "completion") {
+      const ra = completion(a.responses, a.started), rb = completion(b.responses, b.started);
+      if (ra === null && rb === null) d = 0;
+      else if (ra === null) return 1;      // sin datos siempre al final
+      else if (rb === null) return -1;
+      else d = ra - rb;
+    } else d = text(a).localeCompare(text(b), undefined, { sensitivity: "base", numeric: true });
+    return sign * d || time(b) - time(a);   // empate: el más reciente primero
   });
 }
 

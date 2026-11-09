@@ -1,17 +1,45 @@
 # Changelog
 
-## Fase 4
-- Plantillas llenables por proyecto (12): personas, journey map, afinidad, entrevistas, AEIOU, observación, guion y resultados de usabilidad, evaluación heurística y UX blueprint. Nacen vacías, con ejemplos como texto guía.
-- Guardar como… (copia en este u otro proyecto) y exportación a Word, PDF, Markdown y CSV.
-- Modelo Kano.
-- Interfaz bilingüe español / inglés.
-- Tipografía Spline Sans en títulos.
+All notable changes to redekorate are documented here. The project does not publish versioned releases yet; entries are grouped by development phase, newest first.
 
-## Fase 3
-- Prototype Testing con pantallas subidas, zonas clicables, rutas, éxito directo/indirecto y mapas de calor.
+## Unreleased
 
-## Fase 2
-- Paleta morada, login y dashboard, tipos de investigación con imágenes, lógica, card sorting, tree test, preference, five second y first click. Seguridad reforzada.
+- **HTML prototypes.** Upload a single-file HTML prototype (for example one made with Claude). The server injects a tracker and serves it inside a CSP sandbox; screens are detected by `data-screen`, URL hash or visible `h1`; results show most-tapped elements and clicks with no response.
+- **Home redesign.** Greeting and "Continue draft" card, day summary from real data, four KPIs with a 14-day chart, live studies table with sorting and a low-completion chip, per-user detail view preference, insights sorted by severity with a review toggle, activity grouped by study, loading/error/empty states.
+- **Insight review.** Insights can be marked as reviewed (migration 006), with a pending filter.
+- **Participant panel.** Per-project recruiting base with contact, tags, consent and study history (migration 004).
+- **Project reports.** A shared report can combine several studies of a project (migration 005).
+- **PDF reports**, colored KPIs and layout polish.
+- Official Redekorate logos.
+- Test-data seed (`npm run seed:test`) and upload proxying in development.
+- **Performance.** Gzip/Brotli compression on every response, one-year immutable caching for hashed assets with `no-cache` on `index.html`, one JS chunk per route (the participant runner no longer downloads the builder, results or document templates; main entry 920 KB → 416 KB raw, 138 KB gzipped) and the dashboard's eight queries run in parallel.
+- **Profile photos.** Upload one from My account (optimized in the browser like any image); shown in the header menu, Users and project collaborators (migration 009).
+- **Users and roles.** Admin and member roles (migration 007); the first account becomes admin. Admins invite people by email with a 7-day link that bypasses closed sign-up, change roles, and disable or reactivate accounts (disabling revokes sessions). Guards keep at least one active admin.
+- **Project collaborators.** Owners add existing accounts to a project as editor or read-only (migration 008). Every project, study, document, insight and participant route now checks membership and role; viewers are redirected from the builder, get read-only documents and results, and see no create, edit, delete or share controls anywhere in a project; the dashboard includes shared projects.
+- **Draft vs. published.** Live studies keep a published snapshot (migration 010): the builder edits a draft, participants see the published version, and "Publish changes" pushes the draft explicitly. Sessions record the version they started with and answers validate against the published blocks.
+- **Prototype flow.** HTML prototypes carry a start screen, goal screen, ordered path, required interactions (recorded from the preview or typed, e.g. "tap the Order Checklist tab"; any can be the goal) and participant instructions, marked in the detected-screens list; tasks take the flow as defaults, with a one-click "use the prototype's flow" when it changes. The link and HTML panels can also drop the current source and go back to the chooser, or delete the prototype.
+- **Prototype by link.** Paste a published prototype URL (Figma Make, any live site). The server validates it, refuses private hosts, and reports whether the site allows embedding; the task shows it in an iframe and records time and self-reported outcome.
+- **Neutral dark mode.** Dark backgrounds, borders and secondary text are now grays instead of purple tints; the accent stays purple. Input borders reach a 3:1 boundary contrast in dark mode.
+- **PDF reports** no longer open with a solid purple title block; the title is set in plain type.
+- **Client-side image optimization.** Block, branding and prototype images are resized (max 2048 px) and re-encoded as WebP in the browser before upload; GIFs untouched; the original is kept when re-encoding does not shrink it.
+- Open-source preparation: English README, contributing guide, code of conduct, security policy, issue and PR templates, CI workflow, AGPL-3.0 license.
 
-## Fase 1
-- Proyectos, estudios por bloques, links para participantes, resultados, insights y reportes compartibles.
+## Phase 4
+
+- Fillable document templates per project: personas, journey map, affinity, interviews, AEIOU, observation, usability script and results, heuristic evaluation and UX blueprint. Documents start empty, with examples as placeholder text.
+- "Save as…" (copy into this or another project) and export to Word, PDF, Markdown and CSV.
+- Kano model.
+- Bilingual interface, Spanish / English.
+- Spline Sans for headings.
+
+## Phase 3
+
+- Prototype Testing with uploaded screens, clickable zones, paths, direct/indirect success and heatmaps.
+
+## Phase 2
+
+- Purple palette, login and dashboard, research types with images, conditional logic, card sorting, tree test, preference, five second and first click. Security hardening.
+
+## Phase 1
+
+- Projects, block-based studies, participant links, results, insights and shareable reports.

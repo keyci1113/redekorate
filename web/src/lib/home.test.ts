@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMPLETION_THRESHOLD, DEFAULT_VIEW, aggregateCompletion, completion, groupActivity, isLowCompletion,
-  loadView, peakDay, saveView, sortInsights, sortLive, splitWeeks,
+  LIVE_SORT_PRESETS, loadView, peakDay, presetOf, saveView, sortInsights, sortLive, splitWeeks, toggleSort,
 } from "./home";
 
 describe("completado y umbral", () => {
@@ -32,8 +32,23 @@ describe("completado y umbral", () => {
       { id: "b", responses: 0, started: 0, last_response_at: null },
       { id: "c", responses: 5, started: 10, last_response_at: "2026-11-02T00:00:00Z" },
     ];
-    expect(sortLive(list, "lowest").map((s) => s.id)).toEqual(["c", "a", "b"]);
-    expect(sortLive([list[1], list[0], list[2]], "recent").map((s) => s.id)).toEqual(["c", "a", "b"]);
+    expect(sortLive(list, LIVE_SORT_PRESETS.lowest).map((s) => s.id)).toEqual(["c", "a", "b"]);
+    expect(sortLive([list[1], list[0], list[2]], LIVE_SORT_PRESETS.recent).map((s) => s.id)).toEqual(["c", "a", "b"]);
+  });
+  it("ordena por columna en ambas direcciones y alterna al repetir", () => {
+    const list = [
+      { id: "b", title: "Beta", method: "sus", responses: 1, started: 2, last_response_at: "2026-11-01T00:00:00Z" },
+      { id: "a", title: "alpha", method: "nps", responses: 2, started: 2, last_response_at: "2026-11-03T00:00:00Z" },
+      { id: "c", title: "Gamma 10", method: "nps", responses: 0, started: 0, last_response_at: null },
+    ];
+    expect(sortLive(list, { key: "title", dir: "asc" }).map((s) => s.id)).toEqual(["a", "b", "c"]);
+    expect(sortLive(list, { key: "title", dir: "desc" }).map((s) => s.id)).toEqual(["c", "b", "a"]);
+    expect(sortLive(list, { key: "method", dir: "asc" }).map((s) => s.id)).toEqual(["a", "c", "b"]);   // empate nps: el más reciente primero
+    expect(sortLive(list, { key: "completion", dir: "desc" }).map((s) => s.id)).toEqual(["a", "b", "c"]);   // sin datos al final
+    expect(toggleSort({ key: "title", dir: "asc" }, "title")).toEqual({ key: "title", dir: "desc" });
+    expect(toggleSort({ key: "title", dir: "asc" }, "completion")).toEqual({ key: "completion", dir: "desc" });
+    expect(presetOf(LIVE_SORT_PRESETS.lowest)).toBe("lowest");
+    expect(presetOf({ key: "title", dir: "asc" })).toBe("custom");
   });
 });
 

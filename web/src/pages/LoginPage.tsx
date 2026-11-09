@@ -47,7 +47,7 @@ function FallingCards() {
   );
 }
 
-function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-full lg:grid-cols-[1fr_1.05fr]">
       <div className="flex flex-col px-6 py-8 sm:px-12">
@@ -69,7 +69,7 @@ function AuthShell({ children }: { children: ReactNode }) {
   );
 }
 
-function PasswordInput({ value, onChange, autoComplete }: { value: string; onChange: (v: string) => void; autoComplete: string }) {
+export function PasswordInput({ value, onChange, autoComplete }: { value: string; onChange: (v: string) => void; autoComplete: string }) {
   const [show, setShow] = useState(false);
   return (
     <div className="relative">

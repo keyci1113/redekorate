@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import { fmtNum, fmtPct, plural, relTime, t } from "../../lib/i18n";
 import {
-  COMPLETION_THRESHOLD, HOME_VIEWS, completion, isLowCompletion, sortLive, type Day, type HomeView, type LiveSort,
+  COMPLETION_THRESHOLD, HOME_VIEWS, LIVE_SORT_PRESETS, completion, isLowCompletion, presetOf, sortLive, toggleSort, type Day, type HomeView, type LiveSort, type LiveSortKey,
 } from "../../lib/home";
 import { familyColor, familyOf } from "../../lib/families";
 import { templateByKey } from "../../templates/catalog";
@@ -98,6 +98,20 @@ function Segmented<T extends string>({ value, options, onChange, label }: { valu
           className={cx("focus-ring min-h-10 rounded-md px-3 text-sm font-medium", v === value ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink")}>{l}</button>
       ))}
     </div>
+  );
+}
+
+/** Encabezado de columna ordenable: clic alterna la dirección; anuncia el estado con aria-sort. */
+function SortHeader({ k, sort, onSort, children }: { k: LiveSortKey; sort: LiveSort; onSort: (s: LiveSort) => void; children: ReactNode }) {
+  const active = sort.key === k;
+  return (
+    <span role="columnheader" aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button type="button" onClick={() => onSort(toggleSort(sort, k))}
+        className={cx("focus-ring -mx-1 inline-flex min-h-8 items-center gap-1 rounded px-1 hover:text-ink", active && "text-ink")}>
+        {children}
+        <span aria-hidden className={cx("text-[10px]", !active && "opacity-0 group-hover:opacity-100")}>{active ? (sort.dir === "asc" ? "▲" : "▼") : "▲"}</span>
+      </button>
+    </span>
   );
 }
 
@@ -257,7 +271,7 @@ export function LiveStudies({ live, trend, studyTrend, load, view, onViewChange,
   live: LiveStudy[]; trend: Day[]; studyTrend: { study_id: string; day: string; n: number }[]; load: Load;
   view: HomeView; onViewChange: (v: HomeView) => void; limit?: number;
 }) {
-  const [sort, setSort] = useState<LiveSort>("recent");
+  const [sort, setSort] = useState<LiveSort>(LIVE_SORT_PRESETS.recent);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [animateView, setAnimateView] = useState(false);
@@ -274,8 +288,11 @@ export function LiveStudies({ live, trend, studyTrend, load, view, onViewChange,
 
   const table = (
     <div className="@container">
-      <div aria-hidden className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)_minmax(0,1.5fr)_minmax(0,1fr)] gap-x-4 border-b border-line px-5 py-2 text-xs font-semibold text-ink-2 @min-[560px]:grid">
-        <span>{t("Estudio")}</span><span>{t("Tipo")}</span><span>{t("Completado")}</span><span>{t("Última respuesta")}</span>
+      <div className="hidden grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)_minmax(0,1.5fr)_minmax(0,1fr)] gap-x-4 border-b border-line px-5 py-1 text-xs font-semibold text-ink-2 @min-[560px]:grid">
+        <SortHeader k="title" sort={sort} onSort={setSort}>{t("Estudio")}</SortHeader>
+        <SortHeader k="method" sort={sort} onSort={setSort}>{t("Tipo")}</SortHeader>
+        <SortHeader k="completion" sort={sort} onSort={setSort}>{t("Completado")}</SortHeader>
+        <SortHeader k="recent" sort={sort} onSort={setSort}>{t("Última respuesta")}</SortHeader>
       </div>
       <ul className="divide-y divide-line">
         {shown.map((s) => (
@@ -301,7 +318,7 @@ export function LiveStudies({ live, trend, studyTrend, load, view, onViewChange,
       <Section id="live-studies" title={t("Estudios activos")}
         actions={!load.loading && !load.error && live.length > 0 && (
           <>
-            <Segmented label={t("Ordenar estudios")} value={sort} onChange={setSort} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />
+            <Segmented<"recent" | "lowest" | "custom"> label={t("Ordenar estudios")} value={presetOf(sort)} onChange={(v) => { if (v !== "custom") setSort(LIVE_SORT_PRESETS[v]); }} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />
             <ViewPicker view={view} onChange={changeView} />
           </>
         )}>
@@ -327,10 +344,10 @@ export function LiveStudies({ live, trend, studyTrend, load, view, onViewChange,
 
 /** Tabla simple para la lista completa de estudios activos (sin detalle). */
 export function LiveStudiesList({ live, load }: { live: LiveStudy[]; load: Load }) {
-  const [sort, setSort] = useState<LiveSort>("recent");
+  const [sort, setSort] = useState<LiveSort>(LIVE_SORT_PRESETS.recent);
   return (
     <Section id="all-live" title={plural(live.length, { one: "{n} estudio activo", other: "{n} estudios activos" })}
-      actions={live.length > 1 && <Segmented label={t("Ordenar estudios")} value={sort} onChange={setSort} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />}>
+      actions={live.length > 1 && <Segmented<"recent" | "lowest" | "custom"> label={t("Ordenar estudios")} value={presetOf(sort)} onChange={(v) => { if (v !== "custom") setSort(LIVE_SORT_PRESETS[v]); }} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />}>
       <SectionState load={load} empty={live.length === 0 ? {
         title: t("Todavía no hay estudios activos"),
         action: <Link to="/projects" className="press focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent">{t("Crear estudio")}</Link>,

@@ -64,18 +64,18 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --color-paper: #100617;
-      --color-surface: #201429;
+      --color-paper: #0E0F13;
+      --color-surface: #171920;
       --color-ink: #FCFCFD;
-      --color-ink-2: #D3C4E4;
-      --color-ink-3: #A897BC;
-      --color-line: #331A47;
-      --color-line-2: #5E3182;
+      --color-ink-2: #C7CBD4;
+      --color-ink-3: #8B909E;
+      --color-line: #343845;
+      --color-line-2: #616678;
       --color-accent: #BF7DF5;
-      --color-accent-soft: #331A47;
+      --color-accent-soft: #2A2338;
       --color-accent-ink: #D6AEF9;
       --color-brand: #D6AEF9;
-      --color-on-accent: #100617;
+      --color-on-accent: #0E0F13;
       --color-good: #34D399;
       --color-good-soft: #0E2A1F;
       --color-warn: #FBBF24;
@@ -85,7 +85,7 @@
       --color-caution: #FB923C;
       --color-caution-soft: #3A1D0B;
       --color-caution-ink: #FDBA74;
-      --color-paper-2: #1A0F24;
+      --color-paper-2: #13151B;
       --color-note-yellow: #F0DC8C;
       --color-note-blue: #AFCFF0;
       --color-note-green: #B3DFB6;
@@ -104,18 +104,18 @@
 }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #100617;
-  --color-surface: #201429;
+  --color-paper: #0E0F13;
+  --color-surface: #171920;
   --color-ink: #FCFCFD;
-  --color-ink-2: #D3C4E4;
-  --color-ink-3: #A897BC;
-  --color-line: #331A47;
-  --color-line-2: #5E3182;
+  --color-ink-2: #C7CBD4;
+  --color-ink-3: #8B909E;
+  --color-line: #343845;
+  --color-line-2: #616678;
   --color-accent: #BF7DF5;
-  --color-accent-soft: #331A47;
+  --color-accent-soft: #2A2338;
   --color-accent-ink: #D6AEF9;
   --color-brand: #D6AEF9;
-  --color-on-accent: #100617;
+  --color-on-accent: #0E0F13;
   --color-good: #34D399;
   --color-good-soft: #0E2A1F;
   --color-warn: #FBBF24;
@@ -125,7 +125,7 @@
   --color-caution: #FB923C;
   --color-caution-soft: #3A1D0B;
   --color-caution-ink: #FDBA74;
-  --color-paper-2: #1A0F24;
+  --color-paper-2: #13151B;
   --color-note-yellow: #F0DC8C;
   --color-note-blue: #AFCFF0;
   --color-note-green: #B3DFB6;
@@ -146,10 +146,10 @@
 
 /* Campo oscuro: se ve igual en ambos temas, con los tokens del tema oscuro dentro. */
 .field-dark {
-  --color-surface: #201429; --color-ink: #FCFCFD; --color-ink-2: #D3C4E4; --color-ink-3: #A897BC; --color-line: #331A47; --color-line-2: #5E3182;
-  --color-accent: #BF7DF5; --color-on-accent: #100617; --color-warn: #FBBF24;
+  --color-surface: #171920; --color-ink: #FCFCFD; --color-ink-2: #C7CBD4; --color-ink-3: #8B909E; --color-line: #343845; --color-line-2: #616678;
+  --color-accent: #BF7DF5; --color-on-accent: #0E0F13; --color-warn: #FBBF24;
   --color-family-usability: #FF8A4C; --color-family-ia: #34D399; --color-family-generative: #F06CD2; --color-family-synthesis: #38BDD8; --color-family-metrics: #6AA5FF; --color-family-org: #D9A441;
-  background: #201429; color: var(--color-ink);
+  background: #171920; color: var(--color-ink);
 }
 
 /* Post-its clásicos: papel de color con tinta oscura en ambos temas; en oscuro el papel se atenúa para no deslumbrar. */
@@ -217,6 +217,9 @@ h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
 .label { @apply text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-3; }
 .focus-ring { @apply outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-paper; }
 .field { @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-3 outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/15; }
+/* En oscuro, el borde del campo es su único límite visible: usa el tono fuerte para llegar a 3:1 sobre la superficie. */
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .field { border-color: var(--color-line-2); } }
+:root[data-theme="dark"] .field { border-color: var(--color-line-2); }
 }
 
 @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }

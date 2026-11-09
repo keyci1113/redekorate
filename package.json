@@ -1,6 +1,7 @@
 {
   "name": "redekorate",
   "private": true,
+  "license": "AGPL-3.0-only",
   "workspaces": [
     "server",
     "web"
@@ -10,6 +11,6 @@
     "build": "npm run build -w web && npm run build -w server",
     "start": "npm run start -w server",
     "migrate": "npm run migrate -w server",
-    "seed:test": "python scripts/seed/make_images.py .seed-img && tsx --tsconfig web/tsconfig.json scripts/seed/seed-test.mts .seed-img"
+    "seed:test": "python3 scripts/seed/make_images.py .seed-img && tsx --tsconfig web/tsconfig.json scripts/seed/seed-test.mts .seed-img"
   }
 }

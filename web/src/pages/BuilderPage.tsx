@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BarChart3, Check, CircleAlert, Copy, CopyPlus, Eye, GitBranch, GripVertical, Lightbulb, Link2,
-  Monitor, Palette, Plus, Rocket, Search, Smartphone, Square, Trash2, X,
+  Monitor, Palette, PanelLeft, PanelRight, Plus, Rocket, Search, Smartphone, Square, Trash2, X,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { copy, uid, useLoad } from "../lib/hooks";
+import { copy, uid, useLoad, usePaneWidth, usePref } from "../lib/hooks";
 import type { Project, Study } from "../lib/types";
 import type { Block } from "../blocks/types";
 import { BLOCKS, BLOCK_GROUPS, blockDef, isStructural } from "../blocks/registry";
@@ -14,11 +14,12 @@ import { LogicEditor } from "../blocks/LogicEditor";
 import { BlockView, isWide } from "../blocks/Runner";
 import { validateStudy, type Issue } from "../blocks/validate";
 import { Button, ErrorNote, Field, Modal, Spinner, StatusBadge, cx } from "../components/ui";
-import { ImageDrop, Segmented, Toggle, useSortable } from "../components/editing";
+import { ImageDrop, PaneHandle, Segmented, Toggle, useSortable } from "../components/editing";
 import { BRAND_COLORS, defaultConsent, brandStyle, type StudySettings } from "../lib/settings";
 import { templateByKey } from "../templates/catalog";
 import { getLang, setContentLang } from "../lib/i18n";
 import { PrototypeEditor, newPrototype } from "../components/PrototypeEditor";
+import { rememberStudy } from "../lib/recent";
 import type { ProtoCtx } from "../blocks/PrototypeTaskEditor";
 
 import { t } from "../lib/i18n";
@@ -29,6 +30,7 @@ export function BuilderPage() {
   const { data, error, loading, setData } = useLoad(() => api.get<{ study: Study; project: Project }>(`/studies/${id}`), [id]);
   if (loading) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
+  if (data.project.role === "viewer") return <Navigate to={`/studies/${id}/results`} replace />;   // solo lectura: sin builder
   return <Builder initial={data.study} project={data.project} onStudy={(s) => setData({ ...data, study: s })} />;
 }
 
@@ -48,10 +50,15 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   const [previewValue, setPreviewValue] = useState<Record<string, unknown>>({});
   const first = useRef(true);
   const study = initial;
+  useEffect(() => { rememberStudy({ id: study.id, title: study.title, method: study.method, project_id: project.id, project_name: project.name, where: "edit" }); }, [study.id, study.title, study.method, project.id, project.name]);
   const template = templateByKey(study.method);
   setContentLang(settings.language ?? getLang());   // los bloques nuevos se crean en el idioma del estudio
   const issues = useMemo(() => validateStudy(blocks, settings), [blocks, settings]);
   const [protoEditor, setProtoEditor] = useState<{ id?: string } | null>(null);
+  const leftPane = usePaneWidth("builder-left", 288, 220, 520, "left");
+  const rightPane = usePaneWidth("builder-right", 340, 280, 720, "right");
+  const [showLeft, setShowLeft] = usePref("builder-show-left", true);
+  const [showRight, setShowRight] = usePref("builder-show-right", true);
   const prototypes = settings.prototypes ?? [];
   const protoCtx: ProtoCtx = {
     prototypes,
@@ -94,6 +101,10 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   const duplicate = (b: Block) => insert({ ...structuredClone(b), id: uid(), logic: undefined, title: `${b.title} (copia)` });
   const sortable = useSortable(blocks, setBlocks);
 
+  async function publishChanges() {
+    const { study: s } = await api.post<{ study: Study }>(`/studies/${study.id}/publish`);
+    onStudy(s);
+  }
   async function setStatus(status: Study["status"]) {
     const { study: s } = await api.post<{ study: Study }>(`/studies/${study.id}/status`, { status });
     onStudy(s);
@@ -116,12 +127,19 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} /> {t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : ""}
         </span>
         <StatusBadge status={study.status} />
+        <div className="hidden rounded-lg bg-paper p-0.5 lg:flex">
+          <button onClick={() => setShowLeft(!showLeft)} aria-pressed={showLeft} title={showLeft ? t("Ocultar lista de bloques") : t("Mostrar lista de bloques")} aria-label={t("Lista de bloques")}
+            className={cx("focus-ring rounded-md p-1.5", showLeft ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelLeft size={14} /></button>
+          <button onClick={() => setShowRight(!showRight)} aria-pressed={showRight} title={showRight ? t("Ocultar panel de propiedades") : t("Mostrar panel de propiedades")} aria-label={t("Panel de propiedades")}
+            className={cx("focus-ring rounded-md p-1.5", showRight ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelRight size={14} /></button>
+        </div>
         <Button size="sm" variant="ghost" icon={<Smartphone size={15} />} onClick={() => setProtoEditor({})}>{t("Prototipos")}{prototypes.length ? ` · ${prototypes.length}` : ""}</Button>
         <Button size="sm" variant="ghost" icon={<Palette size={15} />} onClick={() => setDesignOpen(true)}>{t("Diseño")}</Button>
         <Button size="sm" variant="ghost" icon={<Eye size={15} />} onClick={() => window.open(`/s/${study.public_slug}?preview=1`, "_blank", "noopener")}>{t("Probar")}</Button>
         <Link to={`/studies/${study.id}/results`} className="hidden lg:block"><Button size="sm" variant="ghost" icon={<BarChart3 size={15} />}>{t("Resultados")}</Button></Link>
         {study.status === "draft" && <Button size="sm" variant="primary" icon={<Rocket size={15} />} onClick={() => setCheckOpen(true)}>{t("Publicar")}</Button>}
         {study.status === "live" && <>
+          {study.has_unpublished && <Button size="sm" variant="primary" icon={<Rocket size={15} />} onClick={() => setCheckOpen(true)}>{t("Publicar cambios")}</Button>}
           <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>
           <Button size="sm" variant="ghost" icon={<Square size={13} />} onClick={() => setStatus("closed")}>{t("Cerrar")}</Button>
         </>}
@@ -130,13 +148,15 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
 
       {study.status === "live" && (
         <div className="border-b border-warn/20 bg-warn-soft px-4 py-1.5 text-center text-xs text-warn">
-          {t("Este estudio está recibiendo respuestas. Los cambios se aplican de inmediato a nuevos participantes.")}
+          {study.has_unpublished
+            ? <>{t("Tienes cambios sin publicar. Los participantes siguen viendo la versión publicada; quien esté a medio flujo no se interrumpe.")} <button type="button" onClick={() => setCheckOpen(true)} className="font-semibold underline underline-offset-2">{t("Publicar cambios")}</button></>
+            : t("Este estudio está recibiendo respuestas. Lo que edites se guarda como borrador hasta que publiques los cambios.")}
         </div>
       )}
 
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de bloques ── */}
-        <aside className="flex w-72 shrink-0 flex-col border-r border-line bg-paper">
+        {showLeft && <aside className="flex shrink-0 flex-col border-r border-line bg-paper" style={{ width: leftPane.width }}>
           {template?.guide && guideOpen && (
             <div className="m-3 mb-1 rounded-xl border border-accent/15 bg-accent-soft/70 p-3">
               <div className="mb-1.5 flex items-center justify-between">
@@ -182,7 +202,8 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
           <div className="border-t border-line p-3">
             <Button variant="primary" className="w-full" icon={<Plus size={16} />} aria-expanded={adding} onClick={() => setAdding(!adding)}>{t("Agregar bloque")}</Button>
           </div>
-        </aside>
+        </aside>}
+        {showLeft && <PaneHandle {...leftPane.handleProps} label={t("Ancho de la lista de bloques")} />}
 
         {/* ── Vista previa ── */}
         <section className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(var(--color-line-2)_1px,transparent_1px)] [background-size:18px_18px]">
@@ -223,9 +244,10 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
             )}
           </div>
         </section>
+        {showRight && <PaneHandle {...rightPane.handleProps} className="hidden lg:block" label={t("Ancho del panel de propiedades")} />}
 
         {/* ── Propiedades ── */}
-        <aside className="hidden w-[340px] shrink-0 flex-col border-l border-line bg-surface lg:flex">
+        {showRight && <aside className="hidden shrink-0 flex-col border-l border-line bg-surface lg:flex" style={{ width: rightPane.width }}>
           {current ? (
             <>
               <div className="flex shrink-0 border-b border-line px-2">
@@ -245,7 +267,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
               </div>
             </>
           ) : <p className="p-5 text-sm text-ink-3">{t("Selecciona un bloque para editarlo.")}</p>}
-        </aside>
+        </aside>}
       </div>
 
       <AddBlockPanel open={adding} onClose={() => setAdding(false)} onPick={(t) => insert(blockDef(t)!.create())} />
@@ -255,7 +277,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
       )}
       <DesignModal open={designOpen} onClose={() => setDesignOpen(false)} settings={settings} onChange={setSettings} />
       <ChecklistModal open={checkOpen} onClose={() => setCheckOpen(false)} issues={issues} blocks={blocks}
-        onGo={(id) => { setSelected(id); setPanel("content"); setCheckOpen(false); }} onPublish={() => setStatus("live")} errors={errorsCount} />
+        onGo={(id) => { setSelected(id); setPanel("content"); setCheckOpen(false); }} onPublish={() => (study.status === "live" ? publishChanges() : setStatus("live"))} errors={errorsCount} />
       <Modal open={shareOpen} onClose={() => setShareOpen(false)} title={t("Tu estudio está activo 🎉")}>
         <ShareLink url={studyUrl(study.public_slug)} />
         <p className="mt-3 text-sm text-ink-3">{t("Envía este link a tus participantes, no necesitan crear cuenta. Tip: agrega parámetros para identificar el origen, por ejemplo")} <code className="rounded bg-paper px-1">{t("?source=linkedin")}</code>.</p>

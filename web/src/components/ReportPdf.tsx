@@ -34,12 +34,12 @@ function Cover({ kicker, title, project, color, facts }: { kicker: string; title
         <span className="flex items-center gap-2"><LogoMark size={22} /><Wordmark height={15} /></span>
         <span className="text-xs text-ink-3">{t("Generado el")} {fmtDate(new Date())}</span>
       </div>
-      <div className="mt-10 rounded-2xl bg-accent px-8 py-9 text-on-accent">
-        <p className="text-xs font-semibold tracking-[0.12em] uppercase opacity-80">{kicker}</p>
+      <div className="mt-10">
+        <p className="text-xs font-semibold tracking-[0.12em] uppercase text-accent">{kicker}</p>
         <h1 className="mt-3 font-display text-[34px] leading-[1.1] font-normal tracking-[-0.02em] text-balance">{title}</h1>
         {project && (
-          <p className="mt-4 flex items-center gap-2 text-sm opacity-90">
-            {color && <span className="h-2.5 w-2.5 rounded-sm ring-1 ring-white/60" style={{ background: color }} />}{project}
+          <p className="mt-4 flex items-center gap-2 text-sm text-ink-2">
+            {color && <span className="h-2.5 w-2.5 rounded-sm" style={{ background: color }} />}{project}
           </p>
         )}
       </div>

@@ -9,7 +9,8 @@ import { t } from "../lib/i18n";
 import { Button, Card } from "../components/ui";
 import type { Dash, Load } from "../components/home/types";
 import { LiveStudies } from "../components/home/LiveStudies";
-import { ActivityFeed, DaySummary, HomeHeader, KpiRow, RecentInsights } from "../components/home/Sections";
+import { ActivityFeed, DaySummary, HomeHeader, KpiRow, LastOpened, RecentInsights } from "../components/home/Sections";
+import { lastStudy } from "../lib/recent";
 
 export function DashboardPage() {
   const nav = useNavigate();
@@ -46,7 +47,7 @@ export function DashboardPage() {
   return (
     <div className="page space-y-6">
       <HomeHeader name={user?.name.split(" ")[0] ?? ""} draft={data?.drafts[0]} loading={load.loading} />
-      <DaySummary data={data} load={load} />
+      {(() => { const r = data?.recent ?? lastStudy(); return load.loading ? <div className="h-20 animate-pulse rounded-xl bg-ink/5 motion-reduce:animate-none" aria-hidden /> : r ? <LastOpened recent={r} /> : <DaySummary data={data} load={load} />; })()}
       <KpiRow data={data} load={load} />
       <LiveStudies live={data?.live ?? []} trend={data?.trend ?? []} studyTrend={data?.study_trend ?? []} load={load} view={view} onViewChange={changeView} />
       <div className="grid items-start gap-4 lg:grid-cols-2">

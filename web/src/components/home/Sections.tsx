@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Check, PenLine } from "lucide-react";
+import { ArrowRight, BarChart3, Check, PenLine } from "lucide-react";
+import type { RecentStudy } from "../../lib/recent";
 import { fmtNum, fmtPct, locale, plural, relTime, t } from "../../lib/i18n";
 import { aggregateCompletion, completion, groupActivity, isLowCompletion, peakDay, sortInsights, splitWeeks, type Day } from "../../lib/home";
 import { familyColor, familyOf } from "../../lib/families";
 import { templateByKey } from "../../templates/catalog";
 import { SeverityBadge, cx } from "../ui";
 import { CompletionBar, LowChip, Section, SectionState, TrendBars, completionSr, fmtDay } from "./bits";
-import type { Dash, Draft, HomeInsight, Load } from "./types";
+import type { Dash, Draft, HomeInsight, Load, RecentOpen } from "./types";
 
 const methodName = (m: string) => templateByKey(m)?.name ?? m;
 const longDay = (d: string) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
@@ -41,6 +42,26 @@ export function HomeHeader({ name, draft, loading }: { name: string; draft: Draf
           </Link>
         )}
     </header>
+  );
+}
+
+// ── Último estudio abierto ──────────────────────────────────────────
+export function LastOpened({ recent }: { recent: RecentStudy | RecentOpen }) {
+  const tpl = templateByKey(recent.method);
+  const at = "opened_at" in recent ? recent.opened_at : recent.at;
+  const color = "project_color" in recent ? recent.project_color : undefined;
+  return (
+    <section aria-label={t("Último estudio abierto")} className="flex flex-col gap-3 rounded-xl border border-line bg-surface px-4 py-3.5 sm:flex-row sm:items-center sm:px-5">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-ink-2">{t("Retoma donde lo dejaste")} · {t(recent.where === "edit" ? "estabas editando" : "veías resultados")} {relTime(at)}</p>
+        <p className="mt-0.5 truncate text-[1.0625rem] font-semibold">{recent.title}</p>
+        <p className="flex items-center gap-1.5 truncate text-sm text-ink-2">{color && <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: color }} />}{tpl?.name ?? recent.method}{recent.project_name ? ` · ${recent.project_name}` : ""}</p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <Link to={`/studies/${recent.id}/edit`} className="press focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-line px-3 text-sm font-medium hover:border-line-2"><PenLine size={15} aria-hidden /> {t("Editar")}</Link>
+        <Link to={`/studies/${recent.id}/results`} className="press focus-ring inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-accent px-3 text-sm font-medium text-on-accent"><BarChart3 size={15} aria-hidden /> {t("Resultados")}</Link>
+      </div>
+    </section>
   );
 }
 
