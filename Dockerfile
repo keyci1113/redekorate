@@ -4,7 +4,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY server/package.json server/
 COPY web/package.json web/
-RUN npm ci
+# The production VPS has a slow, flaky uplink: retry registry fetches instead of failing the deploy.
+RUN npm config set fetch-retries 6 fetch-retry-mintimeout 20000 fetch-retry-maxtimeout 180000 fetch-timeout 900000 \
+ && npm ci --no-audit --no-fund
 COPY . .
 RUN npm run build
 
@@ -15,7 +17,8 @@ ENV NODE_ENV=production UPLOAD_DIR=/app/uploads
 COPY package.json package-lock.json ./
 COPY server/package.json server/
 COPY web/package.json web/
-RUN npm ci --omit=dev -w server && npm cache clean --force
+RUN npm config set fetch-retries 6 fetch-retry-mintimeout 20000 fetch-retry-maxtimeout 180000 fetch-timeout 900000 \
+ && npm ci --omit=dev -w server --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/server/migrations server/migrations
 COPY --from=build /app/web/dist web/dist
