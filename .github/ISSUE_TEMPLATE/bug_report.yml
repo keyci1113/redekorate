@@ -1,0 +1,58 @@
+name: Bug report
+description: Something is not working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. If it is a security issue, please do **not** file it here; follow [SECURITY.md](https://github.com/keyci1113/redekorate/blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a study with…
+        2. Open the participant link on…
+        3. See error
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Builder / blocks
+        - Participant experience
+        - Prototypes (images)
+        - Prototypes (HTML)
+        - Results / insights / reports
+        - Documents
+        - Participant panel
+        - Auth / account
+        - Deploy / Docker
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit or deploy date
+      description: Output of `git rev-parse --short HEAD`, or the date you last deployed.
+  - type: input
+    id: env
+    attributes:
+      label: Browser and device
+      placeholder: Safari 18 on iPhone 15 · Chrome 131 on macOS
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Server logs (`docker compose logs app`), browser console output, or screenshots.
+      render: shell

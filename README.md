@@ -1,157 +1,181 @@
-# redekorate · plataforma de UX Research
+# redekorate · UX research platform
 
-Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de UX: crea un proyecto, elige el método, configúralo, envía el link a participantes reales y comparte un reporte con insights.
+[![CI](https://github.com/keyci1113/redekorate/actions/workflows/ci.yml/badge.svg)](https://github.com/keyci1113/redekorate/actions/workflows/ci.yml)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-purple.svg)](LICENSE)
 
-## Flujo
+A self-hosted UX research tool in the spirit of Maze: create a project, pick a method, configure it, send a link to real participants and share a report with insights. Bilingual UI (Spanish / English), one Docker Compose file to run it.
 
-1. **Inicio:** un dashboard con estudios activos, respuestas de los últimos 14 días, actividad reciente, borradores e insights.
-2. **Proyecto:** al crearlo, pasas directo a elegir el método. Puedes buscarlo, filtrarlo por categoría o partir de tu pregunta ("¿Las personas pueden usar mi diseño?").
-3. **Template:** cada método muestra sus bloques, una guía paso a paso, la duración y la muestra recomendada antes de crearlo.
-4. **Builder:** reordenas los bloques arrastrando, editas el contenido y la lógica, ves la vista previa en escritorio o móvil, ajustas la marca y pasas una revisión antes de publicar.
-5. **Participantes:** un link público, sin cuenta, que funciona en móvil, con consentimiento informado opcional.
-6. **Resultados:** análisis automático por método, detalle por participante, exportación a CSV, insights y un reporte público revocable.
+[Leer en español](README.es.md)
 
-## Métodos disponibles
+![Home dashboard](docs/screenshots/home-redesign/home-snapshot-en-1280.png)
 
-| Categoría | Listos |
+## Features
+
+**Research methods**
+
+| Category | Ready |
 |---|---|
-| Prototipos | **Prototype Testing** y **Usability Test no moderado**: pantallas subidas + zonas clicables, éxito directo/indirecto, embudo de ruta esperada, rutas más comunes, mapas de calor y clics fuera de zona por pantalla |
-| Usabilidad | First Click (mapa de clics y área correcta), Five Second, Preference Test A/B con imágenes, Tree Testing (éxito directo/indirecto y destinos) |
-| Arquitectura de información | Card Sorting abierto, cerrado e híbrido (acuerdo por tarjeta, matriz de similitud con clustering, categorías creadas) |
-| Generativa | Encuesta, Screener, Priorización de funcionalidades (ranking + matriz) |
-| Métricas | SUS (con escala Sauro-Lewis), NPS con lógica para detractores y promotores, CSAT/CES, SEQ, UMUX-Lite |
-| Organización | Repositorio de insights, reporte compartible |
+| Prototypes | **Prototype Testing** and **unmoderated Usability Test**: uploaded screens with clickable zones or a single-file HTML prototype, direct/indirect success, expected-path funnel, most common paths, heatmaps and off-target clicks per screen |
+| Usability | First Click (click map and correct area), Five Second, A/B Preference Test with images, Tree Testing (direct/indirect success and destinations) |
+| Information architecture | Open, closed and hybrid Card Sorting (agreement per card, similarity matrix with clustering, created categories) |
+| Generative | Survey, Screener, Feature prioritization (ranking + matrix), Kano model |
+| Metrics | SUS (with the Sauro-Lewis scale), NPS with detractor/promoter logic, CSAT/CES, SEQ, UMUX-Lite |
+| Organization | Insight repository with review status, participant panel, shareable reports per study or per project |
 
-**Bloques** (se combinan libremente en un "Estudio en blanco"): Bienvenida, Instrucciones, Agradecimiento, Pregunta abierta, Opción múltiple, Sí/No, Escala (números, estrellas o emojis), Ranking, Matriz, NPS, SUS, Card Sorting, Tree Test, Preference, Five Second, First Click. Todos admiten una imagen opcional.
+**Images** on blocks, branding and prototypes are optimized in the browser before upload: resized to at most 2048 px on the longest side and re-encoded as WebP (PNG or JPEG where the browser cannot encode WebP). GIFs are kept as they are, and a file is only replaced when the result is smaller.
 
-**Prototipos (Fase 3):**
-1. En Figma, selecciona tus frames y usa **Export → PNG 2x**.
-2. En el builder, abre **Prototipos** y arrastra todas las pantallas a la vez; el nombre del archivo será el nombre de la pantalla.
-3. Dibuja zonas clicables arrastrando sobre cada pantalla y elige a dónde llevan (otra pantalla o "atrás"). Las zonas se pueden mover y redimensionar, y el modo **Probar** te deja navegar el prototipo.
-4. En cada tarea eliges la pantalla inicial, la pantalla meta y, si quieres, la ruta esperada.
-5. El participante ve la tarea, navega el prototipo en un marco de teléfono o escritorio (a pantalla completa en su celular) y puede marcar "No puedo completarla". Se guardan cada clic con coordenadas, la ruta y los tiempos.
+**Blocks** combine freely in a "Blank study": Welcome, Instructions, Thank you, Open question, Multiple choice, Yes/No, Scale (numbers, stars or emojis), Ranking, Matrix, NPS, SUS, Card Sorting, Tree Test, Preference, Five Second, First Click. Every block accepts an optional image.
 
-**Prototipos HTML (por ejemplo, hechos con Claude):**
-1. Pídele a Claude el prototipo como **un solo archivo .html** y descárgalo (un componente `.jsx` no sirve).
-2. En **Prototipos**, crea uno nuevo y usa **Subir HTML**. No hay zonas que dibujar.
-3. Navégalo en el editor: cada pantalla que visitas aparece en **Pantallas detectadas**. Se reconocen por el atributo `data-screen="Nombre"`, por el `#` de la URL o por el `<h1>` visible. El editor trae una instrucción lista para copiar y pedirle a Claude que agregue `data-screen`.
-4. En la tarea eliges la pantalla meta y, si quieres, la ruta esperada. Sin meta, el participante toca "Terminé la tarea" (es éxito autodeclarado, no se verifica).
-5. Se guardan la ruta, los tiempos y cada clic con el texto del elemento. En vez de mapas de calor, los resultados muestran los elementos más tocados por pantalla y los **clics sin respuesta** (en algo que no es interactivo).
+**Conditional logic** is written in plain language, for example "if the answer is less than 7 → go to…". It works with options, Yes/No, scales, NPS, preference, and pass/fail in tree tests and first click. Jumps only go forward, so no cycles can form.
 
-> ¿Por qué no basta con pegar el link de Claude? claude.ai no permite que otros sitios muestren sus artifacts dentro de un iframe (`frame-ancestors`), así que el prototipo se sube como archivo. El servidor le agrega un script de seguimiento y lo sirve con CSP `sandbox` (origen opaco): el HTML no puede leer la sesión ni llamar a la API, y solo se puede incrustar desde la app.
+**Fillable documents.** Each project has a Documents tab with 19 templates: UX Project Blueprint, Proto-persona, Persona canvas, User persona, User Journey Map (the emotion curve draws itself), Affinity diagram, Empathy Map, Stakeholder Map, Cognitive Mapping, User / Task Flow, Service Blueprint, Jobs To Be Done, Interview guide and notes, AEIOU observation, Behavioral observation, Diary Study, Usability test script, Usability test results (computes per-task and total rates) and Heuristic evaluation (Weinschenk or Nielsen, several evaluators, severity 0–4). Documents start empty; examples appear only as placeholder text and are never saved. They autosave, support "Save as…" into this or another project, export to **Word (.docx), PDF, Markdown and CSV** from the browser, and can be shared with a revocable read-only link. Each document has its own language.
 
-> ¿Por qué no se conecta directo con Figma? La Embed API de Figma es gratuita, pero solo envía eventos si el participante tiene sesión iniciada en Figma (confirmado por el soporte de Figma en enero de 2026), y además da los clics relativos a la capa tocada, no a la pantalla. Con pantallas subidas, cualquier participante anónimo funciona y los mapas de calor son precisos.
+**Participants.** A public link, no account needed, mobile-friendly, with optional informed consent. A per-project participant panel keeps a recruiting base (name, contact, tags, consent) and the history of which studies each person was invited to and how it went.
 
-**Lógica condicional:** reglas en lenguaje natural, por ejemplo "si la respuesta es menor que 7 → ir a…". Funciona con opciones, Sí/No, escalas, NPS, preferencia y acierto/fallo en tree test y first click. Solo se puede saltar hacia adelante, así que nunca se forman ciclos.
+**Results.** Automatic analysis per method, per-participant detail, CSV export, insights with severity and review status, and public reports that combine one or several studies and can be revoked at any time.
 
-## Seguridad y privacidad
+## How it flows
 
-**Cuentas de usuarios**
-- Las contraseñas se guardan con bcrypt (costo 12). Política: mínimo 10 caracteres, con letras y números, y medidor de fuerza en la interfaz.
-- La sesión vive en una cookie `httpOnly`, `SameSite=Lax` y `Secure` en producción, con un JWT HS256 que expira a los 14 días.
-- Las sesiones se pueden revocar: cambiar la contraseña, restablecerla o usar "Cerrar sesión en todos los dispositivos" invalida todos los tokens.
-- Contra la fuerza bruta: límite de intentos por IP y bloqueo temporal de la cuenta tras 8 fallos. Con un correo inexistente el login tarda lo mismo, para que no se puedan descubrir cuentas.
-- Recuperación de contraseña con un token aleatorio de 256 bits. Solo se guarda su hash SHA-256, sirve una vez y vence en 1 hora. La respuesta es la misma exista o no la cuenta.
-- La cuenta se puede eliminar confirmando con la contraseña. Se borran en cascada los proyectos, estudios, respuestas e insights.
+1. **Home:** a dashboard with live studies, responses over the last 14 days, recent activity, drafts and insights.
+2. **Project:** creating one takes you straight to choosing a method. Search it, filter by category or start from your question ("Can people use my design?").
+3. **Template:** each method shows its blocks, a step-by-step guide, the duration and the recommended sample before you create it.
+4. **Builder:** drag blocks to reorder, edit content and logic, preview on desktop or mobile, adjust branding and run a pre-publish review.
+5. **Participants:** share the public link. Once a study is live, your edits are saved as a draft and participants keep seeing the published version until you press **Publish changes**; anyone mid-flow finishes with the version they started.
+6. **Results:** analysis, insights and a shareable report.
 
-**Aplicación**
-- Protección CSRF: encabezado obligatorio `X-Requested-With` y verificación de `Origin`.
-- Encabezados con Helmet: CSP estricta (`script-src 'self'`, `frame-ancestors 'none'`), HSTS, `nosniff` y Referrer-Policy.
-- Toda la entrada se valida con zod y todo el SQL va parametrizado. Cada recurso verifica que pertenezca al usuario.
-- Imágenes: se valida el formato real del archivo por sus primeros bytes (PNG, JPG, GIF, WEBP; SVG se rechaza porque puede contener scripts). Máximo 10 MB, nombres aleatorios y se sirven con `CSP default-src 'none'`.
-- Límites de uso en las rutas públicas, en la creación de sesiones y en las subidas.
-- El servidor no arranca en producción sin un `JWT_SECRET` de al menos 32 caracteres. El contenedor corre sin root y la base de datos no se expone.
+## Prototype testing
 
-**Participantes**
-- No se guardan su IP ni su user-agent completo, solo el tipo de dispositivo (móvil, tablet o escritorio).
-- Consentimiento informado opcional, con un texto editable.
-- Solo se aceptan parámetros cortos en la URL (máximo 10). Las respuestas se validan contra los bloques del estudio y tienen un tamaño máximo.
-- Los reportes públicos nunca incluyen datos del participante y se pueden revocar.
-- Puedes descartar respuestas individuales.
+**Image prototypes**
 
-> Los límites de uso se guardan en memoria. Si corres varias instancias detrás de un balanceador, conviene moverlos a Redis.
+1. In Figma, select your frames and use **Export → PNG 2x**.
+2. In the builder, open **Prototypes** and drop all the screens at once; the file name becomes the screen name.
+3. Draw clickable zones by dragging over each screen and choose where they lead (another screen or "back"). Zones can be moved and resized, and **Try** mode lets you navigate the prototype.
+4. In each task choose the start screen, the goal screen and, optionally, the expected path. Screens are resized to at most 2048 px and re-encoded as WebP in your browser before upload, so even 2x desktop exports stay light.
+5. The participant sees the task, navigates the prototype inside a phone or desktop frame (full screen on their phone) and can mark "I can't complete it". Every click is stored with coordinates, path and timings.
 
-## Despliegue en tu servidor
+**HTML prototypes** (for example, made with Claude)
+
+1. Ask Claude for the prototype as **a single .html file** and download it (a `.jsx` component will not work).
+2. In **Prototypes**, create a new one and use **Upload HTML**. There are no zones to draw.
+3. Navigate it in the editor: every screen you visit appears under **Detected screens**. Screens are recognized by a `data-screen="Name"` attribute, by the URL `#` hash or by the visible `<h1>`. The editor includes a ready-to-copy instruction to ask Claude to add `data-screen` attributes.
+4. Once screens are detected, define the **flow** in the right panel: where it starts, where it ends, which screens it passes through and the instructions for the participant. When a task opens, the prototype is asked to show the start screen: by URL hash if it has one, otherwise by tapping the element with that name, so a start screen that sits behind a login can't be reached unless the prototype exposes it by hash (the Claude instruction in the editor asks for that). For steps inside a screen, such as opening a tab, add **required interactions**: press *Record clicks* and tap the elements in the preview, or type the element's text; any step can become the goal. Tasks that use the prototype pick that flow up as their goal, expected path, required interactions and description; you can still adjust each task. Results show how many participants performed each interaction and how long it took them. Without a goal, the participant taps "I'm done" (self-reported success, not verified).
+5. The path, timings and every click with the element's text are stored. Instead of heatmaps, results show the most-tapped elements per screen and **clicks with no response** (taps on something that is not interactive).
+
+**Published link** (Figma Make, a deployed site…)
+
+1. Publish the prototype and copy its public link. For Figma Make that is the `….figma.site` address, not the editor URL.
+2. In **Prototypes**, paste it under **Published link**. The server checks that the site allows being embedded and the prototype is shown as is inside the task.
+3. Nothing of ours runs on that site, so only the time and the participant's own "I'm done" or "I can't complete it" are recorded; there are no clicks, screens or heatmaps. claude.ai blocks embedding, so a Claude link is refused with a pointer to the HTML upload above.
+
+> **Why not just paste the Claude link?** claude.ai does not allow other sites to embed its artifacts in an iframe (`frame-ancestors`), so the prototype is uploaded as a file. The server injects a tracking script and serves it with a CSP `sandbox` (opaque origin): the HTML cannot read the session or call the API, and it can only be embedded from the app.
+
+> **Why not connect to Figma directly?** Figma's Embed API is free, but it only sends events when the participant is signed in to Figma (confirmed by Figma support in January 2026), and clicks are relative to the layer that was hit, not to the screen. With uploaded screens any anonymous participant works and heatmaps are accurate.
+
+## Users and roles
+
+Every instance has two roles. The first account ever created is the **admin**; everyone else is a **member**.
+
+- **Members** work in their own projects, exactly as before.
+- **Admins** see a *Users* page in the account menu where they invite people by email (the invitation is valid for 7 days and works even with `ALLOW_REGISTRATION=false`), change roles, and disable or reactivate accounts. Disabling an account closes its sessions immediately. There must always be at least one active admin, and you can't demote or disable yourself.
+
+Without SMTP configured, the admin gets the invitation link to copy instead of an email being sent.
+
+**Project collaborators.** The person who creates a project owns it and can add any existing account from the project's *Collaborators* tab with one of two roles:
+
+| Role | Can |
+|---|---|
+| Editor | Create and change studies, documents, insights, participants and shared reports |
+| Read-only | Open results, documents and reports; the builder redirects to results and documents open read-only |
+
+Only the owner adds or removes people, archives or deletes the project. Collaborators can leave a project themselves. The dashboard counts shared projects too, and any collaborator can preview a draft study.
+
+## Security and privacy
+
+- Passwords hashed with bcrypt, sessions in an `httpOnly` cookie with a short-lived JWT, revocable from "Sign out everywhere".
+- Brute-force protection, constant-time login responses, single-use password-reset tokens.
+- CSRF guard, strict CSP, HSTS, zod validation on every input, parameterized SQL, ownership checks on every resource.
+- Uploads validated by magic bytes (SVG rejected), random file names, served with a no-script CSP. HTML prototypes run in a sandboxed iframe with an opaque origin.
+- Participants' IP and full user agent are never stored, only the device class. Public reports never include participant data.
+
+The full list is in [SECURITY.md](SECURITY.md), together with how to report a vulnerability.
+
+## Deploy on your own server
 
 ```bash
-cp .env.example .env        # completa JWT_SECRET, DB_PASSWORD, APP_URL y SMTP
+cp .env.example .env        # fill in JWT_SECRET, DB_PASSWORD, APP_URL and SMTP
 docker compose up -d --build
 ```
 
-La app escucha en `127.0.0.1:4000`. Ponla detrás de Caddy o Nginx con HTTPS:
+The app listens on `127.0.0.1:4000`. Put it behind Caddy or Nginx with HTTPS:
 
 ```
-research.tudominio.com {
+research.yourdomain.com {
   reverse_proxy localhost:4000
 }
 ```
 
-### Despliegue automático (GitHub Actions)
+After creating your account, set `ALLOW_REGISTRATION=false` and restart. Images and the database live in Docker volumes (`uploads`, `pgdata`); include them in your backups. Do not change `DB_PASSWORD` after the first deploy: PostgreSQL only reads it when the volume is created.
 
-`.github/workflows/deploy.yml` construye y levanta la app en cada push a `main` (o a mano desde la pestaña Actions). Corre en un runner self-hosted instalado en el mismo VPS:
+### Automatic deploys (GitHub Actions)
 
-1. En el VPS, instala Docker y agrega el usuario del runner al grupo `docker`.
-2. Registra el runner en *Settings → Actions → Runners → New self-hosted runner* (Linux) e instálalo como servicio (`sudo ./svc.sh install && sudo ./svc.sh start`).
-3. Crea el secret `ENV_FILE` en *Settings → Secrets and variables → Actions* con el contenido completo de tu `.env`.
+`.github/workflows/deploy.yml` builds and restarts the app on every push to `main` (or manually from the Actions tab). It runs on a self-hosted runner installed on the same VPS:
 
-No cambies `DB_PASSWORD` después del primer despliegue: PostgreSQL solo la lee al crear el volumen.
+1. On the VPS, install Docker and add the runner user to the `docker` group.
+2. Register the runner under *Settings → Actions → Runners → New self-hosted runner* (Linux) and install it as a service (`sudo ./svc.sh install && sudo ./svc.sh start`).
+3. Create the `ENV_FILE` secret under *Settings → Secrets and variables → Actions* with the full contents of your `.env`.
 
-Después de crear tu cuenta, cambia `ALLOW_REGISTRATION=false` y reinicia. Las imágenes y la base de datos viven en volúmenes de Docker (`uploads`, `pgdata`); inclúyelos en tus respaldos.
+If you fork the project, disable this workflow or remove the runner label; it will not run on GitHub-hosted runners by design.
 
-## Desarrollo local
+## Local development
 
 ```bash
 npm install
-createdb redekorate          # usuario/clave por defecto: redekorate/redekorate
-npm run dev                  # API :4000 + web :5173
+createdb redekorate          # default credentials: redekorate / redekorate
+npm run dev                  # API on :4000, web on :5173
 ```
 
-Si no configuras SMTP, el enlace de recuperación de contraseña aparece en la consola del servidor.
+Migrations run automatically when the server starts. Without SMTP, the password-reset link is printed to the server console. `npm run seed:test` fills the database with sample projects for every method (needs Python 3). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full developer guide.
 
-## Arquitectura
+## Architecture
 
 ```
 server/  Express 5 · PostgreSQL · zod · helmet · express-rate-limit · multer
-  migrations/   001 esquema base · 002 seguridad, recuperación y archivos · 003 documentos
-  src/routes/   auth · dashboard · projects · studies · insights · documents · uploads · public
-  src/lib/i18n.ts  mensajes del servidor en ES/EN (según el header x-lang)
+  migrations/   001 base schema · 002 security, reset and uploads · 003 documents
+                004 participant panel · 005 project reports · 006 insight review
+  src/routes/   auth · dashboard · projects · studies · insights · participants · documents · uploads · public
+  src/lib/i18n.ts   server messages in ES/EN (by the x-lang header)
 web/     React 19 · Vite · Tailwind 4 · React Router
-  src/blocks/   types · registry · Editor · Runner · Results · LogicEditor · logic · validate
-  src/templates/catalog.ts   métodos, guías y bloques por defecto
-  src/docs/     plantillas llenables (templates.tsx), secciones, journey, afinidad, matriz, heurísticas
-  src/lib/i18n.tsx · en.ts   idioma de la interfaz (ES/EN) y diccionario en inglés
+  src/blocks/      types · registry · Editor · Runner · Results · LogicEditor · logic · validate
+  src/templates/catalog.ts   methods, guides and default blocks
+  src/docs/        fillable templates (templates.tsx), sections, journey, affinity, matrix, heuristics
+  src/lib/i18n.tsx · en.ts   UI language (ES/EN) and the English dictionary
 ```
 
-## Documentos (plantillas llenables)
+## Languages
 
-Cada proyecto tiene una pestaña **Documentos** con 12 plantillas que se llenan ahí mismo. Los documentos nacen vacíos: los ejemplos solo aparecen como texto guía (en gris e itálica) dentro de cada campo y nunca se guardan:
-UX Project Blueprint, Proto-persona, Perfil de persona (canvas), User persona (entregable), User Journey Map (la curva de emociones se dibuja sola),
-Diagrama de afinidad, Guía y notas de entrevistas, Observación AEIOU, Observación conductual, Guion de prueba de usabilidad,
-Resultados de prueba de usabilidad (calcula tasas por tarea y total) y Evaluación heurística (Weinschenk o Nielsen, varios evaluadores, severidad 0–4).
-Se guardan solos en su proyecto, se pueden **Guardar como…** (copia con otro nombre en este u otro proyecto) y se **exportan a Word (.docx), PDF, Markdown y CSV** desde el menú Exportar (también en el link público). La exportación se genera en el navegador y solo incluye lo que se llenó, nunca los textos de ejemplo. También se comparten con un link de solo lectura que se puede revocar. Cada documento tiene su propio idioma (ES/EN).
+The whole interface switches between **Spanish and English** (ES/EN selector in the sidebar and on the login page).
 
-## Idiomas
-
-Toda la interfaz cambia entre **español e inglés** (selector ES/EN en el menú lateral y en el login). Reglas:
-
-- El idioma de la interfaz es por persona y se guarda en el navegador.
-- Cada estudio tiene su **idioma del estudio** (Diseño → Idioma): los participantes y el reporte compartido lo ven en ese idioma, sin importar quién lo creó.
-- Los bloques nuevos se crean en el idioma del estudio; los documentos, en el idioma del documento.
-- Para traducir un texto nuevo: envuélvelo en `t("texto en español")` y agrega la traducción en `web/src/lib/en.ts`. Si falta, se muestra en español.
-
-Para agregar un método nuevo:
-
-1. Agrega el tipo en `blocks/types.ts`.
-2. Regístralo en `registry.tsx`.
-3. Implementa su editor (`Editor.tsx`), su runner (`Runner.tsx`) y sus resultados (`Results.tsx`).
-4. Agrega su template en `catalog.ts`.
+- The UI language is per person and saved in the browser.
+- Each study has its own **study language** (Design → Language): participants and the shared report see it in that language regardless of who created it.
+- New blocks are created in the study language; documents, in the document language.
+- To translate a new string: wrap it in `t("texto en español")` and add the translation to `web/src/lib/en.ts`. Missing translations fall back to Spanish.
 
 ## Roadmap
 
-- ✅ **Fase 1:** proyectos, encuestas y métricas, resultados, insights y reportes.
-- ✅ **Fase 2:** imágenes, lógica condicional, drag & drop, ranking, matriz, sí/no, card sorting, tree test, preference, five second, first click, marca por estudio, consentimiento, revisión previa, dashboard, gestión de cuenta y seguridad.
-- ✅ **Fase 3:** Prototype Testing con pantallas subidas, zonas clicables, rutas esperadas, éxito directo/indirecto, mapas de calor por pantalla y test de usabilidad no moderado.
-- **Fase 3.1 (opcional):** barras fijas (header/tab bar) en prototipos, overlays y grabación de pantalla, cámara y micrófono con consentimiento.
-- ✅ **Fase 4:** plantillas llenables (personas, journey map, afinidad, entrevistas, AEIOU, observación, guion y resultados de usabilidad, evaluación heurística, UX blueprint), modelo Kano, interfaz bilingüe ES/EN y tipografía Spline Sans en títulos.
-- **Fase 5:** sesiones moderadas con grabación y transcripción, diary study, Empathy Map, Service Blueprint, Stakeholder Map y personas ligadas a insights.
-- **Fase 6:** Research Plan, panel de participantes, colaboradores por proyecto con roles y 2FA.
+- ✅ **Phase 1:** projects, surveys and metrics, results, insights and reports.
+- ✅ **Phase 2:** images, conditional logic, drag & drop, ranking, matrix, yes/no, card sorting, tree test, preference, five second, first click, per-study branding, consent, pre-publish review, dashboard, account management and security hardening.
+- ✅ **Phase 3:** Prototype Testing with uploaded screens, clickable zones, expected paths, direct/indirect success, per-screen heatmaps and unmoderated usability test. HTML prototypes with screen detection.
+- ✅ **Phase 4:** fillable documents, Kano model, bilingual UI and Spline Sans headings.
+- **Phase 3.1 (optional):** fixed bars (header/tab bar) in prototypes, overlays, and screen, camera and microphone recording with consent.
+- **Phase 5:** moderated sessions with recording and transcription, personas linked to insights.
+- **Phase 6:** Research Plan, project collaborators with roles, 2FA.
+
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first: it covers the dev setup, commit conventions, the i18n rules and how to add a research method. Please follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## License
+
+redekorate is free software under the [GNU Affero General Public License v3.0](LICENSE). You can run, study, modify and redistribute it, and if you offer a modified version to users over a network you must make your modified source available to them under the same license.
+
+Copyright © 2026 Keyci Padilla and contributors.
