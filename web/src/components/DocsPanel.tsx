@@ -9,19 +9,19 @@ import { Segmented } from "./editing";
 import { DOC_CATEGORIES, DOC_TEMPLATES, docTemplate } from "../docs/templates";
 import type { DocRecord, DocTemplate } from "../docs/types";
 
-export function DocsPanel({ projectId, docs, onChange, preselect }: { projectId: string; docs: DocRecord[]; onChange: () => void; preselect?: string | null }) {
-  const [open, setOpen] = useState(!!preselect);
+export function DocsPanel({ projectId, docs, onChange, preselect, canEdit = true }: { projectId: string; docs: DocRecord[]; onChange: () => void; preselect?: string | null; canEdit?: boolean }) {
+  const [open, setOpen] = useState(!!preselect && canEdit);
   const nav = useNavigate();
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-3">
         <p className="text-sm text-ink-2">{t("Plantillas para planear, sintetizar y evaluar: se llenan aquí mismo, guiadas por instrucciones y ejemplos en cada campo.")}</p>
-        <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Nuevo documento")}</Button>
+        {canEdit && <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Nuevo documento")}</Button>}
       </div>
       {docs.length === 0 ? (
         <Empty icon={<FilePlus2 size={20} />} title={t("Aún no hay documentos")}
           text={t("User personas, journey maps, diagramas de afinidad, guiones de prueba, evaluaciones heurísticas y más.")}
-          action={<Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Crear el primero")}</Button>} />
+          action={canEdit ? <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Crear el primero")}</Button> : undefined} />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {docs.map((d) => {

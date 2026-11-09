@@ -4,6 +4,7 @@ import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
+import { requireProject, type ProjectRole } from "../lib/access.js";
 
 export const projects = Router();
 projects.use(requireAuth);
@@ -17,15 +18,12 @@ const ProjectInput = z.object({
   archived: z.boolean().optional(),
 });
 
-export async function ownProject(id: string, userId: string) {
-  const p = await one("select * from projects where id = $1 and owner_id = $2", [id, userId]);
-  if (!p) throw notFound("Proyecto");
-  return p;
-}
+/** Proyecto accesible con al menos `min` (viewer < editor < owner). Lanza 404/403. */
+export const ownProject = (id: string, userId: string, min: ProjectRole = "viewer") => requireProject(id, userId, min);
 
 projects.get("/", async (req, res) => {
   const rows = await query(
-    `select p.*,
+    `select p.*, case when p.owner_id = $1 then 'owner' else m.role end as role, u.name as owner_name,
        (select count(*)::int from studies s where s.project_id = p.id) as study_count,
        (select count(*)::int from studies s where s.project_id = p.id and s.status = 'live') as live_count,
        (select count(*)::int from sessions se join studies s on s.id = se.study_id
@@ -35,7 +33,10 @@ projects.get("/", async (req, res) => {
        (select count(*)::int from report_shares rs where rs.project_id = p.id and rs.revoked_at is null) as share_count,
        (select count(*)::int from insights i where i.project_id = p.id) as insight_count,
        (select count(*)::int from documents d where d.project_id = p.id) as document_count
-     from projects p where p.owner_id = $1 order by p.updated_at desc`,
+     from projects p
+       left join project_members m on m.project_id = p.id and m.user_id = $1
+       join users u on u.id = p.owner_id
+     where p.owner_id = $1 or m.user_id is not null order by p.updated_at desc`,
     [req.user!.id],
   );
   res.json({ projects: rows });
@@ -55,8 +56,9 @@ projects.get("/:id", async (req, res) => {
 });
 
 projects.patch("/:id", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
   const b = parse(ProjectInput.partial(), req.body);
+  // Editar nombre, descripción y color: editor. Archivar o desarchivar: solo el dueño.
+  await ownProject(req.params.id, req.user!.id, b.archived === undefined ? "editor" : "owner");
   const p = await one(
     `update projects set
        name = coalesce($2, name), description = coalesce($3, description),
@@ -68,7 +70,7 @@ projects.patch("/:id", async (req, res) => {
 });
 
 projects.delete("/:id", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
+  await ownProject(req.params.id, req.user!.id, "owner");
   await query("delete from projects where id = $1", [req.params.id]);
   res.json({ ok: true });
 });
@@ -110,7 +112,7 @@ projects.get("/:id/shares", async (req, res) => {
 });
 
 projects.post("/:id/shares", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
+  await ownProject(req.params.id, req.user!.id, "editor");
   const b = parse(z.object({ study_ids: z.array(z.string().uuid()).min(1).max(50) }), req.body);
   const owned = await query("select id from studies where project_id = $1 and id = any($2)", [req.params.id, b.study_ids]);
   if (owned.length !== b.study_ids.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
@@ -122,7 +124,50 @@ projects.post("/:id/shares", async (req, res) => {
 });
 
 projects.delete("/:id/shares/:shareId", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
+  await ownProject(req.params.id, req.user!.id, "editor");
   await query("update report_shares set revoked_at = now() where id = $1 and project_id = $2", [req.params.shareId, req.params.id]);
   res.json({ ok: true });
+});
+
+// ── Colaboradores ───────────────────────────────────────────────
+const MemberRole = z.enum(["editor", "viewer"]);
+const MEMBERS_SQL = `
+  select x.* from (
+    select u.id as user_id, u.name, u.email, u.avatar, 'owner'::text as role, p.created_at from projects p join users u on u.id = p.owner_id where p.id = $1
+    union all
+    select u.id, u.name, u.email, u.avatar, m.role, m.created_at from project_members m join users u on u.id = m.user_id where m.project_id = $1
+  ) x order by (x.role = 'owner') desc, x.created_at`;
+
+projects.get("/:id/members", async (req, res) => {
+  await ownProject(req.params.id, req.user!.id);
+  res.json({ members: await query(MEMBERS_SQL, [req.params.id]) });
+});
+
+/** Agrega (o cambia el rol de) una persona que ya tiene cuenta. Solo el dueño. */
+projects.post("/:id/members", async (req, res) => {
+  const p = await ownProject(req.params.id, req.user!.id, "owner");
+  const b = parse(z.object({ email: z.string().trim().toLowerCase().email().max(254), role: MemberRole }), req.body);
+  const u = await one<{ id: string }>("select id from users where email = $1 and disabled_at is null", [b.email]);
+  if (!u) throw new HttpError(404, "No hay una cuenta activa con ese correo. Pídele que se registre o invítala desde Usuarios.");
+  if (u.id === p.owner_id) throw new HttpError(400, "Esa persona ya es dueña del proyecto");
+  await query(
+    `insert into project_members(project_id, user_id, role, added_by) values ($1,$2,$3,$4)
+     on conflict (project_id, user_id) do update set role = excluded.role`,
+    [req.params.id, u.id, b.role, req.user!.id]);
+  res.status(201).json({ members: await query(MEMBERS_SQL, [req.params.id]) });
+});
+
+projects.patch("/:id/members/:userId", async (req, res) => {
+  await ownProject(req.params.id, req.user!.id, "owner");
+  const b = parse(z.object({ role: MemberRole }), req.body);
+  await query("update project_members set role = $3 where project_id = $1 and user_id = $2", [req.params.id, req.params.userId, b.role]);
+  res.json({ members: await query(MEMBERS_SQL, [req.params.id]) });
+});
+
+/** El dueño quita a cualquiera; una colaboradora puede salirse del proyecto. */
+projects.delete("/:id/members/:userId", async (req, res) => {
+  const p = await ownProject(req.params.id, req.user!.id);
+  if (req.params.userId !== req.user!.id && p.role !== "owner") throw new HttpError(403, "Solo quien es dueño del proyecto puede hacer esto");
+  await query("delete from project_members where project_id = $1 and user_id = $2", [req.params.id, req.params.userId]);
+  res.json({ members: await query(MEMBERS_SQL, [req.params.id]) });
 });

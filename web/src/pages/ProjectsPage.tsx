@@ -4,8 +4,9 @@ import { ArrowRight, FileText, Folder, FolderPlus, Lightbulb, Plus, Share2, User
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Project, Study } from "../lib/types";
-import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, cx } from "../components/ui";
+import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, cx, Tag } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
+import { sharedLabel } from "../components/MembersPanel";
 import { templateByKey } from "../templates/catalog";
 import { useAuth } from "../lib/auth";
 
@@ -23,6 +24,7 @@ function ProjectCard({ project: p, on, onSelect }: { project: Project; on: boole
       {/* El botón cubre toda la tarjeta; el enlace de acción queda encima. */}
       <button type="button" aria-current={on || undefined} onClick={onSelect} title={p.name}
         className="focus-ring mt-4 min-w-0 truncate rounded text-left font-display text-[19px] font-bold tracking-[-0.02em] after:absolute after:inset-0 after:rounded-xl">{p.name}</button>
+      {p.role && p.role !== "owner" && <span className="relative mt-1.5 inline-block"><Tag>{sharedLabel(p.role, p.owner_name)}</Tag></span>}
       <p className="mt-1 line-clamp-2 min-h-10 text-[13px] leading-5 text-ink-2">{p.description || t("Sin descripción")}</p>
       <div className="mt-4 flex items-baseline justify-between gap-3 text-[13px]">
         <span className="font-medium text-ink-2">{t("Participantes que terminaron")}</span>

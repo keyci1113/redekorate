@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom"
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
-import type { Insight, Participant, Project, ProjectShare, Study } from "../lib/types";
-import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs } from "../components/ui";
+import type { Insight, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
+import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
 import { ParticipantsPanel } from "../components/ParticipantsPanel";
 import { ReportsPanel } from "../components/ReportsPanel";
+import { MembersPanel, sharedLabel } from "../components/MembersPanel";
 import type { DocRecord } from "../docs/types";
 import { templateByKey } from "../templates/catalog";
 import { CATEGORY_ICON, FallbackIcon } from "../templates/icons";
@@ -19,8 +20,8 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report" } as const;
-  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report", members: "members" } as const;
+  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report" | "members">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -28,11 +29,15 @@ export function ProjectPage() {
   const docs = useLoad(() => api.get<{ documents: DocRecord[] }>(`/documents?project_id=${id}`), [id]);
   const participants = useLoad(() => api.get<{ participants: Participant[] }>(`/participants?project_id=${id}`), [id]);
   const shares = useLoad(() => api.get<{ shares: ProjectShare[] }>(`/projects/${id}/shares`), [id]);
+  const members = useLoad(() => api.get<{ members: ProjectMember[] }>(`/projects/${id}/members`), [id]);
 
   if (project.loading) return <Spinner />;
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
   const p = project.data.project;
   const list = studies.data?.studies ?? [];
+  const role = p.role ?? "owner";
+  const canEdit = role !== "viewer";
+  const isOwner = role === "owner";
 
   async function removeProject() {
     if (!confirm(t("¿Eliminar \"{a}\" con todos sus estudios, respuestas e insights? Esta acción no se puede deshacer.", { a: p.name }))) return;
@@ -48,13 +53,14 @@ export function ProjectPage() {
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded" style={{ background: p.color }} />
             <h1 className="page-title">{p.name}</h1>
+            {!isOwner && <Tag>{sharedLabel(role, p.owner_name)}</Tag>}
           </div>
           {p.description && <p className="mt-2 text-[15px] whitespace-pre-line text-ink-2">{p.description}</p>}
         </div>
-        <div className="flex gap-2">
+        {canEdit && <div className="flex gap-2">
           <Button variant="ghost" icon={<Pencil size={15} />} onClick={() => setEditOpen(true)}>{t("Editar")}</Button>
           <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Nuevo estudio")}</Button>
-        </div>
+        </div>}
       </div>
 
       <div className="mt-8">
@@ -64,6 +70,7 @@ export function ProjectPage() {
           { id: "insights", label: t("Repositorio de insights"), count: insights.data?.insights.length ?? 0 },
           { id: "participants", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
+          { id: "members", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
         ]} />
       </div>
 
@@ -71,21 +78,22 @@ export function ProjectPage() {
         {tab === "studies" && (studies.loading ? <Spinner /> : list.length === 0 ? (
           <Empty icon={<FlaskConical size={20} />} title={t("Este proyecto aún no tiene estudios")}
             text={t("Elige un template (encuesta, SUS, NPS, screener…) o empieza desde cero.")}
-            action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Crear estudio")}</Button>} />
+            action={canEdit ? <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Crear estudio")}</Button> : undefined} />
         ) : (
           <div className="overflow-hidden rounded-xl border border-line bg-surface">
-            {list.map((s, i) => <StudyRow key={s.id} s={s} first={i === 0} onChange={() => { studies.reload(); insights.reload(); }} />)}
+            {list.map((s, i) => <StudyRow key={s.id} s={s} first={i === 0} canEdit={canEdit} onChange={() => { studies.reload(); insights.reload(); }} />)}
           </div>
         ))}
-        {tab === "docs" && <DocsPanel projectId={p.id} docs={docs.data?.documents ?? []} onChange={docs.reload} preselect={params.get("new")} />}
+        {tab === "docs" && <DocsPanel projectId={p.id} docs={docs.data?.documents ?? []} onChange={docs.reload} preselect={params.get("new")} canEdit={canEdit} />}
         {tab === "insights" && (
-          <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} />
+          <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
         )}
         {tab === "participants" && (
-          <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} />
+          <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
         )}
+        {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role} members={members.data?.members ?? []} onChange={members.reload} />)}
         {tab === "report" && (
-          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} />
+          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
         )}
       </div>
 
@@ -94,15 +102,15 @@ export function ProjectPage() {
           await api.patch(`/projects/${p.id}`, v);
           setEditOpen(false); project.reload();
         }} />
-        <div className="mt-6 border-t border-line pt-4">
+        {isOwner && <div className="mt-6 border-t border-line pt-4">
           <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={15} />} onClick={removeProject}>{t("Eliminar proyecto")}</Button>
-        </div>
+        </div>}
       </Modal>
     </div>
   );
 }
 
-function StudyRow({ s, first, onChange }: { s: Study; first: boolean; onChange: () => void }) {
+function StudyRow({ s, first, canEdit, onChange }: { s: Study; first: boolean; canEdit: boolean; onChange: () => void }) {
   const nav = useNavigate();
   const [menu, setMenu] = useState(false);
   const tpl = templateByKey(s.method);
@@ -111,7 +119,7 @@ function StudyRow({ s, first, onChange }: { s: Study; first: boolean; onChange: 
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-paper text-ink-2 ring-1 ring-line">
         {tpl ? CATEGORY_ICON[tpl.category] : FallbackIcon}
       </span>
-      <Link to={s.status === "draft" ? `/studies/${s.id}/edit` : `/studies/${s.id}/results`} className="min-w-0 flex-1 focus-ring rounded">
+      <Link to={s.status === "draft" && canEdit ? `/studies/${s.id}/edit` : `/studies/${s.id}/results`} className="min-w-0 flex-1 focus-ring rounded">
         <p className="truncate font-medium">{s.title}</p>
         <p className="mt-0.5 text-xs text-ink-3">{tpl?.name ?? s.method} · {s.block_count} {t("bloques · editado")} {timeAgo(s.updated_at)}</p>
       </Link>
@@ -121,9 +129,9 @@ function StudyRow({ s, first, onChange }: { s: Study; first: boolean; onChange: 
       </div>
       <div className="w-20"><StatusBadge status={s.status} /></div>
       <div className="flex gap-1">
-        <Link to={`/studies/${s.id}/edit`} title={t("Editar")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><PenLine size={16} /></Link>
+        {canEdit && <Link to={`/studies/${s.id}/edit`} title={t("Editar")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><PenLine size={16} /></Link>}
         <Link to={`/studies/${s.id}/results`} title={t("Resultados")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><BarChart3 size={16} /></Link>
-        <button onClick={() => setMenu(!menu)} onBlur={() => setTimeout(() => setMenu(false), 150)} title={t("Más")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><MoreHorizontal size={16} /></button>
+        {canEdit && <button onClick={() => setMenu(!menu)} onBlur={() => setTimeout(() => setMenu(false), 150)} title={t("Más")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><MoreHorizontal size={16} /></button>}
       </div>
       {menu && (
         <div className="absolute top-12 right-4 z-20 w-44 rounded-lg border border-line bg-surface p-1 shadow-lg">

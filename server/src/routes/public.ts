@@ -1,3 +1,4 @@
+import { projectRole } from "../lib/access.js";
 import { Router } from "express";
 import { z } from "zod";
 import { one, query } from "../lib/db.js";
@@ -12,26 +13,28 @@ const device = (ua: string) => /ipad|tablet/i.test(ua) ? "tablet" : /mobi|androi
 export const publicApi = Router();
 
 publicApi.get("/studies/:slug", async (req, res) => {
-  const s = await one("select id, owner_id, title, method, status, blocks, settings from studies where public_slug = $1", [req.params.slug]);
+  const s = await one("select id, project_id, owner_id, title, method, status, blocks, settings, published_blocks, published_settings, published_version from studies where public_slug = $1", [req.params.slug]);
   if (!s) throw notFound("Estudio");
   const user = await readUser(req);
-  const preview = req.query.preview === "1" && user?.id === s.owner_id;
+  const preview = req.query.preview === "1" && !!user && (await projectRole(s.project_id, user.id)) !== null;
   if (!preview && s.status !== "live")
     return res.json({ study: { title: s.title, status: s.status }, available: false });
-  const { owner_id, ...rest } = s;
-  res.json({ study: rest, available: true, preview });
+  const { owner_id, project_id, published_blocks, published_settings, published_version, ...rest } = s;
+  // La vista previa muestra el borrador; los participantes, la versión publicada.
+  const study = preview ? rest : { ...rest, blocks: published_blocks ?? rest.blocks, settings: published_settings ?? rest.settings };
+  res.json({ study, available: true, preview, version: published_version });
 });
 
 publicApi.post("/studies/:slug/sessions", sessionCreateLimiter, async (req, res) => {
-  const s = await one("select id, status from studies where public_slug = $1", [req.params.slug]);
+  const s = await one("select id, status, published_version from studies where public_slug = $1", [req.params.slug]);
   if (!s || s.status !== "live") throw new HttpError(410, "Este estudio no está recibiendo respuestas");
   // Solo aceptamos parámetros cortos de la URL (p. ej. ?pid=123&source=email). Nunca guardamos IP.
   const { participant } = parse(z.object({
     participant: z.record(z.string().max(40), z.string().max(120)).refine((o) => Object.keys(o).length <= 10, "Demasiados parámetros").default({}),
   }), req.body ?? {});
   const session = await one(
-    "insert into sessions(study_id, participant, device) values ($1,$2,$3) returning id",
-    [s.id, JSON.stringify(participant), device(String(req.headers["user-agent"] ?? ""))],
+    "insert into sessions(study_id, participant, device, study_version) values ($1,$2,$3,$4) returning id",
+    [s.id, JSON.stringify(participant), device(String(req.headers["user-agent"] ?? "")), s.published_version],
   );
   res.status(201).json({ session_id: session!.id });
 });
@@ -39,7 +42,8 @@ publicApi.post("/studies/:slug/sessions", sessionCreateLimiter, async (req, res)
 async function openSession(id: string) {
   if (!/^[0-9a-f-]{36}$/i.test(id)) throw notFound("Sesión");
   const se = await one(
-    "select se.id, se.study_id, se.completed_at, s.status, s.blocks from sessions se join studies s on s.id = se.study_id where se.id = $1",
+    // Las respuestas se validan contra la versión publicada (la que el participante tiene cargada), no contra el borrador.
+    "select se.id, se.study_id, se.completed_at, s.status, coalesce(s.published_blocks, s.blocks) as blocks from sessions se join studies s on s.id = se.study_id where se.id = $1",
     [id],
   );
   if (!se) throw notFound("Sesión");

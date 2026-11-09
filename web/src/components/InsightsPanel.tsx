@@ -9,8 +9,8 @@ import { t } from "../lib/i18n";
 const SEVERITIES = (): [Severity, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")], ["critical", t("Crítica")]];
 const CONFIDENCES = (): [Confidence, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")]];
 
-export function InsightsPanel({ projectId, studyId, studies, insights, onChange }: {
-  projectId: string; studyId?: string; studies?: Pick<Study, "id" | "title">[]; insights: Insight[]; onChange: () => void;
+export function InsightsPanel({ projectId, studyId, studies, insights, onChange, canEdit = true }: {
+  projectId: string; studyId?: string; studies?: Pick<Study, "id" | "title">[]; insights: Insight[]; onChange: () => void; canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState<Insight | "new" | null>(null);
   const [q, setQ] = useState("");
@@ -46,7 +46,7 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange 
               className={cx("focus-ring min-h-9 rounded-md px-3 text-sm font-medium", review === v ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink")}>{l}</button>
           ))}
         </div>
-        <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Nuevo insight")}</Button>
+        {canEdit && <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Nuevo insight")}</Button>}
       </div>
       {allTags.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-1.5">
@@ -62,17 +62,17 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange 
       {insights.length === 0 ? (
         <Empty icon={<Lightbulb size={20} />} title={t("Aún no hay insights")}
           text={t("Registra hallazgos con su severidad, nivel de confianza y etiquetas. Aparecerán en el reporte compartido.")}
-          action={<Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button>} />
+          action={canEdit ? <Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button> : undefined} />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((i) => (
             <Card key={i.id} className="group flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold leading-snug">{i.title}</h3>
-                <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
+                {canEdit && <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
                   <button onClick={() => setEditing(i)} className="focus-ring rounded p-1 text-ink-3 hover:text-ink" aria-label={t("Editar")}><Pencil size={14} /></button>
                   <button onClick={() => remove(i)} className="focus-ring rounded p-1 text-ink-3 hover:text-bad" aria-label={t("Eliminar")}><Trash2 size={14} /></button>
-                </div>
+                </div>}
               </div>
               {i.body && <p className="mt-2 line-clamp-4 text-sm leading-relaxed whitespace-pre-line text-ink-2">{i.body}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">

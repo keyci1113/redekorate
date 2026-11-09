@@ -9,8 +9,8 @@ import { t } from "../lib/i18n";
 const STATUSES = (): [ParticipantStudyStatus, string][] => [["invited", t("Invitado")], ["completed", t("Completó")], ["no_show", t("No asistió")], ["declined", t("Rechazó")]];
 const statusTone = (s: ParticipantStudyStatus) => s === "completed" ? "border-good/30 bg-good-soft text-good" : s === "declined" || s === "no_show" ? "border-bad/30 bg-bad-soft text-bad" : "border-line text-ink-2";
 
-export function ParticipantsPanel({ projectId, studies, participants, onChange }: {
-  projectId: string; studies: Pick<Study, "id" | "title">[]; participants: Participant[]; onChange: () => void;
+export function ParticipantsPanel({ projectId, studies, participants, onChange, canEdit = true }: {
+  projectId: string; studies: Pick<Study, "id" | "title">[]; participants: Participant[]; onChange: () => void; canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState<Participant | "new" | null>(null);
   const [q, setQ] = useState("");
@@ -29,23 +29,23 @@ export function ParticipantsPanel({ projectId, studies, participants, onChange }
           <Search size={15} className="absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" />
           <input className="field pl-9" placeholder={t("Buscar participantes…")} value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
-        <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Nuevo participante")}</Button>
+        {canEdit && <Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Nuevo participante")}</Button>}
       </div>
 
       {participants.length === 0 ? (
         <Empty icon={<UsersRound size={20} />} title={t("Aún no hay participantes")}
           text={t("Lleva aquí tu base de reclutamiento: contacto, consentimiento y en qué estudios ha participado cada quién.")}
-          action={<Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button>} />
+          action={canEdit ? <Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button> : undefined} />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((p) => (
             <Card key={p.id} className="group flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold leading-snug">{p.name}</h3>
-                <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
+                {canEdit && <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
                   <button onClick={() => setEditing(p)} className="focus-ring rounded p-1 text-ink-3 hover:text-ink" aria-label={t("Editar")}><Pencil size={14} /></button>
                   <button onClick={() => remove(p)} className="focus-ring rounded p-1 text-ink-3 hover:text-bad" aria-label={t("Eliminar")}><Trash2 size={14} /></button>
-                </div>
+                </div>}
               </div>
               <div className="mt-1.5 flex flex-col gap-0.5 text-[13px] text-ink-2">
                 {p.email && <span className="flex items-center gap-1.5"><Mail size={12} className="text-ink-3" /> {p.email}</span>}

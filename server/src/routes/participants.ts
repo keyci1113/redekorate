@@ -4,6 +4,7 @@ import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
+import { requireProject } from "../lib/access.js";
 
 export const participants = Router();
 participants.use(requireAuth);
@@ -18,8 +19,9 @@ const Fields = z.object({
 });
 
 async function ownParticipant(id: string, userId: string) {
-  const p = await one("select * from participants where id = $1 and owner_id = $2", [id, userId]);
+  const p = await one("select * from participants where id = $1", [id]);
   if (!p) throw notFound("Participante");
+  await requireProject(p.project_id, userId, "editor");
   return p;
 }
 
@@ -43,7 +45,7 @@ participants.get("/", async (req, res) => {
 
 participants.post("/", async (req, res) => {
   const b = parse(Fields.extend({ project_id: z.string().uuid() }), req.body);
-  await ownProject(b.project_id, req.user!.id);
+  await ownProject(b.project_id, req.user!.id, "editor");
   const p = await one(
     `insert into participants(project_id, owner_id, name, email, phone, tags, notes, consent, consent_at)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,

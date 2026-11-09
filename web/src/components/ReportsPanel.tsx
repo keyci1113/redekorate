@@ -10,8 +10,8 @@ import { ProjectReportPdf, ReportPdfButton, type ReportStudy } from "./ReportPdf
 import { t } from "../lib/i18n";
 export const projectReportUrl = (token: string) => `${window.location.origin}/pr/${token}`;
 
-export function ReportsPanel({ projectId, projectName, projectColor, studies, shares, onChange }: {
-  projectId: string; projectName: string; projectColor?: string; studies: Pick<Study, "id" | "title">[]; shares: ProjectShare[]; onChange: () => void;
+export function ReportsPanel({ projectId, projectName, projectColor, studies, shares, onChange, canEdit = true }: {
+  projectId: string; projectName: string; projectColor?: string; studies: Pick<Study, "id" | "title">[]; shares: ProjectShare[]; onChange: () => void; canEdit?: boolean;
 }) {
   // Trae los resultados de cada estudio y arma el PDF del proyecto
   const pdf = (ids: string[]) => async () => {
@@ -49,7 +49,9 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, sh
         <p className="font-semibold">{t("Reporte compartible")}</p>
         <p className="mt-1 text-sm text-ink-2">{t("Elige qué estudios quieres incluir y genera un link público de solo lectura con sus resultados, gráficas e insights.")}</p>
 
-        {!picking ? (
+        {!canEdit ? (
+          <p className="mt-3 text-sm text-ink-3">{t("Solo editores y dueños crean o revocan links.")}</p>
+        ) : !picking ? (
           <Button className="mt-4" variant="primary" icon={<Plus size={15} />} onClick={() => setPicking(true)}>{t("Elegir estudios y crear link")}</Button>
         ) : (
           <div className="mt-4">
@@ -79,7 +81,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, sh
               <div className="mt-2 flex items-center justify-between">
                 <span className="flex items-center gap-3"><p className="text-xs text-ink-3">{t("Creado")} {timeAgo(sh.created_at)}</p>
                   <ReportPdfButton size="sm" variant="ghost" title={projectName} label={t("PDF")} load={pdf(sh.study_ids)} /></span>
-                <button onClick={() => revoke(sh.id)} className="flex items-center gap-1 text-xs font-medium text-bad hover:underline"><Trash2 size={12} /> {t("Revocar")}</button>
+                {canEdit && <button onClick={() => revoke(sh.id)} className="flex items-center gap-1 text-xs font-medium text-bad hover:underline"><Trash2 size={12} /> {t("Revocar")}</button>}
               </div>
             </Card>
           ))}

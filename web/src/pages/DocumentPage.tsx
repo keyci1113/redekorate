@@ -30,9 +30,11 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [guide, setGuide] = useState(true);
   const first = useRef(true);
+  const readOnly = project.role === "viewer";
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
+    if (readOnly) return;
     setSaving("saving");
     const timer = setTimeout(async () => {
       try { const { document } = await api.patch<{ document: DocRecord }>(`/documents/${doc.id}`, { title: title.trim() || t("Documento sin título"), data: content, language: lang }); onDoc(document); setSaving("saved"); }
@@ -83,7 +85,7 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
         <div className="mb-4 flex justify-end print:hidden">
           <button onClick={() => setGuide(!guide)} className="text-xs font-medium text-accent">{guide ? t("Ocultar instrucciones") : t("Mostrar instrucciones")}</button>
         </div>
-        <DocumentView tpl={tpl} title={title} data={content} lang={lang} onChange={setContent} showGuide={guide} />
+        <DocumentView readOnly={readOnly} tpl={tpl} title={title} data={content} lang={lang} onChange={setContent} showGuide={guide} />
         <div className="mt-10 flex justify-between border-t border-line pt-4 print:hidden">
           <Button variant="ghost" icon={<Copy size={14} />} onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}>{t("Duplicar")}</Button>
           <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {

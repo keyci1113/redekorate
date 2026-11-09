@@ -4,6 +4,7 @@ import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
+import { requireProject } from "../lib/access.js";
 
 export const insights = Router();
 insights.use(requireAuth);
@@ -19,7 +20,7 @@ const Fields = z.object({
 
 insights.post("/", async (req, res) => {
   const b = parse(Fields.extend({ project_id: z.string().uuid(), study_id: z.string().uuid().nullable().optional() }), req.body);
-  await ownProject(b.project_id, req.user!.id);
+  await ownProject(b.project_id, req.user!.id, "editor");
   if (b.study_id) {
     const s = await one("select 1 from studies where id = $1 and project_id = $2", [b.study_id, b.project_id]);
     if (!s) throw new HttpError(400, "El estudio no pertenece a este proyecto");
@@ -33,8 +34,9 @@ insights.post("/", async (req, res) => {
 });
 
 async function ownInsight(id: string, userId: string) {
-  const i = await one("select i.* from insights i join projects p on p.id = i.project_id where i.id = $1 and p.owner_id = $2", [id, userId]);
+  const i = await one("select * from insights where id = $1", [id]);
   if (!i) throw notFound("Insight");
+  await requireProject(i.project_id, userId, "editor");
   return i;
 }
 
