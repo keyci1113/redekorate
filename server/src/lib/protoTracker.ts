@@ -7,9 +7,9 @@
 //   2. El hash de la URL (#/carrito → "carrito").
 //   3. El primer <h1> visible.
 //   4. El <title> del documento.
-const TRACKER = `(function () {
+export const TRACKER = `(function () {
   if (window.parent === window) return;
-  var P = window.parent, last = null, timer = 0;
+  var P = window.parent, last = null, timer = 0, trail = [];   // trail: textos de los clics desde la carga (para volver a una pantalla)
   function mem() { var d = {}; return { getItem: function (k) { return Object.prototype.hasOwnProperty.call(d, k) ? d[k] : null; }, setItem: function (k, v) { d[k] = String(v); }, removeItem: function (k) { delete d[k]; }, clear: function () { d = {}; }, key: function (i) { return Object.keys(d)[i] || null; }, get length() { return Object.keys(d).length; } }; }
   ["localStorage", "sessionStorage"].forEach(function (k) { try { window[k].length; } catch (e) { try { Object.defineProperty(window, k, { value: mem(), configurable: true }); } catch (e2) {} } });
   function send(m) { m.rk = 1; try { P.postMessage(m, "*"); } catch (e) {} }
@@ -24,7 +24,33 @@ const TRACKER = `(function () {
     for (var j = 0; j < hs.length; j++) if (visible(hs[j]) && text(hs[j].textContent)) return text(hs[j].textContent);
     return text(document.title) || "Inicio";
   }
-  function check() { var s = screen(); if (s && s !== last) { last = s; send({ type: "screen", name: s }); } }
+  function check() { var s = screen(); if (s && s !== last) { last = s; send({ type: "screen", name: s, route: location.hash || null, trail: trail.slice(-12) }); } }
+  // El padre puede pedir ir a una pantalla al empezar una tarea: primero por su ruta (#), si no, tocando el elemento con ese nombre.
+  function clickByLabel(want) {
+    var els = document.querySelectorAll(SEL), i, hitEl = null;
+    for (i = 0; i < els.length; i++) { if (visible(els[i]) && text(els[i].innerText || els[i].getAttribute("aria-label")).toLowerCase() === want) { els[i].click(); return true; } }
+    // Muchos prototipos (React) usan <div onClick> sin atributo: buscamos el elemento más profundo con ese texto exacto.
+    var all = document.body.querySelectorAll("*");
+    for (i = 0; i < all.length; i++) { var el = all[i]; if (el.children.length <= 3 && visible(el) && text(el.innerText || "").toLowerCase() === want) hitEl = el; }
+    if (hitEl) { hitEl.click(); return true; }
+    for (i = 0; i < els.length; i++) { if (visible(els[i]) && text(els[i].innerText || "").toLowerCase().indexOf(want) >= 0) { els[i].click(); return true; } }
+    return false;
+  }
+  function at(name) { return text(screen()).toLowerCase() === text(name).toLowerCase(); }
+  // Ir a una pantalla, en orden de fiabilidad: su ruta (#), un enlace visible con su nombre, los clics que llevaron a ella
+  // la primera vez (replay), y por último #nombre. Se detiene en cuanto la pantalla actual coincide.
+  function goto(name, route, trail) {
+    var want = text(name).toLowerCase();
+    var steps = [];
+    if (route) steps.push(function () { location.hash = route; });
+    steps.push(function () { clickByLabel(want); });
+    (trail || []).forEach(function (lbl) { steps.push(function () { clickByLabel(text(lbl).toLowerCase()); }); });
+    var slug = want.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (slug) { steps.push(function () { location.hash = "#" + slug; }); steps.push(function () { location.hash = "#" + encodeURIComponent(name); }); }
+    var i = 0;
+    (function next() { if (at(name)) { check(); return; } if (i >= steps.length) { check(); return; } steps[i++](); setTimeout(next, 160); })();
+  }
+  addEventListener("message", function (e) { var d = e.data; if (d && d.rk === 1 && d.type === "goto" && typeof d.name === "string") goto(d.name, typeof d.route === "string" ? d.route : null, Array.isArray(d.trail) ? d.trail.slice(0, 12) : []); });
   function soon() { clearTimeout(timer); timer = setTimeout(check, 120); }
   var SEL = "a,button,input,select,textarea,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=radio],[role=switch],[onclick],[contenteditable=true]";
   function interactive(el) {
@@ -40,6 +66,7 @@ const TRACKER = `(function () {
     if (!t) return;
     check();
     var hit = interactive(t), d = document.documentElement;
+    if (hit) trail.push(label(hit));
     send({ type: "click", screen: last, x: (e.clientX + scrollX) / Math.max(d.scrollWidth, 1), y: (e.clientY + scrollY) / Math.max(d.scrollHeight, 1), hit: !!hit, label: label(hit || t) });
     setTimeout(check, 60); setTimeout(check, 400);
   }, true);
@@ -49,7 +76,9 @@ const TRACKER = `(function () {
   addEventListener("load", check);
 })();`;
 
-const TAG = `<script data-redekorate-tracker>${TRACKER}</script>`;
+// Se enlaza en vez de incrustarse: así cada mejora del tracker llega a todos los prototipos ya subidos.
+export const TRACKER_PATH = "/proto-tracker.js";
+const TAG = `<script src="${TRACKER_PATH}" data-redekorate-tracker></script>`;
 
 /** Agrega el script lo más arriba posible para que corra antes que el código del prototipo. */
 export function injectTracker(html: string): string {

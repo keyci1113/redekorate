@@ -16,7 +16,7 @@ export const securityHeaders = helmet({
       "img-src": ["'self'", "data:", "blob:"],
       "font-src": ["'self'", "data:"],
       "connect-src": ["'self'"],
-      "frame-src": ["'self'", "https://www.figma.com", "https://embed.figma.com"],
+      "frame-src": ["'self'", "https:"],   // prototipos por link (Figma Make, sitios publicados) se muestran en un iframe
       "frame-ancestors": ["'none'"],
       "form-action": ["'self'"],
       "object-src": ["'none'"],

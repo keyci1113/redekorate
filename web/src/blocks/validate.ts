@@ -3,6 +3,7 @@ import type { Block } from "./types";
 import { parseTree } from "./types";
 import { blockDef, isStructural } from "./registry";
 import type { StudySettings } from "../lib/settings";
+import { resolveTask } from "./prototype";
 
 export interface Issue { level: "error" | "warning"; blockId?: string; message: string }
 
@@ -53,17 +54,22 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
     }
     if (b.type === "prototype_task") {
       const p = settings.prototypes?.find((x) => x.id === b.prototypeId);
+      const tb = p ? resolveTask(b, p) : b;   // una tarea sin ajustes sigue el flujo del prototipo
       if (!p) err(b, t("{a}: elige o crea el prototipo que se usará.", { a: name }));
       else if (p.kind === "html") {
         if (!p.html?.url) err(b, t("{a}: sube el archivo HTML del prototipo \"{b}\".", { a: name, b: p.name }));
-        else if (!b.goalScreens.length) warn(b, t("{a}: sin pantalla meta, el participante indicará cuándo terminó (el éxito no se verifica).", { a: name }));
+        else if (!tb.goalScreens.length && !tb.goalClick) warn(b, t("{a}: sin meta, el éxito no se verifica: solo cuenta lo que el participante declare.", { a: name }));
+      }
+      else if (p.kind === "link") {
+        // Un link no tiene pantallas: solo hace falta la URL. El éxito siempre es autodeclarado.
+        if (!p.link?.url) err(b, t("{a}: pega el link publicado del prototipo \"{b}\".", { a: name, b: p.name }));
       }
       else if (!p.screens.length) err(b, t("{a}: el prototipo \"{b}\" no tiene pantallas.", { a: name, b: p.name }));
       else {
         const ids = new Set(p.screens.map((s) => s.id));
-        if (!ids.has(b.startScreen)) err(b, t("{a}: elige la pantalla inicial.", { a: name }));
-        if (!b.goalScreens.some((g) => ids.has(g))) warn(b, t("{a}: marca la pantalla meta para medir el éxito.", { a: name }));
-        if (b.expectedPath.some((s) => !ids.has(s))) warn(b, t("{a}: la ruta esperada incluye pantallas eliminadas.", { a: name }));
+        if (!ids.has(tb.startScreen)) err(b, t("{a}: elige la pantalla inicial.", { a: name }));
+        if (!tb.goalScreens.some((g) => ids.has(g))) warn(b, t("{a}: marca la pantalla meta para medir el éxito.", { a: name }));
+        if (tb.expectedPath.some((s) => !ids.has(s))) warn(b, t("{a}: la ruta esperada incluye pantallas eliminadas.", { a: name }));
       }
     }
     const targets = [...(b.logic?.rules.map((r) => r.goTo) ?? []), b.logic?.otherwise].filter(Boolean) as string[];
@@ -72,7 +78,7 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
   // Revisión de cada prototipo usado
   const used = new Set(blocks.flatMap((b) => (b.type === "prototype_task" ? [b.prototypeId] : [])));
   for (const p of settings.prototypes ?? []) {
-    if (!used.has(p.id) || p.kind === "html") continue;
+    if (!used.has(p.id) || p.kind === "html" || p.kind === "link") continue;
     const ids = new Set(p.screens.map((s) => s.id));
     const goals = new Set(blocks.flatMap((b) => (b.type === "prototype_task" && b.prototypeId === p.id ? b.goalScreens : [])));
     for (const s of p.screens) {

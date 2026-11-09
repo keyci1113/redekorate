@@ -1,7 +1,8 @@
 import { useRef, useState, type ReactNode } from "react";
 import { GripVertical, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
-import { uid } from "../lib/hooks";
+import { optimizeImage } from "../lib/image";
+import { uid, type usePaneWidth } from "../lib/hooks";
 import type { Option } from "../blocks/types";
 import { cx } from "./ui";
 
@@ -19,7 +20,7 @@ export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact,
     if (!file) return;
     if (!file.type.startsWith("image/") || file.type === "image/svg+xml") { setErr(t("Usa PNG, JPG, GIF o WEBP")); return; }
     setBusy(true); setErr(null);
-    try { onChange(await api.upload(file)); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    try { onChange(await api.upload(await optimizeImage(file))); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
 
   if (value) {
@@ -174,3 +175,14 @@ export function Tip({ children }: { children: ReactNode }) {
 export function RemoveX({ onClick }: { onClick: () => void }) {
   return <button type="button" onClick={onClick} className="rounded p-0.5 text-ink-3 hover:text-bad"><X size={13} /></button>;
 }
+
+/** Asa entre paneles: arrastrar o flechas para cambiar el ancho; doble clic lo restablece. */
+export function PaneHandle({ label, className, ...props }: { label: string; className?: string } & ReturnType<typeof usePaneWidth>["handleProps"]) {
+  return (
+    <div {...props} aria-label={label}
+      className={cx("focus-ring group relative z-10 -mx-[3px] w-[6px] shrink-0 cursor-col-resize touch-none select-none", className)}>
+      <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition group-hover:bg-accent group-focus-visible:bg-accent" />
+    </div>
+  );
+}
+

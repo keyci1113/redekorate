@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, PrototypeTaskValue } from "./prototype";
-import { isDirect, isHtml, screenName } from "./prototype";
+import { isDirect, isHtml, isLink, resolveTask, screenName, stepsComplete } from "./prototype";
 import type { Answer } from "../lib/types";
 import { mean, median } from "../lib/analytics";
 import { formatDuration } from "../lib/hooks";
@@ -12,28 +12,31 @@ import { usePrint } from "../lib/print";
 import { t } from "../lib/i18n";
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
-export function PrototypeResult({ block, answers, proto }: { block: PrototypeTaskBlock; answers: Answer[]; proto?: Prototype }) {
+export function PrototypeResult({ block: raw, answers, proto }: { block: PrototypeTaskBlock; answers: Answer[]; proto?: Prototype }) {
+  const block = resolveTask(raw, proto);
   const vals = answers.map((a) => a.value as PrototypeTaskValue).filter((v) => v?.path);
   const print = usePrint();
   const [tab, setTab] = useState<"paths" | "screens">("paths");
   const n = vals.length;
   const success = vals.filter((v) => v.outcome === "success");
-  const direct = success.filter((v) => isDirect(v, block.expectedPath)).length;
+  const direct = success.filter((v) => isDirect(v, block.expectedPath) && stepsComplete(v, block.steps)).length;
   const gaveUp = n - success.length;
+  const claimed = success.filter((v) => v.claimed).length;
   const allClicks = vals.flatMap((v) => v.clicks);
   const misclicks = allClicks.filter((c) => !c.h).length;
 
   if (!proto) return <p className="text-sm text-warn">{t("El prototipo de esta tarea fue eliminado del estudio.")}</p>;
   const html = isHtml(proto);
+  const link = isLink(proto);
   const screensLabel = html ? t("Clics por pantalla") : t("Mapas de calor por pantalla");
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
-        <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} tone={toneFor(pct(direct, n), 60, 40, { n })} />
+      <div className={cx("grid grid-cols-2 gap-3", !link && "sm:grid-cols-4")}>
+        <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={claimed ? t("{a} de {b} · {c} autodeclarados", { a: success.length, b: n, c: claimed }) : t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
+        {!link && <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} tone={toneFor(pct(direct, n), 60, 40, { n })} />}
         <Stat label={t("Tiempo mediano")} value={formatDuration(median(success.map((v) => v.ms)))} sub={t("en tareas exitosas")} />
-        <Stat label={html ? t("Clics sin respuesta") : t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />
+        {!link && <Stat label={html ? t("Clics sin respuesta") : t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />}
       </div>
 
       <div>
@@ -43,12 +46,17 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
           {gaveUp > 0 && <div className="bg-bad/70" style={{ flex: gaveUp }} title={t("Abandono: {a}", { a: gaveUp })} />}
         </div>
         <div className="mt-2 flex flex-wrap gap-4 text-xs text-ink-2">
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-good" />{t("Directo")} {pct(direct, n)}%</span>
-          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-good/45" />{t("Indirecto")} {pct(success.length - direct, n)}%</span>
+          <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-good" />{link ? t("Completó") : t("Directo")} {pct(direct, n)}%</span>
+          {!link && <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-good/45" />{t("Indirecto")} {pct(success.length - direct, n)}%</span>}
           <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-bad/70" />{t("No la completó")} {pct(gaveUp, n)}%</span>
         </div>
       </div>
 
+      {html && (block.steps?.length ?? 0) > 0 && <StepsTable block={block} vals={vals} proto={proto} />}
+
+      {link ? (
+        <p className="rounded-xl bg-paper p-4 text-sm text-ink-2">{t("Con un prototipo por link no se registran clics ni pantallas; solo el tiempo y el resultado de cada participante.")}</p>
+      ) : <>
       <div className="flex gap-1 rounded-lg bg-paper p-1 print:hidden">
         {([["paths", t("Rutas")], ["screens", screensLabel]] as const).map(([id, l]) => (
           <button key={id} onClick={() => setTab(id)} className={cx("flex-1 rounded-md px-3 py-1.5 text-[13px] font-medium transition", tab === id ? "bg-surface shadow-sm" : "text-ink-3 hover:text-ink")}>{l}</button>
@@ -62,6 +70,40 @@ export function PrototypeResult({ block, answers, proto }: { block: PrototypeTas
           {html ? <HtmlScreens vals={vals} proto={proto} /> : <ScreensGrid vals={vals} proto={proto} />}
         </>
       ) : tab === "paths" ? <Paths block={block} vals={vals} proto={proto} /> : html ? <HtmlScreens vals={vals} proto={proto} /> : <Screens vals={vals} proto={proto} />}
+      </>}
+    </div>
+  );
+}
+
+/** Interacciones requeridas: cuántos participantes cumplieron cada paso y cuánto tardaron en llegar a él. */
+function StepsTable({ block, vals, proto }: { block: PrototypeTaskBlock; vals: PrototypeTaskValue[]; proto: Prototype }) {
+  const steps = block.steps ?? [];
+  return (
+    <div className="overflow-hidden rounded-xl border border-line">
+      <table className="w-full text-sm">
+        <thead className="bg-paper text-left text-[11px] font-semibold tracking-wide text-ink-3 uppercase">
+          <tr><th scope="col" className="px-3 py-2">{t("Interacción requerida")}</th><th scope="col" className="px-3 py-2 text-right">{t("La hicieron")}</th><th scope="col" className="px-3 py-2 text-right">{t("Tiempo mediano")}</th></tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {steps.map((st, i) => {
+            const hits = vals.map((v) => v.steps?.find((d) => d.i === i)).filter((d): d is { i: number; t: number } => !!d);
+            return (
+              <tr key={i}>
+                <td className="px-3 py-2"><span className="mr-2 text-ink-3 tabular-nums">{i + 1}</span>{st.label}{st.screen && <span className="text-ink-3"> · {screenName(proto, st.screen)}</span>}</td>
+                <td className={cx("px-3 py-2 text-right tabular-nums", toneFor(pct(hits.length, vals.length), 80, 60, { n: vals.length }) === "bad" && "text-bad")}>{pct(hits.length, vals.length)}% <span className="text-ink-3">({hits.length}/{vals.length})</span></td>
+                <td className="px-3 py-2 text-right tabular-nums">{hits.length ? formatDuration(median(hits.map((h) => h.t))) : "—"}</td>
+              </tr>
+            );
+          })}
+          {block.goalClick && (
+            <tr className="bg-good-soft/40">
+              <td className="px-3 py-2 text-good">{t("Meta: tocar")} <b>{block.goalClick.label}</b></td>
+              <td className="px-3 py-2 text-right text-good tabular-nums">{pct(vals.filter((v) => v.outcome === "success").length, vals.length)}%</td>
+              <td className="px-3 py-2 text-right text-ink-3">—</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
     </div>
   );
 }

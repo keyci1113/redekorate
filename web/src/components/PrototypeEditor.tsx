@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ArrowLeft, Check, Code2, FileCode2, ImagePlus, Loader2, Monitor, MousePointer2, Play, Plus, RotateCw, Smartphone, SquareDashedMousePointer, Trash2, Upload, X,
+  ArrowLeft, Check, ChevronDown, ChevronUp, Circle, Code2, FileCode2, Flag, Globe, ImagePlus, Link2, Loader2, Monitor, MousePointer2, MousePointerClick, PanelLeft, PanelRight, Play, Plus, RotateCw, Smartphone, SquareDashedMousePointer, Target, Trash2, Upload, X,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { uid } from "../lib/hooks";
-import type { Hotspot, Prototype, Screen } from "../blocks/prototype";
-import { HTML_SANDBOX, asTrackerMsg, htmlScreenId, isHtml, naturalSort } from "../blocks/prototype";
+import { optimizeImage } from "../lib/image";
+import { uid, usePaneWidth, usePref } from "../lib/hooks";
+import type { FlowItem, Hotspot, ProtoFlow, Prototype, Screen } from "../blocks/prototype";
+import { HTML_SANDBOX, asTrackerMsg, flowStartScreen, gotoScreen, htmlScreenId, isEmbedded, isHtml, isLink, naturalSort, normalizeFlow } from "../blocks/prototype";
 import { Button, cx } from "./ui";
-import { Toggle, useSortable } from "./editing";
+import { PaneHandle, Toggle, useSortable } from "./editing";
 
 import { t } from "../lib/i18n";
 const ACCEPT = "image/png,image/jpeg,image/gif,image/webp";
@@ -75,7 +76,9 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
     const added: Screen[] = [];
     for (const f of files) {
       try {
-        const [url, size] = await Promise.all([api.upload(f), imageSize(f)]);
+        // Optimize first so the stored width/height (which hotspots are relative to) match the uploaded file.
+        const file = await optimizeImage(f);
+        const [url, size] = await Promise.all([api.upload(file), imageSize(file)]);
         added.push({ id: uid(), name: f.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || t("Pantalla"), image: url, ...size, hotspots: [] });
       } catch (e) { setErr(`${f.name}: ${(e as Error).message}`); }
       setUploading((u) => u && { ...u, done: u.done + 1 });
@@ -97,6 +100,43 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
     setUploading(null);
   }
   const html = isHtml(proto);
+  const link = isLink(proto);
+  const embedded = isEmbedded(proto);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [recording, setRecording] = useState(false);   // graba clics del preview como interacciones requeridas
+  const leftPane = usePaneWidth("proto-left", 256, 200, 520, "left");
+  const rightPane = usePaneWidth("proto-right", 320, 260, 680, "right");
+  const [showLeft, setShowLeft] = usePref("proto-show-left", true);
+  const [showRight, setShowRight] = usePref("proto-show-right", true);
+
+  async function addLink(raw: string) {
+    const url = raw.trim();
+    if (!url) return;
+    setErr(null); setUploading({ done: 0, total: 1 });
+    try {
+      const r = await api.post<{ url: string; host: string; embeddable: boolean }>("/uploads/link", { url });
+      if (!r.embeddable) {
+        setErr(/(^|\.)claude\.ai$/.test(r.host)
+          ? t("claude.ai no permite mostrar sus artifacts en otros sitios. Descarga el artifact como .html y súbelo con \"Subir HTML\".")
+          : t("{a} no permite mostrarse dentro de otras páginas. Publica el prototipo en un sitio que lo permita o súbelo como HTML.", { a: r.host }));
+      } else {
+        setProto({ kind: "link", link: { url: r.url, host: r.host }, html: undefined, screens: [] });
+        setLinkUrl(""); setPlay(false); setHotId(null);
+      }
+    } catch (e) { setErr((e as Error).message); }
+    setUploading(null);
+  }
+
+  /** Vuelve al selector de tipo (pantallas / HTML / link) conservando el prototipo y su nombre. */
+  const resetSource = () => {
+    if (!confirm(t("¿Quitar este prototipo y empezar de nuevo? Las tareas que lo usan quedarán sin pantallas hasta que elijas otra opción."))) return;
+    setProto({ kind: "screens", link: undefined, html: undefined, screens: [] });
+    setScreenId(""); setHotId(null); setPlay(false); setLinkUrl(""); setErr(null);
+  };
+  const removePrototype = () => {
+    if (!confirm(t("¿Eliminar el prototipo \"{a}\" completo?", { a: proto.name }))) return;
+    const rest = prototypes.filter((p) => p.id !== proto.id); onChange(rest); setProtoId(rest[0]?.id ?? ""); setScreenId(rest[0]?.screens[0]?.id ?? "");
+  };
 
   const hot = screen?.hotspots.find((h) => h.id === hotId) ?? null;
   const setHot = (id: string, p: Partial<Hotspot>) => screen && setScreen(screen.id, { hotspots: screen.hotspots.map((h) => (h.id === id ? { ...h, ...p } : h)) });
@@ -118,7 +158,13 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
           ))}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {!html && <Button size="sm" variant={play ? "primary" : "secondary"} icon={play ? <SquareDashedMousePointer size={14} /> : <Play size={14} />} onClick={() => { setPlay(!play); setHotId(null); }} disabled={!proto.screens.length}>
+          <div className="flex rounded-lg bg-paper p-0.5">
+            <button onClick={() => setShowLeft(!showLeft)} aria-pressed={showLeft} title={showLeft ? t("Ocultar panel de pantallas") : t("Mostrar panel de pantallas")} aria-label={t("Panel de pantallas")}
+              className={cx("focus-ring rounded-md p-1.5", showLeft ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelLeft size={14} /></button>
+            <button onClick={() => setShowRight(!showRight)} aria-pressed={showRight} title={showRight ? t("Ocultar panel de propiedades") : t("Mostrar panel de propiedades")} aria-label={t("Panel de propiedades")}
+              className={cx("focus-ring rounded-md p-1.5", showRight ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelRight size={14} /></button>
+          </div>
+          {!embedded && <Button size="sm" variant={play ? "primary" : "secondary"} icon={play ? <SquareDashedMousePointer size={14} /> : <Play size={14} />} onClick={() => { setPlay(!play); setHotId(null); }} disabled={!proto.screens.length}>
             {play ? t("Volver a editar") : t("Probar")}
           </Button>}
           <Button size="sm" variant="primary" icon={<Check size={14} />} onClick={onClose}>{t("Listo")}</Button>
@@ -127,12 +173,14 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
 
       <div className="flex min-h-0 flex-1">
         {/* Pantallas */}
-        <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-paper">
+        {showLeft && <aside className="flex shrink-0 flex-col border-r border-line bg-paper" style={{ width: leftPane.width }}>
           <input ref={htmlInput} type="file" accept=".html,.htm,text/html" hidden onChange={(e) => { addHtml(e.target.files?.[0]); e.target.value = ""; }} />
           <input ref={fileInput} type="file" accept={ACCEPT} multiple hidden onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = ""; }} />
           {html ? (
             <HtmlFilePanel proto={proto} uploading={!!uploading} err={err} onReplace={() => htmlInput.current?.click()}
-              onRemoveScreen={(id) => setScreens(proto.screens.filter((s) => s.id !== id))} />
+              onRemoveScreen={(id) => setScreens(proto.screens.filter((s) => s.id !== id))} onReset={resetSource} onDelete={removePrototype} />
+          ) : link ? (
+            <LinkPanel proto={proto} uploading={!!uploading} err={err} onChange={addLink} onReset={resetSource} onDelete={removePrototype} />
           ) : !proto.screens.length ? (
             <p className="m-3 rounded-lg bg-surface p-3 text-xs text-ink-2">{t("Elige en el centro cómo quieres armar este prototipo.")}</p>
           ) : <>
@@ -149,20 +197,29 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
           <p className="label px-4 pb-2">{t("Pantallas ·")} {proto.screens.length}</p>
           <ScreenList proto={proto} selected={screen?.id} onSelect={(id) => { setScreenId(id); setHotId(null); }} onReorder={setScreens} onRename={(id, name) => setScreen(id, { name })} onRemove={removeScreen} />
           </>}
-        </aside>
+        </aside>}
+        {showLeft && <PaneHandle {...leftPane.handleProps} label={t("Ancho del panel de pantallas")} />}
 
         {/* Lienzo */}
         <section className="min-w-0 flex-1 overflow-auto bg-[radial-gradient(#E7E2F0_1px,transparent_1px)] [background-size:18px_18px] p-8">
           {html ? (
-            <HtmlCanvas proto={proto} onScreen={(name) => {
+            <HtmlCanvas proto={proto} recording={recording} onScreen={(name, route, trail) => {
               const id = htmlScreenId(name);
-              if (!proto.screens.some((s) => s.id === id)) setScreens([...proto.screens, { id, name, image: "", hotspots: [] }]);
+              const cur = proto.screens.find((s) => s.id === id);
+              if (!cur) setScreens([...proto.screens, { id, name, image: "", hotspots: [], ...(route ? { route } : {}), ...(trail?.length ? { trail } : {}) }]);
+              else if ((route && !cur.route) || (trail?.length && !cur.trail)) setScreen(id, { ...(route && !cur.route ? { route } : {}), ...(trail?.length && !cur.trail ? { trail } : {}) });   // completa datos de pantallas detectadas antes
+            }} onClick={(screen, label) => {
+              if (!recording || !label) return;
+              const f = normalizeFlow(proto.flow);
+              setProto({ flow: { ...f, items: [...f.items, { id: uid(), kind: "tap", label, ...(screen ? { screen: htmlScreenId(screen) } : {}) }] } });
             }} />
+          ) : link ? (
+            <LinkCanvas proto={proto} />
           ) : !screen ? (
-            <div className="mx-auto mt-10 max-w-3xl">
+            <div className="mx-auto mt-10 max-w-4xl">
               <h2 className="text-center text-xl font-semibold">{t("¿Cómo quieres armar tu prototipo?")}</h2>
-              <p className="mt-1 text-center text-sm text-ink-2">{t("Elige una de las dos opciones. Ambas registran rutas, clics y tiempos.")}</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
+              <p className="mt-1 text-center text-sm text-ink-2">{t("Pantallas y HTML registran rutas, clics y tiempos. Un link publicado registra tiempo y resultado.")}</p>
+              <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <OptionCard icon={<ImagePlus size={20} />} title={t("Pantallas exportadas")} tag={t("Figma, Sketch, XD…")}
                   onDrop={(e) => { e.preventDefault(); addFiles(e.dataTransfer.files); }}
                   steps={[t("En Figma, selecciona los frames del flujo y usa Export → PNG 2x."), t("Sube todas las imágenes a la vez."), t("Dibuja zonas clicables y elige a dónde lleva cada una.")]}
@@ -173,6 +230,14 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
                   steps={[t("Pídele a Claude el prototipo como un solo archivo .html y descárgalo."), t("Súbelo aquí. No hay zonas que dibujar."), t("Navégalo para detectar las pantallas y elegir la meta.")]}
                   action={<Button variant="primary" className="w-full" disabled={!!uploading} icon={uploading ? <Loader2 size={15} className="animate-spin" /> : <FileCode2 size={15} />} onClick={() => htmlInput.current?.click()}>{t("Subir HTML")}</Button>}
                   foot={t("Con un link de Claude no se puede: claude.ai no deja mostrarlo en otros sitios.")} />
+                <OptionCard icon={<Link2 size={20} />} title={t("Link publicado")} tag={t("Figma Make, sitio en línea…")}
+                  steps={[t("Publica el prototipo (en Figma Make: Publish) y copia el link público."), t("Pégalo aquí. Se muestra tal cual dentro de la tarea."), t("El participante toca \"Terminé la tarea\" al acabar; se guardan tiempo y resultado.")]}
+                  action={<div className="flex gap-2">
+                    <input className="field min-w-0 flex-1" type="url" placeholder="https://…figma.site" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") addLink(linkUrl); }} aria-label={t("Link del prototipo")} />
+                    <Button variant="primary" disabled={!!uploading || !linkUrl.trim()} icon={uploading ? <Loader2 size={15} className="animate-spin" /> : <Link2 size={15} />} onClick={() => addLink(linkUrl)}>{t("Usar")}</Button>
+                  </div>}
+                  foot={t("Sin clics ni pantallas: el sitio corre fuera de Redekorate.")} />
               </div>
               {err && <p className="mt-3 text-center text-sm text-bad">{err}</p>}
             </div>
@@ -187,11 +252,14 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
             </div>
           )}
         </section>
+        {showRight && <PaneHandle {...rightPane.handleProps} label={t("Ancho del panel de propiedades")} />}
 
         {/* Propiedades */}
-        <aside className="w-80 shrink-0 overflow-y-auto border-l border-line bg-surface p-5">
+        {showRight && <aside className="shrink-0 overflow-y-auto border-l border-line bg-surface p-5" style={{ width: rightPane.width }}>
           {html ? (
-            <HtmlHelp proto={proto} />
+            <HtmlHelp proto={proto} onFlow={(f) => setProto({ flow: f })} recording={recording} onRecord={setRecording} />
+          ) : link ? (
+            <LinkHelp />
           ) : play ? (
             <div className="space-y-3 text-sm text-ink-2">
               <p className="font-semibold text-ink">{t("Modo probar")}</p>
@@ -259,7 +327,7 @@ export function PrototypeEditor({ prototypes, onChange, initialId, onClose }: {
               </div>
             </div>
           )}
-        </aside>
+        </aside>}
       </div>
     </Shell>
   );
@@ -391,8 +459,8 @@ function PlayMode({ proto, startId }: { proto: Prototype; startId: string }) {
 }
 
 /** Prototipo HTML: archivo actual y pantallas detectadas al navegarlo. */
-function HtmlFilePanel({ proto, uploading, err, onReplace, onRemoveScreen }: {
-  proto: Prototype; uploading: boolean; err: string | null; onReplace: () => void; onRemoveScreen: (id: string) => void;
+function HtmlFilePanel({ proto, uploading, err, onReplace, onRemoveScreen, onReset, onDelete }: {
+  proto: Prototype; uploading: boolean; err: string | null; onReplace: () => void; onRemoveScreen: (id: string) => void; onReset: () => void; onDelete: () => void;
 }) {
   return <>
     <div className="p-3">
@@ -407,31 +475,180 @@ function HtmlFilePanel({ proto, uploading, err, onReplace, onRemoveScreen }: {
       <p className="mx-3 rounded-lg bg-surface p-3 text-xs text-ink-2">{t("Navega el prototipo en el centro: cada pantalla que visites aparecerá aquí para que puedas elegirla como meta de una tarea.")}</p>
     ) : (
       <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 pb-3">
-        {proto.screens.map((s, i) => (
+        {proto.screens.map((s, i) => {
+          const f = normalizeFlow(proto.flow); const idx = f.items.findIndex((it) => it.kind === "screen" && it.screen === s.id); const item = f.items[idx];
+          return (
           <li key={s.id} className="group flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-ink/[0.04]">
             <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">{i + 1}</span>
             <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={s.name}>{s.name}</span>
+            {item && f.startId === item.id && <span className="flex items-center gap-1 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink"><Flag size={10} /> {t("Inicio del flujo")}</span>}
+            {item && f.startId !== item.id && f.goalId !== item.id && <span className="rounded bg-paper px-1.5 py-0.5 text-[10px] font-semibold text-ink-2 ring-1 ring-line">{idx + 1}</span>}
+            {item && f.goalId === item.id && <span className="flex items-center gap-1 rounded bg-good-soft px-1.5 py-0.5 text-[10px] font-semibold text-good"><Target size={10} /> {t("Meta")}</span>}
             <button onClick={() => onRemoveScreen(s.id)} className="rounded p-1 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-bad" aria-label={t("Quitar pantalla")}><Trash2 size={13} /></button>
           </li>
-        ))}
+          );
+        })}
       </ol>
     )}
+    <SourceActions onReset={onReset} onDelete={onDelete} resetLabel={t("Cambiar de opción")} />
   </>;
 }
 
+function LinkPanel({ proto, uploading, err, onChange, onReset, onDelete }: { proto: Prototype; uploading: boolean; err: string | null; onChange: (url: string) => void; onReset: () => void; onDelete: () => void }) {
+  const [v, setV] = useState(proto.link?.url ?? "");
+  const changed = v.trim() && v.trim() !== proto.link?.url;
+  return <>
+    <div className="p-3">
+      <div className="rounded-xl border border-line bg-surface p-3">
+        <p className="flex items-center gap-2 text-[13px] font-medium"><Globe size={15} className="shrink-0 text-accent" /><span className="truncate" title={proto.link?.url}>{proto.link?.host}</span></p>
+        <a href={proto.link?.url} target="_blank" rel="noreferrer" className="mt-1 block truncate text-[11px] text-ink-3 hover:text-accent">{proto.link?.url}</a>
+        <input className="field mt-3 text-[12px]" type="url" value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && changed) onChange(v); }} aria-label={t("Link del prototipo")} />
+        <Button size="sm" variant="ghost" className="mt-2 w-full" icon={uploading ? <Loader2 size={14} className="animate-spin" /> : <Link2 size={14} />} disabled={uploading || !changed} onClick={() => onChange(v)}>{t("Cambiar link")}</Button>
+      </div>
+      {err && <p className="mt-2 text-xs text-bad">{err}</p>}
+    </div>
+    <p className="mx-3 rounded-lg bg-surface p-3 text-xs text-ink-2">{t("Con un link no hay pantallas que detectar: el participante indicará cuándo terminó la tarea.")}</p>
+    <SourceActions onReset={onReset} onDelete={onDelete} resetLabel={t("Cambiar de opción")} />
+  </>;
+}
+
+/** Acciones comunes a HTML y link: volver al selector de tipo o borrar el prototipo. */
+function SourceActions({ onReset, onDelete, resetLabel }: { onReset: () => void; onDelete: () => void; resetLabel: string }) {
+  return (
+    <div className="mt-auto space-y-1 border-t border-line p-3">
+      <Button size="sm" variant="ghost" className="h-auto w-full justify-start py-1.5 text-left !whitespace-normal" icon={<ArrowLeft size={14} className="shrink-0" />} onClick={onReset}>{resetLabel}</Button>
+      <Button size="sm" variant="ghost" className="h-auto w-full justify-start py-1.5 text-left !whitespace-normal text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} className="shrink-0" />} onClick={onDelete}>{t("Eliminar prototipo")}</Button>
+    </div>
+  );
+}
+
+/** Vista previa del link tal cual lo verá el participante. Es otro origen: no podemos leer nada de adentro. */
+function LinkCanvas({ proto }: { proto: Prototype }) {
+  const [key, setKey] = useState(0);
+  const mobile = proto.device === "mobile";
+  return (
+    <div className="mx-auto" style={{ maxWidth: mobile ? 400 : 1100 }}>
+      <div className="mb-3 flex items-center justify-between gap-3 text-xs text-ink-3">
+        <span className="truncate">{t("Vista previa del link · así lo verá el participante")}</span>
+        <button onClick={() => setKey((k) => k + 1)} className="flex shrink-0 items-center gap-1 font-medium text-accent"><RotateCw size={12} /> {t("Reiniciar")}</button>
+      </div>
+      <div className={cx("overflow-hidden bg-white shadow-xl", mobile ? "mx-auto rounded-[2rem] ring-8 ring-black" : "rounded-xl border border-line")}
+        style={mobile ? { width: 390, height: 844, maxWidth: "100%" } : { aspectRatio: "16 / 10" }}>
+        {proto.link && <iframe key={key} src={proto.link.url} title={proto.name} className="block h-full w-full border-0" referrerPolicy="no-referrer" />}
+      </div>
+      <p className="mt-3 text-center text-xs text-ink-3">{t("Si se ve en blanco, el sitio no permite mostrarse dentro de otras páginas.")}</p>
+    </div>
+  );
+}
+
+function LinkHelp() {
+  return (
+    <div className="space-y-4 text-sm text-ink-2">
+      <p className="font-semibold text-ink">{t("Prototipo por link")}</p>
+      <p>{t("El prototipo vive en otro sitio y se muestra tal cual dentro de la tarea. Como ahí no corre nada nuestro, no se registran clics ni pantallas.")}</p>
+      <div>
+        <p className="mb-1.5 text-[13px] font-medium text-ink">{t("Qué se registra")}</p>
+        <ul className="list-disc space-y-1 pl-5 text-[13px]">
+          <li>{t("El tiempo hasta que el participante toca \"Terminé la tarea\".")}</li>
+          <li>{t("Si la abandonó con \"No puedo completarla\".")}</li>
+        </ul>
+      </div>
+      <div className="rounded-xl bg-paper p-3 text-[12px]">
+        <p className="font-medium text-ink">Figma Make</p>
+        <p className="mt-1">{t("Usa el link publicado (termina en .figma.site), no el del editor.")}</p>
+        <p className="mt-2 font-medium text-ink">Claude</p>
+        <p className="mt-1">{t("claude.ai no permite mostrar sus artifacts en otros sitios. Descarga el artifact como .html y usa \"HTML de Claude\": así sí tendrás clics y pantallas.")}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Flujo del prototipo: una lista ordenada de pantallas y toques; cualquiera puede ser el inicio o la meta. */
+function FlowEditor({ proto, onChange, recording, onRecord }: { proto: Prototype; onChange: (f: ProtoFlow) => void; recording: boolean; onRecord: (v: boolean) => void }) {
+  const f = normalizeFlow(proto.flow);
+  const [manual, setManual] = useState("");
+  const name = (id?: string) => proto.screens.find((s) => s.id === id)?.name ?? "?";
+  const set = (patch: Partial<ProtoFlow>) => onChange({ ...f, ...patch });
+  const items = f.items;
+  const remove = (id: string) => set({ items: items.filter((i) => i.id !== id), startId: f.startId === id ? undefined : f.startId, goalId: f.goalId === id ? undefined : f.goalId });
+  const move = (i: number, d: -1 | 1) => { const n = [...items]; const j = i + d; if (j < 0 || j >= n.length) return; [n[i], n[j]] = [n[j], n[i]]; set({ items: n }); };
+  const addTap = () => { const label = manual.trim(); if (!label) return; set({ items: [...items, { id: uid(), kind: "tap", label }] }); setManual(""); };
+  const unused = proto.screens.filter((s) => !items.some((i) => i.kind === "screen" && i.screen === s.id));
+  const icon = "focus-ring shrink-0 rounded p-0.5 text-ink-3 hover:text-ink disabled:opacity-30";
+  return (
+    <div className="space-y-3 rounded-xl border border-line bg-paper/60 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-semibold text-ink">{t("Flujo")}</p>
+        <button type="button" onClick={() => onRecord(!recording)} aria-pressed={recording}
+          className={cx("focus-ring flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold", recording ? "bg-bad-soft text-bad" : "bg-surface text-accent ring-1 ring-line hover:ring-accent")}>
+          <Circle size={9} className={cx(recording && "animate-pulse fill-current")} /> {recording ? t("Detener") : t("Grabar toques")}
+        </button>
+      </div>
+      {items.length === 0 ? (
+        <p className="text-[12px] text-ink-3">{recording ? t("Toca elementos en el preview: cada uno se agrega aquí.") : t("Agrega pantallas o toques en el orden que debe seguir el participante.")}</p>
+      ) : (
+        <ol className="space-y-1">
+          {items.map((it, i) => {
+            const isStart = f.startId === it.id, isGoal = f.goalId === it.id;
+            return (
+              <li key={it.id} className="rounded-lg bg-surface px-2.5 py-2 text-[12px] ring-1 ring-line">
+                <div className="flex items-center gap-2">
+                  <span className="w-4 shrink-0 text-right font-semibold text-ink-3 tabular-nums">{i + 1}</span>
+                  {it.kind === "screen" ? <FileCode2 size={13} className="shrink-0 text-ink-3" /> : <MousePointerClick size={13} className="shrink-0 text-accent" />}
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-ink" title={it.kind === "screen" ? name(it.screen) : it.label}>{it.kind === "screen" ? name(it.screen) : <>{it.label}{it.screen && <span className="font-normal text-ink-3"> · {name(it.screen)}</span>}</>}</span>
+                  <button type="button" className={icon} disabled={i === 0} aria-label={t("Subir")} title={t("Subir")} onClick={() => move(i, -1)}><ChevronUp size={14} /></button>
+                  <button type="button" className={icon} disabled={i === items.length - 1} aria-label={t("Bajar")} title={t("Bajar")} onClick={() => move(i, 1)}><ChevronDown size={14} /></button>
+                  <button type="button" className={cx(icon, "hover:text-bad")} aria-label={t("Quitar")} title={t("Quitar")} onClick={() => remove(it.id)}><X size={14} /></button>
+                </div>
+                <div className="mt-1.5 flex gap-1 pl-6">
+                  <button type="button" aria-pressed={isStart} onClick={() => set({ startId: isStart ? undefined : it.id, goalId: isGoal ? undefined : f.goalId })}
+                    title={t("El participante empieza aquí: al abrir la tarea, el prototipo se mueve a esta pantalla.")}
+                    className={cx("focus-ring flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold", isStart ? "bg-accent-soft text-accent-ink ring-1 ring-accent/40" : "text-ink-3 ring-1 ring-line hover:text-ink")}>
+                    <Flag size={11} /> {t("Inicio del flujo")}
+                  </button>
+                  <button type="button" aria-pressed={isGoal} onClick={() => set({ goalId: isGoal ? undefined : it.id, startId: isStart ? undefined : f.startId })}
+                    title={t("La tarea termina con éxito al llegar aquí (o al tocar este elemento).")}
+                    className={cx("focus-ring flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold", isGoal ? "bg-good-soft text-good ring-1 ring-good/40" : "text-ink-3 ring-1 ring-line hover:text-ink")}>
+                    <Target size={11} /> {t("Meta")}
+                  </button>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      <div className="flex gap-1">
+        {unused.length > 0 && (
+          <select className="field h-8 w-auto max-w-[45%] py-0 text-[12px]" value="" aria-label={t("Agregar pantalla")} onChange={(e) => e.target.value && set({ items: [...items, { id: uid(), kind: "screen", screen: e.target.value }] })}>
+            <option value="">{t("+ Pantalla")}</option>{unused.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        )}
+        <input className="field h-8 min-w-0 flex-1 text-[12px]" placeholder={t("+ Toque: texto del elemento")} value={manual} onChange={(e) => setManual(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addTap(); } }} aria-label={t("Texto del elemento")} />
+        <Button size="sm" variant="ghost" icon={<Plus size={13} />} disabled={!manual.trim()} onClick={addTap} aria-label={t("Agregar toque")} />
+      </div>
+      <label className="block text-[12px] text-ink-2">{t("Instrucciones para el participante")}
+        <textarea className="field mt-1 min-h-16 text-[12px]" value={f.instructions ?? ""} onChange={(e) => set({ instructions: e.target.value })} />
+      </label>
+    </div>
+  );
+}
+
 /** El HTML corre en un iframe aislado; el script inyectado nos dice en qué pantalla está. */
-function HtmlCanvas({ proto, onScreen }: { proto: Prototype; onScreen: (name: string) => void }) {
+function HtmlCanvas({ proto, onScreen, onClick, recording }: { proto: Prototype; onScreen: (name: string, route?: string | null, trail?: string[]) => void; onClick?: (screen: string | null, label: string) => void; recording?: boolean }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [key, setKey] = useState(0);
   const [cur, setCur] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const cb = useRef(onScreen); cb.current = onScreen;
+  const clickCb = useRef(onClick); clickCb.current = onClick;
+  const protoRef = useRef(proto); protoRef.current = proto;
   useEffect(() => {
     const h = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
       const m = asTrackerMsg(e.data); if (!m) return;
-      if (m.type === "ready") setReady(true);
-      if (m.type === "screen" && typeof m.name === "string" && m.name) { const n = m.name.slice(0, 80); setCur(n); cb.current(n); }
+      if (m.type === "ready") { setReady(true); const start = flowStartScreen(protoRef.current); if (start) gotoScreen(frame.current, protoRef.current, start); }   // el preview arranca en la pantalla de inicio
+      if (m.type === "screen" && typeof m.name === "string" && m.name) { const n = m.name.slice(0, 80); setCur(n); cb.current(n, m.route ?? null, Array.isArray(m.trail) ? m.trail.map(String).slice(0, 12) : undefined); }
+      if (m.type === "click") clickCb.current?.(m.screen ? String(m.screen).slice(0, 80) : null, String(m.label ?? "").slice(0, 80));
     };
     window.addEventListener("message", h); return () => window.removeEventListener("message", h);
   }, []);
@@ -439,7 +656,7 @@ function HtmlCanvas({ proto, onScreen }: { proto: Prototype; onScreen: (name: st
   return (
     <div className="mx-auto" style={{ maxWidth: mobile ? 400 : 1100 }}>
       <div className="mb-3 flex items-center justify-between gap-3 text-xs text-ink-3">
-        <span className="truncate">{cur ? <>{t("Pantalla actual:")} <b className="text-ink">{cur}</b></> : t("Cargando prototipo…")}</span>
+        <span className="flex min-w-0 items-center gap-2 truncate">{recording && <span className="flex shrink-0 items-center gap-1 rounded bg-bad-soft px-1.5 py-0.5 text-[10px] font-semibold text-bad"><Circle size={8} className="animate-pulse fill-current" /> {t("Grabando clics")}</span>}<span className="truncate">{cur ? <>{t("Pantalla actual:")} <b className="text-ink">{cur}</b></> : t("Cargando prototipo…")}</span></span>
         <button onClick={() => { setKey((k) => k + 1); setCur(null); setReady(false); }} className="flex shrink-0 items-center gap-1 font-medium text-accent"><RotateCw size={12} /> {t("Reiniciar")}</button>
       </div>
       <div className={cx("overflow-hidden bg-white shadow-xl", mobile ? "mx-auto rounded-[2rem] ring-8 ring-black" : "rounded-xl border border-line")}
@@ -451,14 +668,15 @@ function HtmlCanvas({ proto, onScreen }: { proto: Prototype; onScreen: (name: st
   );
 }
 
-const CLAUDE_PROMPT = "Agrega el atributo data-screen=\"Nombre de la pantalla\" al contenedor principal de cada pantalla o vista de este prototipo (por ejemplo data-screen=\"Carrito\"), con nombres cortos y únicos. Entrégamelo como un solo archivo .html que funcione sin servidor.";
+const CLAUDE_PROMPT = "Agrega el atributo data-screen=\"Nombre de la pantalla\" al contenedor principal de cada pantalla o vista de este prototipo, incluidas las pestañas y subvistas (por ejemplo data-screen=\"Carrito\" o data-screen=\"Oportunidad · Checklist\"), con nombres cortos y únicos. Haz que cada pantalla se pueda abrir directamente con la URL (#nombre-de-la-pantalla), sin pasar por el login. Entrégamelo como un solo archivo .html que funcione sin servidor.";
 
-function HtmlHelp({ proto }: { proto: Prototype }) {
+function HtmlHelp({ proto, onFlow, recording, onRecord }: { proto: Prototype; onFlow: (f: ProtoFlow) => void; recording: boolean; onRecord: (v: boolean) => void }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="space-y-4 text-sm text-ink-2">
       <p className="font-semibold text-ink">{t("Prototipo HTML")}</p>
-      <p>{t("Navégalo en el centro como lo haría un participante. No hace falta dibujar zonas: se registra cada clic y si cayó en un elemento interactivo.")}</p>
+      {proto.screens.length > 0 && <FlowEditor proto={proto} onChange={onFlow} recording={recording} onRecord={onRecord} />}
+      <p className="text-[13px]">{t("Navégalo como un participante: cada pantalla y cada clic quedan registrados.")}</p>
       <div>
         <p className="mb-1.5 text-[13px] font-medium text-ink">{t("Cómo se detectan las pantallas")}</p>
         <ol className="list-decimal space-y-1 pl-5 text-[13px]">
@@ -476,7 +694,6 @@ function HtmlHelp({ proto }: { proto: Prototype }) {
           {copied ? t("Copiado") : t("Copiar instrucción")}
         </Button>
       </div>
-      <p className="text-[12px] text-ink-3">{t("Cada pantalla que visites aparece a la izquierda. Después, en la tarea, eliges cuál es la meta. Si no eliges ninguna, el participante indicará cuándo terminó.")}</p>
     </div>
   );
 }

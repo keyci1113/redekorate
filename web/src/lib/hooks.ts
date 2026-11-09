@@ -1,7 +1,44 @@
+import type React from "react";
 import { locale, t } from "./i18n";
 import { useCallback, useEffect, useState } from "react";
 
 /** Carga datos de la API con estado de carga/error y función para recargar. */
+/**
+ * Ancho de un panel que el usuario puede arrastrar. Se guarda en el navegador (solo una comodidad: si falla, vuelve al valor por defecto).
+ * `side` indica de qué lado está el panel respecto al asa: un panel izquierdo crece al arrastrar a la derecha, uno derecho al revés.
+ */
+export function usePaneWidth(key: string, initial: number, min: number, max: number, side: "left" | "right") {
+  const clamp = (w: number) => Math.min(max, Math.max(min, Math.round(w)));
+  const [width, setWidth] = useState(() => { try { const v = Number(localStorage.getItem(`pane:${key}`)); return v ? clamp(v) : initial; } catch { return initial; } });
+  const set = (w: number) => { const c = clamp(w); setWidth(c); try { localStorage.setItem(`pane:${key}`, String(c)); } catch { /* sin almacenamiento */ } };
+  const onPointerDown = (e: React.PointerEvent<HTMLElement>) => {
+    e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId);
+    const startX = e.clientX, startW = width, dir = side === "left" ? 1 : -1;
+    const move = (ev: PointerEvent) => set(startW + dir * (ev.clientX - startX));
+    const up = () => { window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); document.body.style.cursor = ""; };
+    document.body.style.cursor = "col-resize";
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up);
+  };
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const step = e.shiftKey ? 48 : 16;
+    if (e.key === "ArrowLeft") { e.preventDefault(); set(width + (side === "left" ? -step : step)); }
+    if (e.key === "ArrowRight") { e.preventDefault(); set(width + (side === "left" ? step : -step)); }
+    if (e.key === "Home") { e.preventDefault(); set(initial); }
+  };
+  /** Props del asa: un separador vertical accesible. */
+  const handleProps = {
+    role: "separator" as const, "aria-orientation": "vertical" as const, "aria-valuenow": width, "aria-valuemin": min, "aria-valuemax": max, tabIndex: 0,
+    onPointerDown, onKeyDown, onDoubleClick: () => set(initial),
+  };
+  return { width, handleProps };
+}
+
+/** Preferencia booleana guardada en el navegador (solo comodidad de quien edita). */
+export function usePref(key: string, initial: boolean): [boolean, (v: boolean) => void] {
+  const [v, setV] = useState(() => { try { const s = localStorage.getItem(`pref:${key}`); return s === null ? initial : s === "1"; } catch { return initial; } });
+  return [v, (n) => { setV(n); try { localStorage.setItem(`pref:${key}`, n ? "1" : "0"); } catch { /* sin almacenamiento */ } }];
+}
+
 export function useLoad<T>(fn: () => Promise<T>, deps: unknown[] = []) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);

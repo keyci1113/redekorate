@@ -8,6 +8,8 @@ import { requireAuth } from "../lib/auth.js";
 import { HttpError } from "../lib/http.js";
 import { uploadLimiter } from "../lib/security.js";
 import { injectTracker, looksLikeHtml } from "../lib/protoTracker.js";
+import { z } from "zod";
+import { checkLink } from "../lib/linkCheck.js";
 
 export const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? "uploads");
 const MAX_MB = Number(process.env.UPLOAD_MAX_MB ?? 10);
@@ -59,4 +61,14 @@ uploads.post("/prototype", requireAuth, uploadLimiter, receive("El archivo"), as
   await writeFile(path.join(UPLOAD_DIR, filename), html, { mode: 0o640 });
   await one("insert into uploads(owner_id, filename, mime, size) values ($1,$2,$3,$4)", [req.user!.id, filename, "text/html", Buffer.byteLength(html)]);
   res.status(201).json({ url: `/uploads/${filename}` });
+});
+
+// Prototipo publicado en otro sitio (Figma Make, un sitio desplegado…): se valida el link y se
+// informa si el sitio permite mostrarse dentro de un iframe. claude.ai, por ejemplo, no lo permite.
+const LinkBody = z.object({ url: z.string().min(8).max(2000) });
+uploads.post("/link", requireAuth, uploadLimiter, async (req, res) => {
+  const body = LinkBody.safeParse(req.body);
+  if (!body.success) throw new HttpError(400, "El link no es válido.");
+  const origin = process.env.APP_URL || `${req.protocol}://${req.get("host")}`;
+  res.json(await checkLink(body.data.url, origin));
 });

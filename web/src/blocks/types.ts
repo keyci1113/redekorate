@@ -1,3 +1,4 @@
+import type { FlowStep } from "./prototype";
 // Un estudio es una secuencia de bloques. Cada bloque puede tener imagen y lógica condicional.
 
 export interface Option { id: string; label: string; image?: string }
@@ -43,6 +44,7 @@ export interface KanoBlock extends Base { type: "kano"; features: Option[]; func
 export interface PrototypeTaskBlock extends Base {
   type: "prototype_task"; prototypeId: string; startScreen: string;
   goalScreens: string[]; expectedPath: string[]; allowGiveUp: boolean;
+  steps?: FlowStep[]; goalClick?: FlowStep;   // interacciones requeridas y meta por interacción (prototipos HTML)
 }
 
 export type Block =
