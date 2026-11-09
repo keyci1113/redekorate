@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
-import { ChevronDown, LogOut, Plus, Settings } from "lucide-react";
+import { ChevronDown, LogOut, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import type { Project } from "../lib/types";
 import { Logo } from "./Logo";
+import { Avatar } from "./Avatar";
 import { cx } from "./ui";
 import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
@@ -109,8 +110,8 @@ export function Layout() {
             <Disclosure
               align="right"
               label={t("Menú de la cuenta")}
-              buttonClass="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#BF7DF5] to-[#5902A1] text-[13px] font-semibold text-white transition hover:opacity-90"
-              button={user?.name.slice(0, 1).toUpperCase()}
+              buttonClass="focus-ring flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-90"
+              button={<Avatar name={user?.name ?? ""} avatar={user?.avatar} size={36} />}
             >
               <div className="px-2.5 py-1.5">
                 <p className="truncate text-sm font-medium">{user?.name}</p>
@@ -118,6 +119,7 @@ export function Layout() {
               </div>
               <div className="mt-1 border-t border-line pt-1">
                 <Link to="/account" className={menuItem}><Settings size={15} /> {t("Mi cuenta")}</Link>
+                {user?.role === "admin" && <Link to="/admin/users" className={menuItem}><Users size={15} /> {t("Usuarios")}</Link>}
                 <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Idioma")}<LangSwitch /></div>
                 <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Tema")}<ThemeSwitch /></div>
               </div>

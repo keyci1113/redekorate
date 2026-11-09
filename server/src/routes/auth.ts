@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { one, query } from "../lib/db.js";
-import { clearSession, readUser, requireAuth, signSession } from "../lib/auth.js";
+import { clearSession, readUser, requireAuth, signSession, type Role } from "../lib/auth.js";
 import { HttpError, parse } from "../lib/http.js";
 import { authLimiter, passwordProblem, resetLimiter } from "../lib/security.js";
 import { sendMail } from "../lib/mail.js";
@@ -25,28 +25,48 @@ function checkPassword(pw: string) {
   if (p) throw new HttpError(400, p);
 }
 
+const inviteToken = z.string().min(20).max(200);
+const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null }>(
+  `select i.id, i.email, i.role, u.name as invited_by from invites i left join users u on u.id = i.invited_by
+   where i.token_hash = $1 and i.accepted_at is null and i.expires_at > now()`, [sha256(token)]);
+
+/** Datos públicos de una invitación, para prellenar el formulario. */
+auth.get("/invite/:token", resetLimiter, async (req, res) => {
+  const inv = await pendingInvite(parse(inviteToken, req.params.token));
+  if (!inv) throw new HttpError(404, "La invitación no es válida o ya venció.");
+  res.json({ invite: { email: inv.email, role: inv.role, invited_by: inv.invited_by } });
+});
+
 auth.post("/register", authLimiter, async (req, res) => {
-  if (process.env.ALLOW_REGISTRATION === "false") {
-    const any = await one("select 1 from users limit 1");
-    if (any) throw new HttpError(403, "El registro está cerrado. Pide acceso a la administradora.");
+  const body = parse(z.object({ name: z.string().trim().min(1).max(120), email, password, invite: inviteToken.optional() }), req.body);
+  const anyUser = !!(await one("select 1 from users limit 1"));
+  let role: Role = anyUser ? "member" : "admin";   // la primera cuenta administra la instancia
+  let inviteId: string | null = null;
+  if (body.invite) {
+    const inv = await pendingInvite(body.invite);
+    if (!inv) throw new HttpError(400, "La invitación no es válida o ya venció.");
+    if (inv.email !== body.email) throw new HttpError(400, "Usa el correo al que se envió la invitación.");
+    role = inv.role; inviteId = inv.id;
+  } else if (process.env.ALLOW_REGISTRATION === "false" && anyUser) {
+    throw new HttpError(403, "El registro está cerrado. Pide acceso a la administradora.");
   }
-  const body = parse(z.object({ name: z.string().trim().min(1).max(120), email, password }), req.body);
   checkPassword(body.password);
   const exists = await one("select id from users where email = $1", [body.email]);
   if (exists) throw new HttpError(409, "Ya existe una cuenta con ese correo");
   const hash = await bcrypt.hash(body.password, COST);
-  const user = await one<{ id: string; email: string; name: string }>(
-    "insert into users(name, email, password_hash, last_login_at) values ($1,$2,$3,now()) returning id, email, name",
-    [body.name, body.email, hash],
+  const user = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null }>(
+    "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,$3,$4,now()) returning id, email, name, role, avatar",
+    [body.name, body.email, hash, role],
   );
+  if (inviteId) await query("update invites set accepted_at = now() where id = $1", [inviteId]);
   signSession(res, user!, 0);
   res.status(201).json({ user });
 });
 
 auth.post("/login", authLimiter, async (req, res) => {
   const body = parse(z.object({ email, password: password.min(1) }), req.body);
-  const row = await one<{ id: string; email: string; name: string; password_hash: string; token_version: number; failed_logins: number; locked_until: string | null }>(
-    "select id, email, name, password_hash, token_version, failed_logins, locked_until from users where email = $1", [body.email]);
+  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; password_hash: string; token_version: number; failed_logins: number; locked_until: string | null; disabled_at: string | null }>(
+    "select id, email, name, role, avatar, password_hash, token_version, failed_logins, locked_until, disabled_at from users where email = $1", [body.email]);
   const ok = await bcrypt.compare(body.password, row?.password_hash ?? DUMMY_HASH);
   if (row?.locked_until && new Date(row.locked_until) > new Date())
     throw new HttpError(429, "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo en unos minutos.");
@@ -60,8 +80,9 @@ auth.post("/login", authLimiter, async (req, res) => {
     }
     throw new HttpError(401, "Correo o contraseña incorrectos");
   }
+  if (row.disabled_at) throw new HttpError(403, "Esta cuenta está desactivada.");
   await query("update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = $1", [row.id]);
-  const user = { id: row.id, email: row.email, name: row.name };
+  const user = { id: row.id, email: row.email, name: row.name, role: row.role, avatar: row.avatar };
   signSession(res, user, row.token_version);
   res.json({ user });
 });
@@ -78,8 +99,11 @@ auth.get("/me", async (req, res) => {
 
 // ── Cuenta ──────────────────────────────────────────────────────
 auth.patch("/me", requireAuth, async (req, res) => {
-  const b = parse(z.object({ name: z.string().trim().min(1).max(120) }), req.body);
-  const user = await one("update users set name = $2 where id = $1 returning id, email, name", [req.user!.id, b.name]);
+  // Nombre y/o foto. La foto debe ser un archivo subido a esta instancia (/uploads/…), nunca una URL externa.
+  const b = parse(z.object({ name: z.string().trim().min(1).max(120).optional(), avatar: z.string().regex(/^\/uploads\/[a-z0-9]+\.(png|jpg|gif|webp)$/).nullable().optional() }), req.body);
+  const user = await one(
+    "update users set name = coalesce($2, name), avatar = case when $3::boolean then $4 else avatar end where id = $1 returning id, email, name, role, avatar",
+    [req.user!.id, b.name ?? null, b.avatar !== undefined, b.avatar ?? null]);
   const { token_version } = (await one<{ token_version: number }>("select token_version from users where id = $1", [req.user!.id]))!;
   signSession(res, user, token_version);
   res.json({ user });

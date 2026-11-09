@@ -13,7 +13,8 @@ if (process.env.NODE_ENV === "production" && (SECRET === DEFAULT_SECRET || SECRE
   process.exit(1);
 }
 
-export interface AuthUser { id: string; email: string; name: string }
+export type Role = "admin" | "member";
+export interface AuthUser { id: string; email: string; name: string; role: Role; avatar: string | null }
 interface TokenPayload extends AuthUser { tv: number }
 
 declare global {
@@ -46,15 +47,20 @@ function decode(req: Request): TokenPayload | null {
 export async function readUser(req: Request): Promise<AuthUser | null> {
   const t = decode(req);
   if (!t) return null;
-  const row = await one<{ id: string; email: string; name: string; token_version: number }>(
-    "select id, email, name, token_version from users where id = $1", [t.id]);
-  if (!row || row.token_version !== t.tv) return null;
-  return { id: row.id, email: row.email, name: row.name };
+  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; token_version: number; disabled_at: string | null }>(
+    "select id, email, name, role, avatar, token_version, disabled_at from users where id = $1", [t.id]);
+  if (!row || row.token_version !== t.tv || row.disabled_at) return null;
+  return { id: row.id, email: row.email, name: row.name, role: row.role, avatar: row.avatar };
 }
 
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   const user = await readUser(req);
   if (!user) return next(new HttpError(401, "No autenticado"));
   req.user = user;
+  next();
+}
+
+export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
+  if (req.user?.role !== "admin") return next(new HttpError(403, "Solo para administradores"));
   next();
 }
