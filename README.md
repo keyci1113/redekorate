@@ -71,6 +71,12 @@ A self-hosted UX research tool in the spirit of Maze: create a project, pick a m
 
 > **Why not connect to Figma directly?** Figma's Embed API is free, but it only sends events when the participant is signed in to Figma (confirmed by Figma support in January 2026), and clicks are relative to the layer that was hit, not to the screen. With uploaded screens any anonymous participant works and heatmaps are accurate.
 
+## First run and help
+
+A new account opens a short welcome wizard: profile (photo, name, interface language), workspace (personal, or create an organization), a first project and a first study from a recommended method. Every step can be skipped and *Finish later* leaves at any point; the account remembers it, so the wizard shows once per person, not per browser. People who arrive through an organization or project invitation skip the steps they don't need.
+
+The Home shows a *Getting started* checklist (project, study, publish, first response, shared report) checked off from real data until it is complete or hidden. *Help and concepts* in the account menu has how-tos for the main tasks and a glossary of the words the interface uses, and lets you replay the wizard.
+
 ## Users and roles
 
 Every instance has two roles. The first account ever created is the **admin**; everyone else is a **member**.
@@ -152,7 +158,7 @@ Migrations run automatically when the server starts. Without SMTP, the password-
 ```
 server/  Express 5 · PostgreSQL · zod · helmet · express-rate-limit · multer
   migrations/   001 base schema · 002 security, reset and uploads · 003 documents
-                004 participant panel · 005 project reports · 006 insight review · … · 012 organizations and comments
+                004 participant panel · 005 project reports · 006 insight review · … · 012 organizations and comments · 013 onboarding
   src/routes/   auth · dashboard · projects · studies · insights · participants · documents · uploads · public · admin · orgs
   src/lib/i18n.ts   server messages in ES/EN (by the x-lang header)
 web/     React 19 · Vite · Tailwind 4 · React Router

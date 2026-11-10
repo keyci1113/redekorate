@@ -17,7 +17,10 @@ dashboard.get("/", async (req, res) => {
        (select count(distinct project_id)::int from studies where project_id in (select id from acc) and status = 'live') as projects_live,
        (select count(*)::int from sessions se join studies s on s.id = se.study_id where s.project_id in (select id from acc) and se.completed_at is not null) as responses,
        (select count(*)::int from sessions se join studies s on s.id = se.study_id where s.project_id in (select id from acc) and se.completed_at > now() - interval '7 days') as responses_week,
-       (select count(*)::int from insights i join projects p on p.id = i.project_id where p.id in (select id from acc)) as insights`,
+       (select count(*)::int from insights i join projects p on p.id = i.project_id where p.id in (select id from acc)) as insights,
+       (select count(*)::int from studies where project_id in (select id from acc) and published_at is not null) as published,
+       (select count(*)::int from report_shares rs left join studies s on s.id = rs.study_id
+          where rs.revoked_at is null and coalesce(rs.project_id, s.project_id) in (select id from acc)) as shares`,
     [uid]);
   const trendQ = query(
     `with ${ACC_CTE}

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
-import { Building2, ChevronDown, LogOut, Plus, Settings, Users } from "lucide-react";
+import { Building2, ChevronDown, CircleHelp, LogOut, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
@@ -120,6 +120,7 @@ export function Layout() {
               <div className="mt-1 border-t border-line pt-1">
                 <Link to="/account" className={menuItem}><Settings size={15} /> {t("Mi cuenta")}</Link>
                 <Link to="/orgs" className={menuItem}><Building2 size={15} /> {t("Organizaciones")}</Link>
+                <Link to="/help" className={menuItem}><CircleHelp size={15} /> {t("Ayuda y conceptos")}</Link>
                 {user?.role === "admin" && <Link to="/admin/users" className={menuItem}><Users size={15} /> {t("Usuarios")}</Link>}
                 <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Idioma")}<LangSwitch /></div>
                 <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Tema")}<ThemeSwitch /></div>

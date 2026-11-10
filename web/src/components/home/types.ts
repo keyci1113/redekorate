@@ -12,7 +12,7 @@ export interface HomeInsight {
   project_id: string; study_id: string | null; project_name: string; method: string | null;
 }
 export interface Dash {
-  totals: { projects: number; studies: number; live: number; projects_live: number; responses: number; responses_week: number; insights: number };
+  totals: { projects: number; studies: number; live: number; projects_live: number; responses: number; responses_week: number; insights: number; published: number; shares: number };
   recent?: RecentOpen | null;   // último estudio abierto por esta persona
   trend: Day[];
   study_trend: { study_id: string; day: string; n: number }[];
