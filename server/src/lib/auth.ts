@@ -37,6 +37,14 @@ export function clearSession(res: Response) {
   res.clearCookie(COOKIE, cookieOpts());
 }
 
+/** Token firmado de vida corta (estado del inicio de sesión externo). */
+export const signShort = (payload: object, seconds: number) => jwt.sign(payload, SECRET, { expiresIn: seconds, algorithm: "HS256" });
+export function verifyShort<T extends object>(token: string | undefined): T | null {
+  if (!token) return null;
+  try { return jwt.verify(token, SECRET, { algorithms: ["HS256"] }) as T; } catch { return null; }
+}
+export const shortCookieOpts = (path: string, seconds: number) => ({ ...cookieOpts(), path, maxAge: seconds * 1000 });
+
 function decode(req: Request): TokenPayload | null {
   const token = req.cookies?.[COOKIE];
   if (!token) return null;

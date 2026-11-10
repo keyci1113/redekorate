@@ -86,6 +86,18 @@ Every instance has two roles. The first account ever created is the **admin**; e
 
 Without SMTP configured, the admin gets the invitation link to copy instead of an email being sent.
 
+### Sign in with Google or Microsoft
+
+Optional. When a provider's credentials are in `.env`, a *Continue with Google / Microsoft* button appears on the login and invitation pages, and *My account* gets a *Linked accounts* section to link or unlink either provider and to create a password for accounts that were created through a provider.
+
+| Variable | Value |
+|---|---|
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client of type *Web application* in [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials); authorized redirect URI `https://<your-domain>/api/auth/oauth/google/callback` |
+| `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | App registration in [Entra admin center](https://entra.microsoft.com) with a *Web* redirect URI `https://<your-domain>/api/auth/oauth/microsoft/callback` and a client secret; ID tokens enabled |
+| `MICROSOFT_TENANT` | `common` (any Microsoft account), `organizations` (work or school only), `consumers`, or your tenant ID or domain to restrict sign-in to one company |
+
+How accounts are matched: the provider's stable subject is stored per user, so the same Google or Microsoft account always opens the same Redekorate account even if the email changes later. On first use, a provider account whose **verified** email matches an existing user is linked to that user (Google asserts `email_verified`; Microsoft emails come from the organization's domain or from a verified personal account). Otherwise a new account is created, following the same rules as the form: the first account is admin, `ALLOW_REGISTRATION=false` blocks it unless the person arrives through a pending invitation sent to that same email. Accounts created this way have no password; they can set one from *My account*, and the last remaining sign-in method can never be removed. The flow is OpenID Connect authorization code with PKCE, state and nonce; the ID token signature is checked against the provider's published keys and no access token is stored.
+
 **Project collaborators.** The person who creates a project owns it and can add any existing account from the project's *Collaborators* tab with one of three roles:
 
 | Role | Can |
@@ -108,7 +120,7 @@ Owners and admins act as owners of every organization project. When a project ha
 
 ## Security and privacy
 
-- Passwords hashed with bcrypt, sessions in an `httpOnly` cookie with a short-lived JWT, revocable from "Sign out everywhere".
+- Passwords hashed with bcrypt, sessions in an `httpOnly` cookie with a short-lived JWT, revocable from "Sign out everywhere". Optional Google and Microsoft sign-in over OpenID Connect with PKCE, state and nonce; ID tokens verified against the provider's keys.
 - Brute-force protection, constant-time login responses, single-use password-reset tokens.
 - CSRF guard, strict CSP, HSTS, zod validation on every input, parameterized SQL, ownership checks on every resource.
 - Uploads validated by magic bytes (SVG rejected), random file names, served with a no-script CSP. HTML prototypes run in a sandboxed iframe with an opaque origin.

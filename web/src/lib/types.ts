@@ -4,6 +4,8 @@ export type Role = "admin" | "member";
 export interface User { id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null }
 export interface AdminUser extends User { created_at: string; last_login_at: string | null; disabled_at: string | null; project_count: number }
 export interface Invite { id: string; email: string; role: Role; created_at: string; expires_at: string; invited_by: string | null }
+/** Cuenta externa (Google/Microsoft) vinculada a un usuario. */
+export interface Identity { provider: "google" | "microsoft"; email: string | null; created_at: string; last_login_at: string | null }
 
 /** Project roles, lowest to highest. Commenter reads everything and can leave comments. */
 export type ProjectRole = "owner" | "editor" | "commenter" | "viewer";
