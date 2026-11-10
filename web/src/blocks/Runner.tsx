@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronRight, CornerDownLeft, GripVertical, Maximize2, Plus, Star, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type {
   Block, CardSortBlock, CardSortValue, ChoiceBlock, ChoiceValue, FirstClickBlock, FirstClickValue, FiveSecondBlock,
-  MatrixBlock, Option, PreferenceBlock, PreferenceValue, RankingBlock, TreeNode, TreeTestBlock, TreeTestValue,
+  MatrixBlock, Option, PreferenceBlock, PreferenceValue, RankingBlock, TimedTaskValue, TreeNode, TreeTestBlock, TreeTestValue,
 } from "./types";
+import { TimedTaskView } from "./TimedTaskRunner";
 import { parseTree } from "./types";
 import { SUS_ITEMS } from "./registry";
 import { cx } from "../components/ui";
@@ -53,6 +54,7 @@ export function isAnswered(block: Block, value: unknown): boolean {
     case "five_second": return !!(value as { seen?: boolean } | undefined)?.seen;
     case "first_click": return !!value;
     case "prototype_task": return !!(value as PrototypeTaskValue | undefined)?.outcome;
+    case "timed_task": return !!(value as TimedTaskValue | undefined)?.outcome;
     case "kano": return kanoAnswered(block, value as KanoValue | undefined);
     default: return true;
   }
@@ -110,6 +112,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
       {block.type === "kano" && <KanoRunner block={block} value={value as KanoValue | undefined} onChange={onChange} />}
       {block.type === "prototype_task" && <PrototypeTaskView block={block} proto={settings?.prototypes?.find((p) => p.id === block.prototypeId)}
         value={value as PrototypeTaskValue | undefined} onChange={onChange} onAdvance={onAdvance} preview={preview} />}
+      {block.type === "timed_task" && <TimedTaskView block={block} value={value as TimedTaskValue | undefined} onChange={onChange} onAdvance={onAdvance} preview={preview} />}
       {block.type === "first_click" && <FirstClickView block={block} value={value as FirstClickValue | undefined} preview={preview}
         onClick={(v) => { onChange(v); if (!preview) setTimeout(() => onAdvance?.(v), 650); }} />}
     </div>

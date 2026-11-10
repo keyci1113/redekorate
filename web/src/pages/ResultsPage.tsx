@@ -6,8 +6,9 @@ import { timeAgo, useLoad } from "../lib/hooks";
 import { rememberStudy } from "../lib/recent";
 import { useEffect } from "react";
 import type { Answer, Insight, Session, Share, Study } from "../lib/types";
-import type { Block, CardSortValue, ChoiceValue, FirstClickValue, PreferenceValue, TreeTestValue } from "../blocks/types";
+import type { Block, CardSortValue, ChoiceValue, FirstClickValue, PreferenceValue, TimedTaskValue, TreeTestValue } from "../blocks/types";
 import { isSuccess } from "../blocks/logic";
+import { outcomeLabel } from "../blocks/TimedTaskResults";
 import { classify } from "../blocks/kano";
 import type { StudySettings } from "../lib/settings";
 import { isDirect, screenName, type PrototypeTaskValue } from "../blocks/prototype";
@@ -112,6 +113,10 @@ export function formatAnswer(block: Block, value: unknown, settings?: StudySetti
     case "kano": {
       const v = value as Record<string, { f: number; d: number; imp?: number }>;
       return block.features.map((f) => v[f.id] ? `${f.label}: ${classify(v[f.id].f, v[f.id].d)}${v[f.id].imp ? ` (${v[f.id].imp}/10)` : ""}` : "").filter(Boolean).join(" | ");
+    }
+    case "timed_task": {
+      const v = value as TimedTaskValue;
+      return `${outcomeLabel(v.outcome)} · ${(v.ms / 1000).toFixed(1)} s${block.benchmarkSec && v.outcome === "success" ? (v.ms <= block.benchmarkSec * 1000 ? " ✓" : " ✗") : ""}`;
     }
     case "prototype_task": {
       const v = value as PrototypeTaskValue, p = settings?.prototypes?.find((x) => x.id === block.prototypeId);

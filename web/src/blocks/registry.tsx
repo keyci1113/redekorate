@@ -2,7 +2,7 @@ import { t, tc } from "../lib/i18n";
 import type { ReactNode } from "react";
 import {
   DoorOpen, Info, MessageSquareText, ListChecks, SlidersHorizontal, Gauge, ClipboardCheck, PartyPopper,
-  ThumbsUp, ListOrdered, Grid3x3, LayoutGrid, Network, Images, Timer, MousePointerClick, Smartphone, Scale,
+  ThumbsUp, ListOrdered, Grid3x3, LayoutGrid, Network, Images, Timer, MousePointerClick, Smartphone, Scale, Hourglass,
 } from "lucide-react";
 import type { Block, BlockType } from "./types";
 import { uid } from "../lib/hooks";
@@ -83,6 +83,10 @@ export const BLOCKS: BlockDef[] = [
     create: () => ({ id: uid(), type: "kano", title: tc("Cuéntanos cómo te sentirías con estas funcionalidades"), description: tc("Para cada una responderás dos preguntas: si la tuviera y si no la tuviera."),
       required: true, askImportance: true, funcQ: tc("Si el producto tuviera «{f}», ¿cómo te sentirías?"), dysQ: tc("Si el producto NO tuviera «{f}», ¿cómo te sentirías?"),
       features: opts(tc("Modo sin conexión"), tc("Notificaciones de entrega"), tc("Modo oscuro")) }) },
+  { type: "timed_task", get label() { return t("Tarea cronometrada"); }, group: "Métricas", collectsAnswer: true, logic: ["success"], icon: <Hourglass size={16} />,
+    get description() { return t("Cuánto tardan en completar una tarea real"); },
+    create: () => ({ id: uid(), type: "timed_task", title: tc("Encuentra cuánto cuesta el envío a tu ciudad"), description: tc("Hazlo como lo harías normalmente, a tu ritmo. Cuando lo tengas, vuelve aquí y pulsa \"Lo logré\"."),
+      required: true, url: "", limitSec: 180, benchmarkSec: null, allowGiveUp: true, showTimer: true }) },
 
   // ── Arquitectura de información
   { type: "card_sort", get label() { return t("Card Sorting"); }, group: "Arquitectura de información", collectsAnswer: true, logic: [], icon: <LayoutGrid size={16} />,

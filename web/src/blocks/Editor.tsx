@@ -13,7 +13,7 @@ type Set = (p: Record<string, unknown>) => void;
 export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: (p: Partial<Block>) => void; ctx?: ProtoCtx }) {
   const set: Set = (p) => onChange(p as Partial<Block>);
   const visual = block.type === "five_second" || block.type === "first_click";
-  const titleLabel = isStructural(block) ? t("Título") : block.type === "first_click" || block.type === "tree_test" || block.type === "prototype_task" ? t("Tarea") : block.type === "card_sort" ? t("Instrucción principal") : t("Pregunta");
+  const titleLabel = isStructural(block) ? t("Título") : block.type === "first_click" || block.type === "tree_test" || block.type === "prototype_task" || block.type === "timed_task" ? t("Tarea") : block.type === "card_sort" ? t("Instrucción principal") : t("Pregunta");
 
   return (
     <div className="space-y-5">
@@ -130,6 +130,27 @@ export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: 
         <Tip>{t("Cada funcionalidad se clasifica automáticamente en Obligatoria, Unidimensional, Atractiva, Indiferente, Inversa o Cuestionable.")}</Tip>
       </>}
       {block.type === "prototype_task" && ctx && <PrototypeTaskEditor block={block} set={set} ctx={ctx} />}
+      {block.type === "timed_task" && <>
+        <Field label={t("Link del producto o prototipo (opcional)")} hint={t("Se abre en una pestaña nueva al empezar a cronometrar. Déjalo vacío si la tarea ocurre fuera de la pantalla (en un local, con papel, en otra app).")}>
+          <input className="field" type="url" inputMode="url" placeholder="https://" value={block.url} onChange={(e) => set({ url: e.target.value.trim() })} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label={t("Tiempo límite")} hint={t("Al llegar, la tarea termina sola.")}>
+            <select className="field" value={block.limitSec ?? 0} onChange={(e) => set({ limitSec: +e.target.value || null })}>
+              <option value={0}>{t("Sin límite")}</option>
+              {[30, 60, 120, 180, 300, 600].map((s) => <option key={s} value={s}>{s < 60 ? `${s} s` : `${s / 60} min`}</option>)}
+            </select>
+          </Field>
+          <Field label={t("Tiempo de referencia (s)")} hint={t("Lo que tarda alguien experto, o la versión actual.")}>
+            <input className="field" type="number" min={1} max={3600} placeholder="—" value={block.benchmarkSec ?? ""} onChange={(e) => set({ benchmarkSec: e.target.value ? Math.max(0, +e.target.value) || null : null })} />
+          </Field>
+        </div>
+        <div className="border-t border-line pt-3">
+          <Toggle label={t("Mostrar el cronómetro al participante")} hint={t("Ocúltalo si no quieres que se sienta presionado")} checked={block.showTimer} onChange={(v) => set({ showTimer: v })} />
+          <Toggle label={t("Permitir \"No pude completarla\"")} checked={block.allowGiveUp} onChange={(v) => set({ allowGiveUp: v })} />
+        </div>
+        <Tip>{t("Agrega una Escala (SEQ) justo después para cruzar el tiempo con la facilidad percibida. El template Estudio de tiempos ya lo hace.")}</Tip>
+      </>}
 
       {block.type === "preference" && <>
         <OptionsEditor label={t("Diseños a comparar")} items={block.options} onChange={(options) => set({ options })} withImages min={2} placeholder={t("Diseño")} addLabel={t("Agregar diseño")} />
@@ -146,7 +167,7 @@ export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: 
         <Tip>{t("Después de este bloque agrega preguntas como \"¿Qué recuerdas?\" o \"¿De qué trata esta página?\". El template ya las incluye.")}</Tip>
       </>}
 
-      {!isStructural(block) && block.type !== "five_second" && block.type !== "prototype_task" && (
+      {!isStructural(block) && block.type !== "five_second" && block.type !== "prototype_task" && block.type !== "timed_task" && (
         <div className="border-t border-line pt-3">
           <Toggle label={t("Respuesta obligatoria")} checked={!!block.required} onChange={(v) => set({ required: v })} />
         </div>

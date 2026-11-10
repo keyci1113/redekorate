@@ -116,7 +116,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
 
   const atEnd = finished || block?.type === "thank_you";
   const progress = atEnd ? 1 : blocks.length > 1 ? i / (blocks.length - 1) : 0;
-  const autoAdvance = block?.type === "five_second" || block?.type === "first_click" || block?.type === "prototype_task";
+  const autoAdvance = block?.type === "five_second" || block?.type === "first_click" || block?.type === "prototype_task" || block?.type === "timed_task";
 
   return (
     <div className="flex min-h-full flex-col" style={brandStyle(settings) as CSSProperties}>

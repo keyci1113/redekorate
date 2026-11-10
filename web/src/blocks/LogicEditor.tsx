@@ -69,7 +69,7 @@ export function LogicEditor({ block, blocks, onChange }: { block: Block; blocks:
                 {kind === "number" && (
                   <input type="number" className="field py-1.5" value={Number(r.value ?? 0)} onChange={(e) => upd(r.id, { value: +e.target.value })} />
                 )}
-                {kind === "success" && <span className="self-center text-[13px] text-ink-3">{block.type === "tree_test" ? t("el destino correcto") : t("el área correcta")}</span>}
+                {kind === "success" && <span className="self-center text-[13px] text-ink-3">{block.type === "tree_test" ? t("el destino correcto") : block.type === "prototype_task" || block.type === "timed_task" ? t("la tarea") : t("el área correcta")}</span>}
               </div>
               <p className="text-[13px] text-ink-2">{t("…entonces ir a")}</p>
               <Target value={r.goTo} onPick={(v) => upd(r.id, { goTo: v })} />

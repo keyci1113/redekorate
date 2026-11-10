@@ -1,12 +1,12 @@
 import type { Block, ChoiceValue, FirstClickValue, LogicRule, PreferenceValue, TreeTestValue } from "./types";
 
-/** ¿La respuesta fue "exitosa"? (tree test y first click) */
+/** ¿La respuesta fue "exitosa"? (tree test, first click, tareas en prototipo y cronometradas) */
 export function isSuccess(block: Block, value: unknown): boolean | null {
   if (block.type === "tree_test") {
     const v = value as TreeTestValue | undefined;
     return v ? block.correct.includes(v.selected) : null;
   }
-  if (block.type === "prototype_task") {
+  if (block.type === "prototype_task" || block.type === "timed_task") {
     const v = value as { outcome?: string } | undefined;
     return v?.outcome ? v.outcome === "success" : null;
   }

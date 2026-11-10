@@ -4,6 +4,7 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Time study.** New research method and block: a timed task the participant does in the live product (a link that opens in a new tab) or off-screen, with a stopwatch that can be hidden, an optional time limit and a reference time. Results show success rate, median, mean and range, the central half or the delta against the reference, how many gave up or ran out of time, and one bar per participant sorted by time with the median and reference marked. The template chains three timed tasks with a SEQ scale after each; pass/fail logic works like in prototype tasks; the CSV lists outcome and seconds.
 - **HTML prototypes.** Upload a single-file HTML prototype (for example one made with Claude). The server injects a tracker and serves it inside a CSP sandbox; screens are detected by `data-screen`, URL hash or visible `h1`; results show most-tapped elements and clicks with no response.
 - **Home redesign.** Greeting and "Continue draft" card, day summary from real data, four KPIs with a 14-day chart, live studies table with sorting and a low-completion chip, per-user detail view preference, insights sorted by severity with a review toggle, activity grouped by study, loading/error/empty states.
 - **Insight review.** Insights can be marked as reviewed (migration 006), with a pending filter.
