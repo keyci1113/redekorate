@@ -107,6 +107,10 @@ export function Layout() {
                 </div>
               </Disclosure>
             )}
+            <NavLink to="/help" aria-label={t("Ayuda y conceptos")} title={t("Ayuda y conceptos")}
+              className={({ isActive }) => cx("focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition hover:border-line-2 hover:text-ink", isActive && "bg-ink/5 text-ink")}>
+              <CircleHelp size={18} aria-hidden />
+            </NavLink>
             <Disclosure
               align="right"
               label={t("Menú de la cuenta")}
