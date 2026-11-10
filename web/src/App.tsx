@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { lazy, Suspense, type ReactNode } from "react";
 import { useAuth } from "./lib/auth";
 import { Spinner } from "./components/ui";
@@ -25,11 +25,16 @@ const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage").then((m) => (
 const PublicDocPage = lazy(() => import("./pages/PublicDocPage").then((m) => ({ default: m.PublicDocPage })));
 const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgsPage })));
 const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
+const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
+const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
 function Private({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
+  const { pathname } = useLocation();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/login" replace />;
+  // A new account goes through the welcome wizard once (it can finish it or skip it; both set onboarded_at).
+  if (!user.onboarded_at && pathname !== "/welcome") return <Navigate to="/welcome" replace />;
   return <>{children}</>;
 }
 
@@ -58,8 +63,10 @@ export function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/orgs" element={<OrgsPage />} />
         <Route path="/orgs/:id" element={<OrgPage />} />
+        <Route path="/help" element={<HelpPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
+      <Route path="/welcome" element={<Private><WelcomePage /></Private>} />
       <Route path="/studies/:id/edit" element={<Private><BuilderPage /></Private>} />
       <Route path="/docs/:id" element={<Private><DocumentPage /></Private>} />
       <Route path="*" element={<Navigate to="/" replace />} />
