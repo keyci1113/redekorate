@@ -11,6 +11,9 @@ import type { Dash, Load } from "../components/home/types";
 import { LiveStudies } from "../components/home/LiveStudies";
 import { ActivityFeed, DaySummary, HomeHeader, KpiRow, LastOpened, RecentInsights } from "../components/home/Sections";
 import { lastStudy } from "../lib/recent";
+import { GettingStarted } from "../components/home/GettingStarted";
+import { Link } from "react-router-dom";
+import { CircleHelp } from "lucide-react";
 
 export function DashboardPage() {
   const nav = useNavigate();
@@ -39,7 +42,10 @@ export function DashboardPage() {
             <li key={n}><Card className="h-full p-5"><span className="text-sm font-semibold text-ink-2">{n}</span><p className="mt-2 font-semibold">{title}</p><p className="mt-1 text-sm text-ink-2">{d}</p></Card></li>
           ))}
         </ol>
-        <Button variant="primary" size="lg" className="press mt-8" icon={<FolderPlus size={17} />} onClick={() => nav("/projects?crear=1")}>{t("Crear mi primer proyecto")}</Button>
+        <div className="mt-8 flex flex-wrap items-center gap-4">
+          <Button variant="primary" size="lg" className="press" icon={<FolderPlus size={17} />} onClick={() => nav("/projects?crear=1")}>{t("Crear mi primer proyecto")}</Button>
+          <Link to="/help" className="focus-ring flex items-center gap-1.5 rounded text-sm font-medium text-accent"><CircleHelp size={15} /> {t("Ayuda y conceptos")}</Link>
+        </div>
       </div>
     );
   }
@@ -47,6 +53,7 @@ export function DashboardPage() {
   return (
     <div className="page space-y-6">
       <HomeHeader name={user?.name.split(" ")[0] ?? ""} draft={data?.drafts[0]} loading={load.loading} />
+      {data && user && <GettingStarted userId={user.id} totals={data.totals} />}
       {(() => { const r = data?.recent ?? lastStudy(); return load.loading ? <div className="h-20 animate-pulse rounded-xl bg-ink/5 motion-reduce:animate-none" aria-hidden /> : r ? <LastOpened recent={r} /> : <DaySummary data={data} load={load} />; })()}
       <KpiRow data={data} load={load} />
       <LiveStudies live={data?.live ?? []} trend={data?.trend ?? []} studyTrend={data?.study_trend ?? []} load={load} view={view} onViewChange={changeView} />

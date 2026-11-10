@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { one, query } from "../lib/db.js";
-import { clearSession, readUser, requireAuth, signSession, type Role } from "../lib/auth.js";
+import { clearSession, readUser, requireAuth, signSession, type AuthUser, type Role } from "../lib/auth.js";
 import { HttpError, parse } from "../lib/http.js";
 import { authLimiter, passwordProblem, resetLimiter } from "../lib/security.js";
 import { sendMail } from "../lib/mail.js";
@@ -57,8 +57,8 @@ auth.post("/register", authLimiter, async (req, res) => {
   const exists = await one("select id from users where email = $1", [body.email]);
   if (exists) throw new HttpError(409, "Ya existe una cuenta con ese correo");
   const hash = await bcrypt.hash(body.password, COST);
-  const user = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null }>(
-    "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,$3,$4,now()) returning id, email, name, role, avatar",
+  const user = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null }>(
+    "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,$3,$4,now()) returning id, email, name, role, avatar, onboarded_at",
     [body.name, body.email, hash, role],
   );
   if (inviteId) await query("update invites set accepted_at = now() where id = $1", [inviteId]);
@@ -69,8 +69,8 @@ auth.post("/register", authLimiter, async (req, res) => {
 
 auth.post("/login", authLimiter, async (req, res) => {
   const body = parse(z.object({ email, password: password.min(1) }), req.body);
-  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; password_hash: string; token_version: number; failed_logins: number; locked_until: string | null; disabled_at: string | null }>(
-    "select id, email, name, role, avatar, password_hash, token_version, failed_logins, locked_until, disabled_at from users where email = $1", [body.email]);
+  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null; password_hash: string; token_version: number; failed_logins: number; locked_until: string | null; disabled_at: string | null }>(
+    "select id, email, name, role, avatar, onboarded_at, password_hash, token_version, failed_logins, locked_until, disabled_at from users where email = $1", [body.email]);
   const ok = await bcrypt.compare(body.password, row?.password_hash ?? DUMMY_HASH);
   if (row?.locked_until && new Date(row.locked_until) > new Date())
     throw new HttpError(429, "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo en unos minutos.");
@@ -86,7 +86,7 @@ auth.post("/login", authLimiter, async (req, res) => {
   }
   if (row.disabled_at) throw new HttpError(403, "Esta cuenta está desactivada.");
   await query("update users set failed_logins = 0, locked_until = null, last_login_at = now() where id = $1", [row.id]);
-  const user = { id: row.id, email: row.email, name: row.name, role: row.role, avatar: row.avatar };
+  const user = { id: row.id, email: row.email, name: row.name, role: row.role, avatar: row.avatar, onboarded_at: row.onboarded_at };
   signSession(res, user, row.token_version);
   res.json({ user });
 });
@@ -106,10 +106,18 @@ auth.patch("/me", requireAuth, async (req, res) => {
   // Nombre y/o foto. La foto debe ser un archivo subido a esta instancia (/uploads/…), nunca una URL externa.
   const b = parse(z.object({ name: z.string().trim().min(1).max(120).optional(), avatar: z.string().regex(/^\/uploads\/[a-z0-9]+\.(png|jpg|gif|webp)$/).nullable().optional() }), req.body);
   const user = await one(
-    "update users set name = coalesce($2, name), avatar = case when $3::boolean then $4 else avatar end where id = $1 returning id, email, name, role, avatar",
+    "update users set name = coalesce($2, name), avatar = case when $3::boolean then $4 else avatar end where id = $1 returning id, email, name, role, avatar, onboarded_at",
     [req.user!.id, b.name ?? null, b.avatar !== undefined, b.avatar ?? null]);
   const { token_version } = (await one<{ token_version: number }>("select token_version from users where id = $1", [req.user!.id]))!;
   signSession(res, user, token_version);
+  res.json({ user });
+});
+
+/** The first-run wizard was finished or skipped: never show it again on any device. */
+auth.post("/onboarded", requireAuth, async (req, res) => {
+  const user = await one<AuthUser>("update users set onboarded_at = coalesce(onboarded_at, now()) where id = $1 returning id, email, name, role, avatar, onboarded_at", [req.user!.id]);
+  const { token_version } = (await one<{ token_version: number }>("select token_version from users where id = $1", [req.user!.id]))!;
+  signSession(res, user!, token_version);
   res.json({ user });
 });
 

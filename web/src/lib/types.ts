@@ -1,7 +1,7 @@
 import type { Block } from "../blocks/types";
 
 export type Role = "admin" | "member";
-export interface User { id: string; email: string; name: string; role: Role; avatar: string | null }
+export interface User { id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null }
 export interface AdminUser extends User { created_at: string; last_login_at: string | null; disabled_at: string | null; project_count: number }
 export interface Invite { id: string; email: string; role: Role; created_at: string; expires_at: string; invited_by: string | null }
 
