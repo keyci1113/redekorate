@@ -80,14 +80,25 @@ Every instance has two roles. The first account ever created is the **admin**; e
 
 Without SMTP configured, the admin gets the invitation link to copy instead of an email being sent.
 
-**Project collaborators.** The person who creates a project owns it and can add any existing account from the project's *Collaborators* tab with one of two roles:
+**Project collaborators.** The person who creates a project owns it and can add any existing account from the project's *Collaborators* tab with one of three roles:
 
 | Role | Can |
 |---|---|
 | Editor | Create and change studies, documents, insights, participants and shared reports |
+| Commenter | Everything read-only can, plus leave comments on the project, on study results and on documents |
 | Read-only | Open results, documents and reports; the builder redirects to results and documents open read-only |
 
-Only the owner adds or removes people, archives or deletes the project. Collaborators can leave a project themselves. The dashboard counts shared projects too, and any collaborator can preview a draft study.
+Only the owner adds or removes people, archives or deletes the project, or moves it into an organization. Collaborators can leave a project themselves. The dashboard counts shared projects too, and any collaborator can preview a draft study.
+
+**Organizations.** Anyone can create an organization from the account menu: a workspace with a name, a logo and a color, for a company, a team or a personal studio. A project is either personal or belongs to one organization (chosen when creating it, or moved later by its owner from *Edit project*).
+
+| Organization role | Can |
+|---|---|
+| Owner | Everything, including deleting the organization |
+| Admin | Change the profile, add or remove people, send invitations |
+| Member | See every project of the organization as a **commenter** |
+
+Owners and admins act as owners of every organization project. When a project has an explicit collaborator role and an organization role, the higher one wins. New studies in an organization project start with the organization's logo and color as their brand, and public reports show the logo next to Redekorate's. People who already have an account are added by email; people who don't get a 7-day invitation link that creates the account and joins the organization. Deleting an organization never deletes projects: they become personal projects of their owners again.
 
 ## Security and privacy
 
@@ -141,8 +152,8 @@ Migrations run automatically when the server starts. Without SMTP, the password-
 ```
 server/  Express 5 · PostgreSQL · zod · helmet · express-rate-limit · multer
   migrations/   001 base schema · 002 security, reset and uploads · 003 documents
-                004 participant panel · 005 project reports · 006 insight review
-  src/routes/   auth · dashboard · projects · studies · insights · participants · documents · uploads · public
+                004 participant panel · 005 project reports · 006 insight review · … · 012 organizations and comments
+  src/routes/   auth · dashboard · projects · studies · insights · participants · documents · uploads · public · admin · orgs
   src/lib/i18n.ts   server messages in ES/EN (by the x-lang header)
 web/     React 19 · Vite · Tailwind 4 · React Router
   src/blocks/      types · registry · Editor · Runner · Results · LogicEditor · logic · validate

@@ -13,7 +13,7 @@ import type { StudySettings } from "../lib/settings";
 import { LangSwitch, getLang, locale, t, useLang } from "../lib/i18n";
 import { useEffect, useRef } from "react";
 interface Report {
-  study: { title: string; method: string; status: string; blocks: Block[]; settings?: StudySettings; published_at: string | null; project_name: string; project_color: string };
+  study: { title: string; method: string; status: string; blocks: Block[]; settings?: StudySettings; published_at: string | null; project_name: string; project_color: string; org_name?: string | null; org_logo?: string | null };
   sessions: Session[]; answers: Answer[]; insights: Insight[];
 }
 
@@ -34,7 +34,10 @@ export function ReportPage() {
     <div className="min-h-full bg-paper-2">
       <header className="border-b border-line bg-surface">
         <div className="flex items-center justify-between px-(--page-gutter) py-4">
-          <Logo />
+          <span className="flex items-center gap-3">
+            {study.org_logo && <><img src={study.org_logo} alt={study.org_name ?? ""} className="h-8 max-w-40 object-contain" /><span className="h-6 w-px bg-line" aria-hidden /></>}
+            <Logo />
+          </span>
           <span className="flex items-center gap-3"><LangSwitch />
           <ReportPdfButton size="sm" variant="primary" label={t("Descargar PDF")} title={study.title}
             content={<StudyReportPdf r={{ study, sessions, answers, insights }} projectName={study.project_name} projectColor={study.project_color} />} /></span>

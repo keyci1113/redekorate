@@ -108,7 +108,7 @@ export function NewStudyPage() {
       ))}
       {shown.length === 0 && <p className="mt-10 text-center text-sm text-ink-3">{t("Ningún método coincide con tu búsqueda.")}</p>}
 
-      <TemplateModal tpl={pick} projectId={id!} onClose={() => setPick(null)} onCreated={(sid) => nav(`/studies/${sid}/edit`)} />
+      <TemplateModal tpl={pick} projectId={id!} project={project.data?.project} onClose={() => setPick(null)} onCreated={(sid) => nav(`/studies/${sid}/edit`)} />
     </div>
   );
 }
@@ -138,7 +138,7 @@ function TemplateCard({ tpl, onPick }: { tpl: Template; onPick: () => void }) {
   );
 }
 
-function TemplateModal({ tpl, projectId, onClose, onCreated }: { tpl: Template | null; projectId: string; onClose: () => void; onCreated: (id: string) => void }) {
+function TemplateModal({ tpl, projectId, project, onClose, onCreated }: { tpl: Template | null; projectId: string; project?: Project | null; onClose: () => void; onCreated: (id: string) => void }) {
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +148,9 @@ function TemplateModal({ tpl, projectId, onClose, onCreated }: { tpl: Template |
   async function create() {
     setBusy(true); setError(null);
     try {
-      const { study } = await api.post<{ study: Study }>("/studies", { project_id: projectId, title: title.trim() || (tpl!.key === "blank" ? t("Estudio sin título") : tpl!.name), method: tpl!.key, blocks, settings: { language: lang } });
+      // A study in an organization project starts with the organization's logo and color as its brand.
+      const brand = project?.organization_id ? { color: project.org_color ?? undefined, logo: project.org_logo ?? undefined } : undefined;
+      const { study } = await api.post<{ study: Study }>("/studies", { project_id: projectId, title: title.trim() || (tpl!.key === "blank" ? t("Estudio sin título") : tpl!.name), method: tpl!.key, blocks, settings: { language: lang, ...(brand ? { brand } : {}) } });
       onCreated(study.id);
     } catch (e) { setError((e as Error).message); setBusy(false); }
   }

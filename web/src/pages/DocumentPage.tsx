@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, Copy, Gauge, Link2, Save, Trash2 } from "lucide-react";
+import { Check, Copy, Gauge, Link2, MessageSquare, Save, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { copy, timeAgo, uid, useLoad } from "../lib/hooks";
 import { t, type Lang } from "../lib/i18n";
@@ -10,6 +10,8 @@ import { ExportMenu } from "../components/ExportMenu";
 import { DocumentView } from "../docs/DocumentView";
 import { docTemplate } from "../docs/templates";
 import type { DocData, DocRecord, Entry } from "../docs/types";
+import { canEdit } from "../lib/roles";
+import { CommentsPanel } from "../components/CommentsPanel";
 
 export function DocumentPage() {
   const { id } = useParams();
@@ -29,8 +31,9 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   const [shareOpen, setShareOpen] = useState(false);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [guide, setGuide] = useState(true);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const first = useRef(true);
-  const readOnly = project.role === "viewer";
+  const readOnly = !canEdit(project.role);
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -78,7 +81,8 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
         {doc.kind === "usability_script" && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript}>{t("Crear matriz de resultados")}</Button>}
         <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)}>{t("Guardar como…")}</Button>
         <ExportMenu tpl={tpl} title={title} data={content} lang={lang} projectName={project.name} />
-        <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>
+        <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)}>{t("Comentarios")}</Button>
+        {!readOnly && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>}
       </header>
 
       <main className="page print:p-0">
@@ -96,6 +100,9 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
       </main>
 
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} doc={doc} onDoc={onDoc} />
+      <Modal open={commentsOpen} onClose={() => setCommentsOpen(false)} title={t("Comentarios")} wide>
+        <CommentsPanel projectId={project.id} documentId={doc.id} role={project.role} />
+      </Modal>
       <SaveAsModal open={saveAsOpen} onClose={() => setSaveAsOpen(false)} docId={doc.id} title={title} projectId={project.id} onSaved={(id) => { setSaveAsOpen(false); nav(`/docs/${id}`); }} />
     </div>
   );

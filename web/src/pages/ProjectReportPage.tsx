@@ -16,7 +16,7 @@ interface StudyReport {
   study: { id: string; title: string; method: string; status: string; blocks: Block[]; settings?: StudySettings; published_at: string | null };
   sessions: Session[]; answers: Answer[]; insights: Insight[];
 }
-interface Report { project: { name: string; color: string }; reports: StudyReport[] }
+interface Report { project: { name: string; color: string; org_name?: string | null; org_logo?: string | null }; reports: StudyReport[] }
 
 export function ProjectReportPage() {
   const { token } = useParams();
@@ -29,7 +29,10 @@ export function ProjectReportPage() {
     <div className="min-h-full bg-paper-2">
       <header className="border-b border-line bg-surface">
         <div className="flex items-center justify-between px-(--page-gutter) py-4">
-          <Logo />
+          <span className="flex items-center gap-3">
+            {project.org_logo && <><img src={project.org_logo} alt={project.org_name ?? ""} className="h-8 max-w-40 object-contain" /><span className="h-6 w-px bg-line" aria-hidden /></>}
+            <Logo />
+          </span>
           <span className="flex items-center gap-3"><LangSwitch />
           <ReportPdfButton size="sm" variant="primary" label={t("Descargar PDF")} title={project.name}
             content={<ProjectReportPdf projectName={project.name} projectColor={project.color} reports={reports} />} /></span>

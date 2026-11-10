@@ -20,10 +20,12 @@ import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
 import type { Project, ProjectRole } from "../lib/types";
 import { ShareLink, studyUrl } from "./BuilderPage";
 import { templateByKey } from "../templates/catalog";
+import { canEdit as roleCanEdit } from "../lib/roles";
+import { CommentsPanel } from "../components/CommentsPanel";
 
 import { t } from "../lib/i18n";
 interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole }
-type TabId = "summary" | "responses" | "insights" | "share";
+type TabId = "summary" | "responses" | "insights" | "comments" | "share";
 
 export function ResultsPage() {
   const { id } = useParams();
@@ -35,7 +37,7 @@ export function ResultsPage() {
   if (loading && !data) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
   const { study, sessions, answers, insights } = data;
-  const canEdit = data.role !== "viewer";   // solo lectura: sin editar, descartar ni compartir
+  const canEdit = roleCanEdit(data.role);   // commenter and viewer: no editing, discarding or sharing
 
   return (
     <div className="page">
@@ -73,6 +75,7 @@ export function ResultsPage() {
           { id: "summary", label: t("Resultados") },
           { id: "responses", label: t("Participantes"), count: sessions.length },
           { id: "insights", label: t("Insights"), count: insights.length },
+          { id: "comments", label: t("Comentarios") },
           ...(canEdit ? [{ id: "share" as const, label: t("Compartir") }] : []),
         ]} />
       </div>
@@ -80,6 +83,7 @@ export function ResultsPage() {
         {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings} />}
         {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} onChange={reload} canEdit={canEdit} />}
         {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} />}
+        {tab === "comments" && <CommentsPanel projectId={study.project_id} studyId={study.id} role={data.role} />}
         {tab === "share" && canEdit && <SharePanel study={study} />}
       </div>
     </div>

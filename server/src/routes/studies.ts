@@ -5,7 +5,7 @@ import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
-import { projectRole, requireProject, type ProjectRole } from "../lib/access.js";
+import { ORG_COLS, projectRole, requireProject, type ProjectRole } from "../lib/access.js";
 
 export const studies = Router();
 studies.use(requireAuth);
@@ -64,7 +64,7 @@ studies.post("/", async (req, res) => {
 
 studies.get("/:id", async (req, res) => {
   const s = await ownStudy(req.params.id, req.user!.id);
-  const project = await one("select id, name, color from projects where id = $1", [s.project_id]);
+  const project = await one(`select p.id, p.name, p.color, p.organization_id, ${ORG_COLS} from projects p left join organizations o on o.id = p.organization_id where p.id = $1`, [s.project_id]);
   await noteOpen(s.id, req.user!.id, "edit");
   res.json({ study: await withDirty(s.id), project: { ...project, role: await projectRole(s.project_id, req.user!.id) } });
 });

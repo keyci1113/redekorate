@@ -13,7 +13,7 @@ export function InvitePage() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const { user, register } = useAuth();
-  const [inv, setInv] = useState<{ email: string; role: Role; invited_by: string | null } | null>(null);
+  const [inv, setInv] = useState<{ email: string; role: Role; invited_by: string | null; organization?: string | null } | null>(null);
   const [loading, setLoading] = useState(!!token);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", password: "" });
@@ -46,7 +46,7 @@ export function InvitePage() {
       ) : (
         <form onSubmit={submit} className="mt-8 space-y-5">
           <p className="text-base text-ink-2">
-            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {t("Crea tu contraseña para entrar.")}
+            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.organization ? ` ${t("a la organización")} ${inv.organization}` : ""}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {t("Crea tu contraseña para entrar.")}
           </p>
           <Field label={t("Correo")}><input className="field h-13 bg-paper text-base" value={inv.email} disabled /></Field>
           <Field label={t("Nombre")}><input className="field h-13 text-base" required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

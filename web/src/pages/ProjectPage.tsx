@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
+import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
+import { CommentsPanel } from "../components/CommentsPanel";
+import { OrgChip } from "./OrgsPage";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
-import type { Insight, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
+import type { Insight, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
 import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
@@ -20,8 +23,8 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report", members: "members" } as const;
-  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report" | "members">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
+  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -30,14 +33,15 @@ export function ProjectPage() {
   const participants = useLoad(() => api.get<{ participants: Participant[] }>(`/participants?project_id=${id}`), [id]);
   const shares = useLoad(() => api.get<{ shares: ProjectShare[] }>(`/projects/${id}/shares`), [id]);
   const members = useLoad(() => api.get<{ members: ProjectMember[] }>(`/projects/${id}/members`), [id]);
+  const orgs = useLoad(() => (editOpen ? api.get<{ organizations: Organization[] }>("/orgs") : Promise.resolve({ organizations: [] as Organization[] })), [editOpen]);
 
   if (project.loading) return <Spinner />;
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
   const p = project.data.project;
   const list = studies.data?.studies ?? [];
-  const role = p.role ?? "owner";
-  const canEdit = role !== "viewer";
-  const isOwner = role === "owner";
+  const role = p.role;
+  const canEdit = roleCanEdit(role);
+  const isOwner = roleIsOwner(role);
 
   async function removeProject() {
     if (!confirm(t("¿Eliminar \"{a}\" con todos sus estudios, respuestas e insights? Esta acción no se puede deshacer.", { a: p.name }))) return;
@@ -53,7 +57,8 @@ export function ProjectPage() {
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded" style={{ background: p.color }} />
             <h1 className="page-title">{p.name}</h1>
-            {!isOwner && <Tag>{sharedLabel(role, p.owner_name)}</Tag>}
+            {p.organization_id && <OrgChip id={p.organization_id} name={p.org_name ?? ""} logo={p.org_logo} color={p.org_color} />}
+            {role && !isOwner && <Tag>{sharedLabel(role, p.owner_name)}</Tag>}
           </div>
           {p.description && <p className="mt-2 text-[15px] whitespace-pre-line text-ink-2">{p.description}</p>}
         </div>
@@ -71,6 +76,7 @@ export function ProjectPage() {
           { id: "participants", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
           { id: "members", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
+          { id: "comments", label: t("Comentarios") },
         ]} />
       </div>
 
@@ -91,15 +97,18 @@ export function ProjectPage() {
         {tab === "participants" && (
           <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
         )}
-        {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role} members={members.data?.members ?? []} onChange={members.reload} />)}
+        {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} onChange={members.reload} />)}
+        {tab === "comments" && <CommentsPanel projectId={p.id} role={role} />}
         {tab === "report" && (
           <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
         )}
       </div>
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t("Editar proyecto")}>
-        <ProjectForm initial={p} submitLabel={t("Guardar cambios")} onSubmit={async (v) => {
-          await api.patch(`/projects/${p.id}`, v);
+        <ProjectForm initial={{ name: p.name, description: p.description, color: p.color, organization_id: p.organization_id ?? null }} orgs={isOwner ? orgs.data?.organizations : undefined} submitLabel={t("Guardar cambios")} onSubmit={async (v) => {
+          // Only the owner may move the project; collaborators never send organization_id.
+          const { organization_id, ...rest } = v;
+          await api.patch(`/projects/${p.id}`, isOwner ? { ...rest, organization_id } : rest);
           setEditOpen(false); project.reload();
         }} />
         {isOwner && <div className="mt-6 border-t border-line pt-4">
