@@ -9,6 +9,7 @@ import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { Bubble } from "../components/Bubble";
+import { SsoButtons, SsoDivider, ssoErrorMessage, useSsoProviders } from "../components/SsoButtons";
 
 import { t } from "../lib/i18n";
 // Tarjetas de ejemplo que caen en el panel del login, como un vistazo a los insights que genera cada método.
@@ -83,9 +84,12 @@ export function PasswordInput({ value, onChange, autoComplete }: { value: string
 
 export function LoginPage() {
   const { user, login, register } = useAuth();
+  const [params] = useSearchParams();
+  const providers = useSsoProviders();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [error, setError] = useState<string | null>(null);
+  // El servidor vuelve con ?error=oauth_* cuando el inicio con Google/Microsoft no termina bien.
+  const [error, setError] = useState<string | null>(() => ssoErrorMessage(params.get("error")));
   const [busy, setBusy] = useState(false);
   if (user) return <Navigate to="/" replace />;
 
@@ -103,7 +107,13 @@ export function LoginPage() {
     <AuthShell>
       <h1 className="display text-4xl sm:text-5xl">{mode === "login" ? t("Bienvenida de vuelta") : t("Crea tu cuenta")}</h1>
       <p className="mt-3 text-base text-ink-2">{mode === "login" ? t("Entra para ver tus proyectos e investigaciones.") : t("Organiza toda tu investigación de UX en un solo lugar.")}</p>
-      <form onSubmit={submit} className="mt-10 space-y-5">
+      {providers.length > 0 && (
+        <div className="mt-10 space-y-5">
+          <SsoButtons providers={providers} />
+          <SsoDivider>{t("o con tu correo")}</SsoDivider>
+        </div>
+      )}
+      <form onSubmit={submit} className={providers.length ? "mt-5 space-y-5" : "mt-10 space-y-5"}>
         {mode === "register" && <Field label={t("Nombre")}><input className="field h-13 text-base" required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>}
         <Field label={t("Correo")}><input className="field h-13 text-base" type="email" required autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
         <div className="space-y-1.5">

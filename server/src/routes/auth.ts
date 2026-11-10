@@ -26,7 +26,8 @@ function checkPassword(pw: string) {
 }
 
 const inviteToken = z.string().min(20).max(200);
-const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null }>(
+/** Invitación vigente para un token; la usan el registro con contraseña y el inicio con Google/Microsoft. */
+export const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null }>(
   `select i.id, i.email, i.role, u.name as invited_by from invites i left join users u on u.id = i.invited_by
    where i.token_hash = $1 and i.accepted_at is null and i.expires_at > now()`, [sha256(token)]);
 
@@ -65,9 +66,10 @@ auth.post("/register", authLimiter, async (req, res) => {
 
 auth.post("/login", authLimiter, async (req, res) => {
   const body = parse(z.object({ email, password: password.min(1) }), req.body);
-  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; password_hash: string; token_version: number; failed_logins: number; locked_until: string | null; disabled_at: string | null }>(
+  const row = await one<{ id: string; email: string; name: string; role: Role; avatar: string | null; password_hash: string | null; token_version: number; failed_logins: number; locked_until: string | null; disabled_at: string | null }>(
     "select id, email, name, role, avatar, password_hash, token_version, failed_logins, locked_until, disabled_at from users where email = $1", [body.email]);
-  const ok = await bcrypt.compare(body.password, row?.password_hash ?? DUMMY_HASH);
+  // Una cuenta que solo entra con Google/Microsoft no tiene hash: se compara contra el ficticio y falla igual que un correo inexistente.
+  const ok = (await bcrypt.compare(body.password, row?.password_hash ?? DUMMY_HASH)) && !!row?.password_hash;
   if (row?.locked_until && new Date(row.locked_until) > new Date())
     throw new HttpError(429, "Cuenta bloqueada temporalmente por varios intentos fallidos. Inténtalo en unos minutos.");
   if (!row || !ok) {
@@ -110,10 +112,11 @@ auth.patch("/me", requireAuth, async (req, res) => {
 });
 
 auth.post("/password", requireAuth, authLimiter, async (req, res) => {
-  const b = parse(z.object({ current: password.min(1), next: password }), req.body);
+  const b = parse(z.object({ current: password.optional(), next: password }), req.body);
   checkPassword(b.next);
-  const row = (await one<{ password_hash: string }>("select password_hash from users where id = $1", [req.user!.id]))!;
-  if (!(await bcrypt.compare(b.current, row.password_hash))) throw new HttpError(400, "La contraseña actual no es correcta");
+  const row = (await one<{ password_hash: string | null }>("select password_hash from users where id = $1", [req.user!.id]))!;
+  // Sin contraseña (cuenta creada con Google/Microsoft) se define la primera sin pedir la actual.
+  if (row.password_hash && !(await bcrypt.compare(b.current ?? "", row.password_hash))) throw new HttpError(400, "La contraseña actual no es correcta");
   // Cambiar la contraseña cierra todas las demás sesiones.
   const u = await one<{ token_version: number }>(
     "update users set password_hash = $2, token_version = token_version + 1 where id = $1 returning token_version",
@@ -129,9 +132,14 @@ auth.post("/logout-all", requireAuth, async (req, res) => {
 });
 
 auth.delete("/me", requireAuth, authLimiter, async (req, res) => {
-  const b = parse(z.object({ password: password.min(1) }), req.body);
-  const row = (await one<{ password_hash: string }>("select password_hash from users where id = $1", [req.user!.id]))!;
-  if (!(await bcrypt.compare(b.password, row.password_hash))) throw new HttpError(400, "Contraseña incorrecta");
+  const b = parse(z.object({ password: password.optional(), confirm: z.string().trim().toLowerCase().max(254).optional() }), req.body);
+  const row = (await one<{ password_hash: string | null }>("select password_hash from users where id = $1", [req.user!.id]))!;
+  if (row.password_hash) {
+    if (!b.password || !(await bcrypt.compare(b.password, row.password_hash))) throw new HttpError(400, "Contraseña incorrecta");
+  } else if (b.confirm !== req.user!.email) {
+    // Sin contraseña, se confirma escribiendo el correo de la cuenta.
+    throw new HttpError(400, "Escribe el correo de tu cuenta para confirmar");
+  }
   await query("delete from users where id = $1", [req.user!.id]); // en cascada: proyectos, estudios, respuestas, archivos
   clearSession(res);
   res.json({ ok: true });

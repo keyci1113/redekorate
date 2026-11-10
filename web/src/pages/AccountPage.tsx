@@ -1,13 +1,15 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
-import { KeyRound, LogOut, ShieldCheck, Trash2, UserRound } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { KeyRound, Link2, LogOut, ShieldCheck, Trash2, Unlink, UserRound } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
-import type { User } from "../lib/types";
+import { timeAgo, useLoad } from "../lib/hooks";
+import type { Identity, User } from "../lib/types";
 import { Button, Card, ErrorNote, Field } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { ImageDrop } from "../components/editing";
 import { Avatar } from "../components/Avatar";
+import { ProviderIcon, SsoButtons, ssoErrorMessage, type SsoProviderInfo } from "../components/SsoButtons";
 
 import { t } from "../lib/i18n";
 function Section({ icon, title, text, children }: { icon: ReactNode; title: string; text?: string; children: ReactNode }) {
@@ -33,13 +35,19 @@ function useForm() {
   return { run, busy, note };
 }
 
+interface SignIn { identities: Identity[]; has_password: boolean; providers: SsoProviderInfo[] }
+
 export function AccountPage() {
   const { user, setUser } = useAuth();
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const [name, setName] = useState(user?.name ?? "");
   const [pw, setPw] = useState({ current: "", next: "" });
   const [del, setDel] = useState("");
-  const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm();
+  const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm(), linking = useForm();
+  const signIn = useLoad(() => api.get<SignIn>("/auth/oauth/identities"), []);
+  const hasPassword = signIn.data?.has_password ?? true;
+  const ssoError = ssoErrorMessage(params.get("error"));
 
   return (
     <div className="page">
@@ -67,18 +75,49 @@ export function AccountPage() {
           </form>
         </Section>
 
-        <Section icon={<KeyRound size={16} />} title={t("Contraseña")} text={t("Al cambiarla, se cierran tus sesiones en otros dispositivos.")}>
+        {signIn.data && (signIn.data.providers.length > 0 || signIn.data.identities.length > 0) && (
+          <Section icon={<Link2 size={16} />} title={t("Cuentas vinculadas")} text={t("Entra con Google o Microsoft además de tu contraseña. Siempre debe quedarte al menos una forma de entrar.")}>
+            <div className="space-y-4">
+              {ssoError && <ErrorNote>{ssoError}</ErrorNote>}
+              {signIn.data.identities.length > 0 && (
+                <ul className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+                  {signIn.data.identities.map((i) => (
+                    <li key={i.provider} className="flex items-center gap-3 px-4 py-3">
+                      <ProviderIcon id={i.provider} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium capitalize">{i.provider}</p>
+                        <p className="truncate text-xs text-ink-3">{i.email ?? "—"}{i.last_login_at ? ` · ${t("último acceso")} ${timeAgo(i.last_login_at)}` : ""}</p>
+                      </div>
+                      <Button size="sm" icon={<Unlink size={14} />} disabled={linking.busy || (!hasPassword && signIn.data!.identities.length <= 1)}
+                        onClick={() => linking.run(async () => {
+                          if (!confirm(t("¿Desvincular {a}? Podrás volver a vincularla cuando quieras.", { a: i.provider }))) return;
+                          await api.del(`/auth/oauth/identities/${i.provider}`); signIn.reload();
+                        })()}>{t("Desvincular")}</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {linking.note}
+              {!hasPassword && signIn.data.identities.length <= 1 && <p className="text-xs text-ink-3">{t("Para desvincular tu única cuenta, primero crea una contraseña abajo.")}</p>}
+              <SsoButtons compact providers={signIn.data.providers.filter((p) => !signIn.data!.identities.some((i) => i.provider === p.id))} query={{ link: "1", next: "/account" }} label={t("Vincular {a}")} />
+            </div>
+          </Section>
+        )}
+
+        <Section icon={<KeyRound size={16} />} title={hasPassword ? t("Contraseña") : t("Crear contraseña")}
+          text={hasPassword ? t("Al cambiarla, se cierran tus sesiones en otros dispositivos.") : t("Tu cuenta entra con Google o Microsoft. Una contraseña te da una segunda forma de acceso.")}>
           <form className="space-y-4" onSubmit={password.run(async () => {
             if (!passwordOk(pw.next)) throw new Error(t("La nueva contraseña no cumple los requisitos"));
-            await api.post("/auth/password", pw); setPw({ current: "", next: "" }); return t("Contraseña actualizada");
+            await api.post("/auth/password", hasPassword ? pw : { next: pw.next }); setPw({ current: "", next: "" }); signIn.reload();
+            return hasPassword ? t("Contraseña actualizada") : t("Contraseña creada");
           })}>
-            <Field label={t("Contraseña actual")}><input className="field" type="password" autoComplete="current-password" required value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>
+            {hasPassword && <Field label={t("Contraseña actual")}><input className="field" type="password" autoComplete="current-password" required value={pw.current} onChange={(e) => setPw({ ...pw, current: e.target.value })} /></Field>}
             <div className="space-y-1.5">
               <Field label={t("Nueva contraseña")}><input className="field" type="password" autoComplete="new-password" required value={pw.next} onChange={(e) => setPw({ ...pw, next: e.target.value })} /></Field>
               <PasswordStrength value={pw.next} />
             </div>
             {password.note}
-            <Button variant="primary" disabled={password.busy}>{t("Cambiar contraseña")}</Button>
+            <Button variant="primary" disabled={password.busy}>{hasPassword ? t("Cambiar contraseña") : t("Crear contraseña")}</Button>
           </form>
         </Section>
 
@@ -94,9 +133,11 @@ export function AccountPage() {
         <Section icon={<Trash2 size={16} className="text-bad" />} title={t("Eliminar cuenta")} text={t("Se borran de forma permanente tus proyectos, estudios, respuestas de participantes, insights e imágenes.")}>
           <form className="space-y-3" onSubmit={danger.run(async () => {
             if (!confirm(t("¿Seguro? Esta acción no se puede deshacer."))) return;
-            await api.del("/auth/me", { password: del }); setUser(null); nav("/login");
+            await api.del("/auth/me", hasPassword ? { password: del } : { confirm: del }); setUser(null); nav("/login");
           })}>
-            <Field label={t("Confirma con tu contraseña")}><input className="field" type="password" autoComplete="current-password" required value={del} onChange={(e) => setDel(e.target.value)} /></Field>
+            {hasPassword
+              ? <Field label={t("Confirma con tu contraseña")}><input className="field" type="password" autoComplete="current-password" required value={del} onChange={(e) => setDel(e.target.value)} /></Field>
+              : <Field label={t("Confirma escribiendo tu correo")}><input className="field" type="email" autoComplete="off" required placeholder={user?.email} value={del} onChange={(e) => setDel(e.target.value)} /></Field>}
             {danger.note}
             <Button variant="danger" disabled={danger.busy || !del}>{t("Eliminar mi cuenta y todos mis datos")}</Button>
           </form>

@@ -6,6 +6,7 @@ import type { Role } from "../lib/types";
 import { Button, ErrorNote, Field, Spinner } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { AuthShell, PasswordInput } from "./LoginPage";
+import { SsoButtons, SsoDivider, ssoErrorMessage, useSsoProviders } from "../components/SsoButtons";
 import { t } from "../lib/i18n";
 
 /** Crear cuenta a partir de una invitación: funciona aunque el registro esté cerrado. */
@@ -15,7 +16,8 @@ export function InvitePage() {
   const { user, register } = useAuth();
   const [inv, setInv] = useState<{ email: string; role: Role; invited_by: string | null } | null>(null);
   const [loading, setLoading] = useState(!!token);
-  const [error, setError] = useState<string | null>(null);
+  const providers = useSsoProviders();
+  const [error, setError] = useState<string | null>(() => ssoErrorMessage(params.get("error")));
   const [form, setForm] = useState({ name: "", password: "" });
   const [busy, setBusy] = useState(false);
 
@@ -46,8 +48,12 @@ export function InvitePage() {
       ) : (
         <form onSubmit={submit} className="mt-8 space-y-5">
           <p className="text-base text-ink-2">
-            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {t("Crea tu contraseña para entrar.")}
+            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {providers.length ? t("Entra con tu cuenta de {a} o crea una contraseña.", { a: inv.email }) : t("Crea tu contraseña para entrar.")}
           </p>
+          {providers.length > 0 && <>
+            <SsoButtons providers={providers} query={{ invite: token, next: "/" }} />
+            <SsoDivider>{t("o crea una contraseña")}</SsoDivider>
+          </>}
           <Field label={t("Correo")}><input className="field h-13 bg-paper text-base" value={inv.email} disabled /></Field>
           <Field label={t("Nombre")}><input className="field h-13 text-base" required autoComplete="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
           <div className="space-y-1.5">

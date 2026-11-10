@@ -16,6 +16,8 @@ const EN: Record<string, string> = {
   "La invitación no es válida o ya venció.": "This invitation is invalid or has expired.",
   "Usa el correo al que se envió la invitación.": "Use the email address the invitation was sent to.",
   "Esta cuenta está desactivada.": "This account is disabled.",
+  "Define una contraseña antes de desvincular tu único método de acceso.": "Set a password before unlinking your only way to sign in.",
+  "Escribe el correo de tu cuenta para confirmar": "Type your account email to confirm",
   "Solo quien es dueño del proyecto puede hacer esto": "Only the project owner can do this",
   "Tu rol en este proyecto es de solo lectura": "Your role in this project is read-only",
   "No hay una cuenta activa con ese correo. Pídele que se registre o invítala desde Usuarios.": "There is no active account with that email. Ask them to sign up, or invite them from Users.",
