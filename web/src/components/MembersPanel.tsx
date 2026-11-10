@@ -3,11 +3,12 @@ import { Crown, LogOut, UserPlus, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { ProjectMember, ProjectRole } from "../lib/types";
+import { ASSIGNABLE_PROJECT_ROLES } from "../lib/roles";
 import { Button, Card, ErrorNote, Field, Tag } from "./ui";
 import { Avatar } from "./Avatar";
 import { t } from "../lib/i18n";
 
-export const roleLabel = (r: ProjectRole) => (r === "owner" ? t("Dueño/a") : r === "editor" ? t("Editor") : t("Solo lectura"));
+export const roleLabel = (r: ProjectRole) => (r === "owner" ? t("Dueño/a") : r === "editor" ? t("Editor") : r === "commenter" ? t("Comentarista") : t("Solo lectura"));
 /** Etiqueta de un proyecto compartido: "Editor · Dueño/a: Ana". Misma forma en la lista y en la cabecera. */
 export const sharedLabel = (r: ProjectRole, owner?: string | null) => owner ? `${roleLabel(r)} · ${t("Dueño/a: {a}", { a: owner })}` : roleLabel(r);
 
@@ -15,7 +16,7 @@ export const sharedLabel = (r: ProjectRole, owner?: string | null) => owner ? `$
 export function MembersPanel({ projectId, myRole, members, onChange }: { projectId: string; myRole: ProjectRole; members: ProjectMember[]; onChange: () => void }) {
   const { user: me } = useAuth();
   const owner = myRole === "owner";
-  const [form, setForm] = useState<{ email: string; role: "editor" | "viewer" }>({ email: "", role: "editor" });
+  const [form, setForm] = useState<{ email: string; role: ProjectRole }>({ email: "", role: "editor" });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); setError(null); try { await fn(); onChange(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } };
@@ -25,14 +26,13 @@ export function MembersPanel({ projectId, myRole, members, onChange }: { project
     <div className="space-y-5">
       <Card className="p-4">
         <p className="font-semibold">{t("Colaboradores")}</p>
-        <p className="mt-1 text-sm text-ink-2">{t("Editores crean y modifican estudios, documentos, insights y participantes. Solo lectura ve resultados y documentos sin cambiar nada. Solo quien es dueño agrega personas, archiva o elimina el proyecto.")}</p>
+        <p className="mt-1 text-sm text-ink-2">{t("Editores crean y modifican estudios, documentos, insights y participantes. Comentaristas ven todo y dejan comentarios. Solo lectura ve resultados y documentos sin cambiar nada. Solo quien es dueño agrega personas, archiva o elimina el proyecto.")}</p>
         {owner && (
           <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={add}>
             <div className="flex-1"><Field label={t("Correo de una cuenta existente")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
             <Field label={t("Rol")}>
-              <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "editor" | "viewer" })}>
-                <option value="editor">{t("Editor")}</option>
-                <option value="viewer">{t("Solo lectura")}</option>
+              <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as ProjectRole })}>
+                {ASSIGNABLE_PROJECT_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
               </select>
             </Field>
             <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy}>{t("Agregar")}</Button>
@@ -53,8 +53,7 @@ export function MembersPanel({ projectId, myRole, members, onChange }: { project
               {m.role === "owner" ? <Tag><span className="flex items-center gap-1"><Crown size={11} /> {roleLabel(m.role)}</span></Tag>
                 : owner ? (
                   <select className="field h-8 w-36 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/projects/${projectId}/members/${m.user_id}`, { role: e.target.value }))}>
-                    <option value="editor">{t("Editor")}</option>
-                    <option value="viewer">{t("Solo lectura")}</option>
+                    {ASSIGNABLE_PROJECT_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                   </select>
                 ) : <Tag>{roleLabel(m.role)}</Tag>}
               {m.role !== "owner" && (owner || self) && (

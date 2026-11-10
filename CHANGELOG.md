@@ -4,6 +4,8 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Organizations.** Anyone can create an organization (a personal studio or a company) with a logo and a color (migration 012). Projects can live in an organization: every member sees them, admins and owners manage them, and new studies inherit the organization's brand; public reports show its logo. People are added by email or invited with a 7-day link that joins the organization on sign-up. Deleting an organization turns its projects back into personal projects.
+- **Commenter role and comments.** A new project role between editor and read-only: commenters see everything and leave comments on the project, on a study's results and on a document. Organization members are commenters on every organization project. Authors and the project owner delete comments.
 - **HTML prototypes.** Upload a single-file HTML prototype (for example one made with Claude). The server injects a tracker and serves it inside a CSP sandbox; screens are detected by `data-screen`, URL hash or visible `h1`; results show most-tapped elements and clicks with no response.
 - **Home redesign.** Greeting and "Continue draft" card, day summary from real data, four KPIs with a 14-day chart, live studies table with sorting and a low-completion chip, per-user detail view preference, insights sorted by severity with a review toggle, activity grouped by study, loading/error/empty states.
 - **Insight review.** Insights can be marked as reviewed (migration 006), with a pending filter.

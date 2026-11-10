@@ -5,10 +5,24 @@ export interface User { id: string; email: string; name: string; role: Role; ava
 export interface AdminUser extends User { created_at: string; last_login_at: string | null; disabled_at: string | null; project_count: number }
 export interface Invite { id: string; email: string; role: Role; created_at: string; expires_at: string; invited_by: string | null }
 
-export type ProjectRole = "owner" | "editor" | "viewer";
+/** Project roles, lowest to highest. Commenter reads everything and can leave comments. */
+export type ProjectRole = "owner" | "editor" | "commenter" | "viewer";
 export interface ProjectMember { user_id: string; name: string; email: string; avatar: string | null; role: ProjectRole; created_at: string }
 
-export interface Project {
+/** Organization roles: owner (everything), admin (settings and people), member (commenter on every project). */
+export type OrgRole = "owner" | "admin" | "member";
+export interface Organization {
+  id: string; name: string; logo: string | null; color: string; created_at: string;
+  role: OrgRole; member_count: number; project_count: number;
+}
+export interface OrgMember { user_id: string; name: string; email: string; avatar: string | null; role: OrgRole; created_at: string }
+export interface OrgInvite { id: string; email: string; role: "admin" | "member"; created_at: string; expires_at: string; invited_by: string | null }
+/** The organization fields a project carries (null when personal). */
+export interface OrgRef { organization_id?: string | null; org_name?: string | null; org_logo?: string | null; org_color?: string | null }
+
+export interface Comment { id: string; body: string; created_at: string; user_id: string | null; name: string | null; avatar: string | null }
+
+export interface Project extends OrgRef {
   id: string; name: string; description: string; color: string; archived: boolean;
   role?: ProjectRole; owner_name?: string;   // rol de quien consulta; owner_name para proyectos compartidos
   created_at: string; updated_at: string;

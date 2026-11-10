@@ -14,6 +14,7 @@ import { dashboard } from "./routes/dashboard.js";
 import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
 import { admin } from "./routes/admin.js";
+import { orgs } from "./routes/orgs.js";
 import { errorHandler } from "./lib/http.js";
 import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
@@ -42,6 +43,7 @@ app.use("/api/participants", participants);
 app.use("/api/documents", documents);
 app.use("/api/uploads", uploads);
 app.use("/api/admin", admin);
+app.use("/api/orgs", orgs);
 app.use("/api/public", publicLimiter, publicApi);
 app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no encontrada", req.get("x-lang")) }));
 

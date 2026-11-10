@@ -76,8 +76,9 @@ publicApi.get("/reports/:token", async (req, res) => {
   const share = await one("select study_id from report_shares where token = $1 and revoked_at is null", [req.params.token]);
   if (!share) throw notFound("Reporte");
   const study = await one(
-    `select s.id, s.title, s.method, s.status, s.blocks, s.settings, s.published_at, p.name as project_name, p.color as project_color
-     from studies s join projects p on p.id = s.project_id where s.id = $1`,
+    `select s.id, s.title, s.method, s.status, s.blocks, s.settings, s.published_at, p.name as project_name, p.color as project_color,
+       o.name as org_name, o.logo as org_logo
+     from studies s join projects p on p.id = s.project_id left join organizations o on o.id = p.organization_id where s.id = $1`,
     [share.study_id],
   );
   // Nunca exponemos los datos personales del participante en un reporte público.
@@ -96,7 +97,8 @@ publicApi.get("/project-reports/:token", async (req, res) => {
     [req.params.token],
   );
   if (!share) throw notFound("Reporte");
-  const project = await one("select name, color from projects where id = $1", [share.project_id]);
+  const project = await one(
+    "select p.name, p.color, o.name as org_name, o.logo as org_logo from projects p left join organizations o on o.id = p.organization_id where p.id = $1", [share.project_id]);
   const studies = await query(
     `select id, title, method, status, blocks, settings, published_at from studies where id = any($1) order by array_position($1, id)`,
     [share.study_ids],

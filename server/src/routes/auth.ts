@@ -26,15 +26,16 @@ function checkPassword(pw: string) {
 }
 
 const inviteToken = z.string().min(20).max(200);
-const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null }>(
-  `select i.id, i.email, i.role, u.name as invited_by from invites i left join users u on u.id = i.invited_by
+const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null; organization_id: string | null; org_role: "admin" | "member" | null; organization: string | null }>(
+  `select i.id, i.email, i.role, u.name as invited_by, i.organization_id, i.org_role, o.name as organization
+   from invites i left join users u on u.id = i.invited_by left join organizations o on o.id = i.organization_id
    where i.token_hash = $1 and i.accepted_at is null and i.expires_at > now()`, [sha256(token)]);
 
 /** Datos públicos de una invitación, para prellenar el formulario. */
 auth.get("/invite/:token", resetLimiter, async (req, res) => {
   const inv = await pendingInvite(parse(inviteToken, req.params.token));
   if (!inv) throw new HttpError(404, "La invitación no es válida o ya venció.");
-  res.json({ invite: { email: inv.email, role: inv.role, invited_by: inv.invited_by } });
+  res.json({ invite: { email: inv.email, role: inv.role, invited_by: inv.invited_by, organization: inv.organization } });
 });
 
 auth.post("/register", authLimiter, async (req, res) => {
@@ -42,11 +43,13 @@ auth.post("/register", authLimiter, async (req, res) => {
   const anyUser = !!(await one("select 1 from users limit 1"));
   let role: Role = anyUser ? "member" : "admin";   // la primera cuenta administra la instancia
   let inviteId: string | null = null;
+  let org: { id: string; role: "admin" | "member" } | null = null;   // an organization invite also joins the organization
   if (body.invite) {
     const inv = await pendingInvite(body.invite);
     if (!inv) throw new HttpError(400, "La invitación no es válida o ya venció.");
     if (inv.email !== body.email) throw new HttpError(400, "Usa el correo al que se envió la invitación.");
     role = inv.role; inviteId = inv.id;
+    if (inv.organization_id) org = { id: inv.organization_id, role: inv.org_role ?? "member" };
   } else if (process.env.ALLOW_REGISTRATION === "false" && anyUser) {
     throw new HttpError(403, "El registro está cerrado. Pide acceso a la administradora.");
   }
@@ -59,6 +62,7 @@ auth.post("/register", authLimiter, async (req, res) => {
     [body.name, body.email, hash, role],
   );
   if (inviteId) await query("update invites set accepted_at = now() where id = $1", [inviteId]);
+  if (org) await query("insert into organization_members(organization_id, user_id, role) values ($1,$2,$3) on conflict do nothing", [org.id, user!.id, org.role]);
   signSession(res, user!, 0);
   res.status(201).json({ user });
 });

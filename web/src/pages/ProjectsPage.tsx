@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, FileText, Folder, FolderPlus, Lightbulb, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, Building2, FileText, Folder, FolderPlus, Lightbulb, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
-import type { Project, Study } from "../lib/types";
+import type { Organization, Project, Study } from "../lib/types";
+import { OrgLogo } from "../components/OrgLogo";
+import { OrgChip } from "./OrgsPage";
 import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, cx, Tag } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { sharedLabel } from "../components/MembersPanel";
@@ -24,7 +26,12 @@ function ProjectCard({ project: p, on, onSelect }: { project: Project; on: boole
       {/* El botón cubre toda la tarjeta; el enlace de acción queda encima. */}
       <button type="button" aria-current={on || undefined} onClick={onSelect} title={p.name}
         className="focus-ring mt-4 min-w-0 truncate rounded text-left font-display text-[19px] font-bold tracking-[-0.02em] after:absolute after:inset-0 after:rounded-xl">{p.name}</button>
-      {p.role && p.role !== "owner" && <span className="relative mt-1.5 inline-block"><Tag>{sharedLabel(p.role, p.owner_name)}</Tag></span>}
+      {(p.organization_id || (p.role && p.role !== "owner")) && (
+        <span className="relative mt-1.5 flex flex-wrap items-center gap-1.5">
+          {p.organization_id && <OrgChip id={p.organization_id} name={p.org_name ?? ""} logo={p.org_logo} color={p.org_color} />}
+          {p.role && p.role !== "owner" && <Tag>{sharedLabel(p.role, p.owner_name)}</Tag>}
+        </span>
+      )}
       <p className="mt-1 line-clamp-2 min-h-10 text-[13px] leading-5 text-ink-2">{p.description || t("Sin descripción")}</p>
       <div className="mt-4 flex items-baseline justify-between gap-3 text-[13px]">
         <span className="font-medium text-ink-2">{t("Participantes que terminaron")}</span>
@@ -126,7 +133,13 @@ export function ProjectsPage() {
   // "Nuevo proyecto" de la barra superior también funciona si ya estás en esta página.
   useEffect(() => { if (params.get("crear") === "1") setOpenState(true); }, [params]);
   const { data, error, loading } = useLoad(() => api.get<{ projects: Project[] }>("/projects"), []);
-  const projects = data?.projects ?? [];
+  const orgs = useLoad(() => api.get<{ organizations: Organization[] }>("/orgs"), []);
+  const orgList = orgs.data?.organizations ?? [];
+  // Workspace filter: "all", "personal" or an organization id. Preselects the organization for a new project too.
+  const space = params.get("org") ?? "all";
+  const all = data?.projects ?? [];
+  const projects = all.filter((p) => space === "all" || (space === "personal" ? !p.organization_id : p.organization_id === space));
+  const setSpace = (v: string) => setParams((prev) => { const next = new URLSearchParams(prev); if (v === "all") next.delete("org"); else next.set("org", v); next.delete("project"); return next; }, { replace: true });
   const totals = projects.reduce((a, p) => ({ studies: a.studies + (p.study_count ?? 0), responses: a.responses + (p.response_count ?? 0), live: a.live + (p.live_count ?? 0) }), { studies: 0, responses: 0, live: 0 });
   const selected = projects.find((p) => p.id === params.get("project")) ?? projects[0];
 
@@ -143,8 +156,23 @@ export function ProjectsPage() {
         <Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo proyecto")}</Button>
       </div>
 
+      {(orgList.length > 0 || all.some((p) => p.organization_id)) && (
+        <div className="mt-6 flex flex-wrap items-center gap-2" role="group" aria-label={t("Espacio")}>
+          {[{ id: "all", label: t("Todos"), icon: null }, { id: "personal", label: t("Personal"), icon: <span className="flex h-4 w-4 items-center justify-center rounded bg-ink/10 text-[9px] font-semibold" aria-hidden>{t("Yo")}</span> },
+            ...orgList.map((o) => ({ id: o.id, label: o.name, icon: <OrgLogo name={o.name} logo={o.logo} color={o.color} size={16} /> }))].map((c) => (
+            <button key={c.id} type="button" onClick={() => setSpace(c.id)} aria-pressed={space === c.id}
+              className={cx("focus-ring flex max-w-56 items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-medium transition", space === c.id ? "border-ink bg-ink text-paper" : "border-line bg-surface text-ink-2 hover:border-line-2")}>
+              {c.icon}<span className="truncate">{c.label}</span>
+            </button>
+          ))}
+          <Link to="/orgs" className="focus-ring ml-1 flex items-center gap-1 rounded-full px-2 py-1 text-[13px] text-ink-3 hover:text-ink"><Building2 size={14} /> {t("Organizaciones")}</Link>
+        </div>
+      )}
       <div className="mt-7">
-        {loading ? <Spinner /> : error ? <ErrorNote>{error}</ErrorNote> : projects.length === 0 ? (
+        {loading ? <Spinner /> : error ? <ErrorNote>{error}</ErrorNote> : projects.length === 0 && space !== "all" ? (
+          <Empty icon={<FolderPlus size={20} />} title={t("No hay proyectos en este espacio")} text={t("Crea uno aquí o cambia el filtro de espacio.")}
+            action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo proyecto")}</Button>} />
+        ) : projects.length === 0 ? (
           <Empty icon={<FolderPlus size={20} />} title={t("Crea tu primer proyecto")}
             text={t("Un proyecto agrupa los estudios, respuestas e insights de un producto o cliente.")}
             action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo proyecto")}</Button>} />
@@ -170,7 +198,7 @@ export function ProjectsPage() {
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title={t("Nuevo proyecto")}>
-        <ProjectForm submitLabel={t("Crear proyecto")} onSubmit={async (v) => {
+        <ProjectForm key={space} orgs={orgList} initial={{ organization_id: space !== "all" && space !== "personal" ? space : null }} submitLabel={t("Crear proyecto")} onSubmit={async (v) => {
           const { project } = await api.post<{ project: Project }>("/projects", v);
           nav(`/projects/${project.id}/new?nuevo=1`);
         }} />

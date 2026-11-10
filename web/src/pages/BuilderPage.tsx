@@ -20,6 +20,7 @@ import { templateByKey } from "../templates/catalog";
 import { getLang, setContentLang } from "../lib/i18n";
 import { PrototypeEditor, newPrototype } from "../components/PrototypeEditor";
 import { rememberStudy } from "../lib/recent";
+import { canEdit } from "../lib/roles";
 import type { ProtoCtx } from "../blocks/PrototypeTaskEditor";
 
 import { t } from "../lib/i18n";
@@ -30,7 +31,7 @@ export function BuilderPage() {
   const { data, error, loading, setData } = useLoad(() => api.get<{ study: Study; project: Project }>(`/studies/${id}`), [id]);
   if (loading) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
-  if (data.project.role === "viewer") return <Navigate to={`/studies/${id}/results`} replace />;   // solo lectura: sin builder
+  if (!canEdit(data.project.role)) return <Navigate to={`/studies/${id}/results`} replace />;   // commenter and viewer: no builder
   return <Builder initial={data.study} project={data.project} onStudy={(s) => setData({ ...data, study: s })} />;
 }
 

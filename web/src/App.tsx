@@ -23,6 +23,8 @@ const DocumentPage = lazy(() => import("./pages/DocumentPage").then((m) => ({ de
 const InvitePage = lazy(() => import("./pages/InvitePage").then((m) => ({ default: m.InvitePage })));
 const AdminUsersPage = lazy(() => import("./pages/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })));
 const PublicDocPage = lazy(() => import("./pages/PublicDocPage").then((m) => ({ default: m.PublicDocPage })));
+const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgsPage })));
+const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
 
 function Private({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -54,6 +56,8 @@ export function App() {
         <Route path="/studies" element={<LiveStudiesPage />} />
         <Route path="/studies/:id/results" element={<ResultsPage />} />
         <Route path="/account" element={<AccountPage />} />
+        <Route path="/orgs" element={<OrgsPage />} />
+        <Route path="/orgs/:id" element={<OrgPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
       <Route path="/studies/:id/edit" element={<Private><BuilderPage /></Private>} />

@@ -543,7 +543,16 @@ if (del.length) console.log(`Borrados ${del.length} proyectos [Test] anteriores`
 
 // ════ 6. Proyecto vacío y archivado ═════════════════════════════════
 {
-  await project("[Test] Proyecto vacío", "Sin estudios ni documentos, para revisar los estados vacíos.", "#4F46E5", 1);
+  const EMPTY = await project("[Test] Proyecto vacío", "Sin estudios ni documentos, para revisar los estados vacíos.", "#4F46E5", 1);
+  // Organización de prueba: el proyecto vacío vive en ella y el segundo usuario (si existe) es miembro, para ver el rol comentarista.
+  await q("delete from organizations where name like '[Test]%'");
+  const [org] = await q("insert into organizations(name, color, created_by) values ('[Test] Acme Research', '#0E7490', $1) returning id", [OWNER]);
+  await q("insert into organization_members(organization_id, user_id, role) values ($1,$2,'owner')", [org.id, OWNER]);
+  const [other] = await q("select id from users where id <> $1 and disabled_at is null order by created_at limit 1", [OWNER]);
+  if (other) await q("insert into organization_members(organization_id, user_id, role) values ($1,$2,'member')", [org.id, other.id]);
+  await q("update projects set organization_id = $2 where id = $1", [EMPTY, org.id]);
+  await q("insert into comments(project_id, user_id, body) values ($1,$2,'Comentario de ejemplo: ¿lanzamos el screener esta semana?')", [EMPTY, OWNER]);
+  console.log("\n[Test] Acme Research (organización) → [Test] Proyecto vacío");
   const A = await project("[Test] Proyecto archivado", "Proyecto viejo archivado.", "#1F1633", 200);
   await q("update projects set archived = true where id = $1", [A]);
   console.log("\n[Test] Proyecto vacío · [Test] Proyecto archivado");
