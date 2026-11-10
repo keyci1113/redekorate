@@ -4,6 +4,7 @@ import { parseTree } from "./types";
 import { isSuccess } from "./logic";
 import { PrototypeResult } from "./PrototypeResults";
 import { KanoResults } from "./KanoViews";
+import { TimedTaskResult } from "./TimedTaskResults";
 import type { StudySettings } from "../lib/settings";
 import type { Answer } from "../lib/types";
 import { blockDef, SUS_ITEMS } from "./registry";
@@ -200,6 +201,7 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
     case "preference": return <PreferenceResult block={block} answers={answers} />;
     case "first_click": return <FirstClickResult block={block} answers={answers} />;
     case "kano": return <KanoResults block={block} answers={answers} />;
+    case "timed_task": return <TimedTaskResult block={block} answers={answers} />;
     case "prototype_task": return <PrototypeResult block={block} answers={answers} proto={settings?.prototypes?.find((p) => p.id === block.prototypeId)} />;
     case "five_second":
       return (

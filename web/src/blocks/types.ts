@@ -40,6 +40,15 @@ export interface FiveSecondBlock extends Base { type: "five_second"; seconds: nu
 export interface FirstClickBlock extends Base { type: "first_click"; area: { x: number; y: number; w: number; h: number } | null }
 // Kano
 export interface KanoBlock extends Base { type: "kano"; features: Option[]; funcQ: string; dysQ: string; askImportance: boolean }
+// Estudio de tiempos: una tarea cronometrada en el producto real (link) o fuera de la pantalla
+export interface TimedTaskBlock extends Base {
+  type: "timed_task";
+  url: string;                   // se abre en otra pestaña al empezar; "" si la tarea es fuera de pantalla
+  limitSec: number | null;       // al llegar aquí la tarea termina como "timeout"
+  benchmarkSec: number | null;   // tiempo de referencia (experto o versión actual) contra el que se comparan los resultados
+  allowGiveUp: boolean;
+  showTimer: boolean;            // ocultarlo evita presionar al participante
+}
 // Prototipos
 export interface PrototypeTaskBlock extends Base {
   type: "prototype_task"; prototypeId: string; startScreen: string;
@@ -53,7 +62,7 @@ export type Block =
   | NpsBlock | SusBlock
   | CardSortBlock | TreeTestBlock
   | PreferenceBlock | FiveSecondBlock | FirstClickBlock
-  | PrototypeTaskBlock | KanoBlock;
+  | PrototypeTaskBlock | KanoBlock | TimedTaskBlock;
 
 export type BlockType = Block["type"];
 
@@ -63,6 +72,7 @@ export interface CardSortValue { groups: { id: string; name: string; cardIds: st
 export interface TreeTestValue { selected: string; path: string[]; backtracks: number }
 export interface PreferenceValue { choice: string; why?: string }
 export interface FirstClickValue { x: number; y: number; ms: number }
+export interface TimedTaskValue { outcome: "success" | "gave_up" | "timeout"; ms: number }
 
 // Árbol para tree testing: se escribe con sangría (2 espacios por nivel)
 export interface TreeNode { id: string; label: string; children: TreeNode[] }

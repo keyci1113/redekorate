@@ -47,6 +47,11 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
         if (b.features.length > 15) warn(b, t("{a}: más de 15 funcionalidades cansa a los participantes.", { a: name }));
         break;
       case "five_second": if (!b.image?.url) err(b, t("{a}: sube la imagen que se mostrará.", { a: name })); break;
+      case "timed_task":
+        if (b.url && !/^https?:\/\/\S+$/i.test(b.url)) err(b, t("{a}: el link debe empezar con http:// o https://.", { a: name }));
+        if (b.benchmarkSec && b.limitSec && b.benchmarkSec >= b.limitSec) warn(b, t("{a}: el tiempo de referencia es mayor que el límite; nadie podrá llegar a él.", { a: name }));
+        if (!b.url && !b.description?.trim()) warn(b, t("{a}: sin link ni instrucciones, el participante no sabrá dónde hacer la tarea.", { a: name }));
+        break;
       case "first_click":
         if (!b.image?.url) err(b, t("{a}: sube la imagen del diseño.", { a: name }));
         else if (!b.area) warn(b, t("{a}: marca el área correcta para medir el éxito.", { a: name }));

@@ -107,7 +107,7 @@ async function simulate(studyId: string, blocks: B[], n: number, opt: { days?: n
         if (answered >= stopAt) break;
         const v = gens.get(b.id)!(ctx);
         if (v !== undefined) {
-          const ms = b.type === "prototype_task" ? (v as any).ms : int(3, 45) * 1000;
+          const ms = b.type === "prototype_task" ? (v as any).ms : b.type === "timed_task" ? (v as any).ms + int(3, 8) * 1000 : int(3, 45) * 1000;
           ctx.answers.set(b.id, v);
           await q("insert into answers(session_id, study_id, block_id, value, duration_ms, created_at) values ($1,$2,$3,$4,$5,$6)",
             [se.id, studyId, b.id, JSON.stringify(v), ms, new Date(t)]);
@@ -306,6 +306,25 @@ if (del.length) console.log(`Borrados ${del.length} proyectos [Test] anteriores`
     thanks(),
   ], "live", 64);
 
+  // Estudio de tiempos: tareas cronometradas en la web publicada, con tiempo de referencia
+  const timed = (title: string, description: string, benchmarkSec: number, meanSec: number, sdSec: number, pSuccess: number, limitSec = 180) =>
+    blk("timed_task", title, { description, url: "https://comida-ya.example.com", limitSec, benchmarkSec, allowGiveUp: true, showTimer: true }, () => {
+      if (!chance(pSuccess)) return chance(0.3) ? { outcome: "timeout", ms: limitSec * 1000 } : { outcome: "gave_up", ms: around(meanSec * 1.6, sdSec, 8, limitSec - 1) * 1000 };
+      return { outcome: "success", ms: around(meanSec, sdSec, Math.round(benchmarkSec * 0.7), limitSec - 1) * 1000 + int(0, 999) };
+    });
+  const s6 = await study(P, "Estudio de tiempos · Pedir y pagar en la web", "time_study", [
+    welcome("Vas a completar algunas tareas mientras medimos cuánto tiempo toman. Hazlas a tu ritmo normal, sin apurarte: evaluamos el diseño, no a ti."),
+    timed("Encuentra cuánto cuesta el envío a tu colonia", "Hazlo como lo harías normalmente. Cuando lo tengas, vuelve aquí y pulsa \"Lo logré\".", 25, 38, 14, 0.9),
+    scale("En general, ¿qué tan difícil o fácil fue completar esta tarea?", 1, 7, "Muy difícil", "Muy fácil", 5.4),
+    timed("Agrega dos tacos al pastor al carrito y llega hasta el pago", "No necesitas pagar: detente cuando veas el resumen del pedido y vuelve aquí.", 45, 61, 20, 0.84),
+    scale("En general, ¿qué tan difícil o fácil fue completar esta tarea?", 1, 7, "Muy difícil", "Muy fácil", 4.9),
+    timed("Cambia la dirección de entrega por una nueva", "Puedes inventar la dirección.", 40, 92, 35, 0.62, 240),
+    scale("En general, ¿qué tan difícil o fácil fue completar esta tarea?", 1, 7, "Muy difícil", "Muy fácil", 3.6),
+    open("¿En qué tarea perdiste más tiempo? ¿Qué te detuvo?", ["La dirección: no encontré dónde agregar una nueva.", "Cambiar la dirección, el botón está escondido en el perfil.", "El pago, no sabía si ya estaba en el resumen.", "Ninguna, todo fluyó.", "El envío: tuve que meter el código postal dos veces.", "La dirección nueva, pedía demasiados campos."], false),
+    thanks(),
+  ], "live", 26, {}, { mobile: 0.3, days: 12 });
+
+  await insight(P, s6, "Cambiar la dirección toma más del doble que la referencia", "La mediana fue de ~1:30 contra 40 s de referencia y casi 4 de cada 10 no la completaron. El acceso vive en Perfil, no en el checkout.", ["tiempo", "checkout", "direcciones"], "high", "high");
   await insight(P, s1, "Cambiar el método de pago es difícil de encontrar", "Solo el 42% llegó por la ruta esperada (Cuenta → Pagos → Métodos de pago). Varios participantes buscaron primero en Pedidos.", ["pagos", "navegación"], "high", "high", ["\"No encontré dónde estaban las tarjetas, pensé que estaría en Pedidos.\""]);
   await insight(P, s1, "El banner de pedido activo es un atajo muy usado", "1 de cada 5 personas llegó al detalle desde el banner de Inicio. Conviene mantenerlo visible.", ["seguimiento", "home"], "low", "medium");
   await insight(P, s3, "\"Mis pedidos\" compite con el avatar", "16% hizo clic en el avatar esperando ver sus pedidos en el menú de la cuenta.", ["navegación", "web"], "medium", "medium");
@@ -319,7 +338,7 @@ if (del.length) console.log(`Borrados ${del.length} proyectos [Test] anteriores`
     ["Valeria Gómez", "vale.gomez@example.com", ["usuaria frecuente"]], ["Pablo Ortiz", "pablo.ortiz@example.com", ["MTY", "iOS"]],
   ]);
   await q("insert into report_shares(study_id, token) values ($1,$2)", [s1, token()]);
-  await q("insert into report_shares(project_id, study_ids, token) values ($1,$2,$3)", [P, [s1, s3, s5], token()]);
+  await q("insert into report_shares(project_id, study_ids, token) values ($1,$2,$3)", [P, [s1, s3, s5, s6], token()]);
 }
 
 // ════ 2. Arquitectura de información ════════════════════════════════
