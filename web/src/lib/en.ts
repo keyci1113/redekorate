@@ -2172,4 +2172,13 @@ export const EN: Record<string, string> = {
 "Tu cuenta entra con Google o Microsoft. Una contraseña te da una segunda forma de acceso.": "Your account signs in with Google or Microsoft. A password gives you a second way in.",
 "Contraseña creada": "Password created",
 "Confirma escribiendo tu correo": "Confirm by typing your email",
+"Responder con voz": "Answer by voice",
+"Seguir dictando": "Keep dictating",
+"Escuchando… tu voz no se graba, solo se transcribe.": "Listening… your voice is not recorded, only transcribed.",
+"Habla y lo escribimos por ti. Tu voz no se graba ni se guarda: solo queda el texto, que puedes corregir.": "Speak and we'll write it for you. Your voice is not recorded or stored: only the text is kept, and you can correct it.",
+"No tenemos permiso para usar el micrófono. Actívalo en tu navegador o escribe tu respuesta.": "We don't have permission to use the microphone. Allow it in your browser or type your answer.",
+"No encontramos un micrófono. Puedes escribir tu respuesta.": "We couldn't find a microphone. You can type your answer.",
+"Este navegador no pudo transcribir tu voz. Escribe tu respuesta, o abre el estudio en Chrome, Safari o Edge para dictar.": "This browser couldn't transcribe your voice. Type your answer, or open the study in Chrome, Safari or Edge to dictate.",
+"Permitir responder con voz": "Allow voice answers",
+"En las preguntas abiertas, el participante puede dictar y el navegador lo transcribe. No se guarda audio.": "On open questions the participant can dictate and the browser transcribes it. No audio is stored.",
 };
