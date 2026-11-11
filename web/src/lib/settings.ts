@@ -10,8 +10,12 @@ export interface StudySettings {
   showProgress?: boolean;   // por defecto true
   allowBack?: boolean;      // por defecto true
   hideCredit?: boolean;
+  voiceAnswers?: boolean;   // on by default: participants can dictate text answers
   consent?: { enabled: boolean; text: string };
 }
+
+/** Voice answers are on unless the study turned them off. */
+export const voiceOn = (s?: StudySettings) => s?.voiceAnswers !== false;
 
 export const defaultConsent = () =>
   tc("Te invitamos a participar en un estudio para mejorar un producto digital.\n\n") +

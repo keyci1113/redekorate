@@ -62,6 +62,8 @@ Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de
 - Límites de uso en las rutas públicas, en la creación de sesiones y en las subidas.
 - El servidor no arranca en producción sin un `JWT_SECRET` de al menos 32 caracteres. El contenedor corre sin root y la base de datos no se expone.
 
+**Respuestas por voz.** En las preguntas abiertas y en el "¿por qué elegiste esta opción?", el participante puede pulsar *Responder con voz* y hablar en vez de escribir. El navegador transcribe mientras habla, el texto cae en el mismo campo y se puede corregir. El campo le avisa, antes y mientras habla, que su voz no se graba ni se guarda. No se graba ni se guarda audio: solo el texto, igual que una respuesta escrita. Usa el reconocimiento de voz del navegador (Chrome, Edge y Safari); donde no existe, como en Firefox, el campo aparece sin micrófono. Se desactiva por estudio en *Diseño → Permitir responder con voz*.
+
 **Participantes**
 - No se guardan su IP ni su user-agent completo, solo el tipo de dispositivo (móvil, tablet o escritorio).
 - Consentimiento informado opcional, con un texto editable.

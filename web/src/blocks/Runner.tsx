@@ -13,7 +13,8 @@ import { PrototypeTaskView } from "./PrototypeRunner";
 import { KanoRunner, kanoAnswered } from "./KanoViews";
 import type { KanoValue } from "./kano";
 import type { PrototypeTaskValue } from "./prototype";
-import type { StudySettings } from "../lib/settings";
+import { voiceOn, type StudySettings } from "../lib/settings";
+import { DictationField } from "../components/Dictation";
 
 import { t } from "../lib/i18n";
 export interface BlockViewProps {
@@ -84,9 +85,11 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
         </div>
       )}
 
-      {block.type === "open_question" && (block.multiline
-        ? <textarea autoFocus className="field min-h-36 text-[15px]" placeholder={block.placeholder} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} maxLength={5000} />
-        : <input autoFocus className="field h-12 text-[15px]" placeholder={block.placeholder} value={(value as string) ?? ""} onChange={(e) => onChange(e.target.value)} maxLength={500} />)}
+      {block.type === "open_question" && (
+        <DictationField autoFocus multiline={block.multiline} voice={voiceOn(settings)} label={block.title} placeholder={block.placeholder}
+          className={block.multiline ? "field min-h-36 text-[15px]" : "field h-12 text-[15px]"} maxLength={block.multiline ? 5000 : 500}
+          value={(value as string) ?? ""} onChange={onChange} />
+      )}
       {block.type === "choice" && <ChoiceView block={block} value={value as ChoiceValue | undefined} onChange={onChange} />}
       {block.type === "yes_no" && (
         <div className="grid grid-cols-2 gap-3">
@@ -107,7 +110,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
       {block.type === "matrix" && <MatrixView block={block} value={(value as Record<string, string>) ?? {}} onChange={onChange} />}
       {block.type === "card_sort" && <CardSortView block={block} value={value as CardSortValue | undefined} onChange={onChange} />}
       {block.type === "tree_test" && <TreeView block={block} value={value as TreeTestValue | undefined} onChange={onChange} />}
-      {block.type === "preference" && <PreferenceView block={block} value={value as PreferenceValue | undefined} onChange={onChange} />}
+      {block.type === "preference" && <PreferenceView block={block} value={value as PreferenceValue | undefined} onChange={onChange} voice={voiceOn(settings)} />}
       {block.type === "five_second" && <FiveSecondView block={block} preview={preview} onDone={() => { onChange({ seen: true }); onAdvance?.({ seen: true }); }} />}
       {block.type === "kano" && <KanoRunner block={block} value={value as KanoValue | undefined} onChange={onChange} />}
       {block.type === "prototype_task" && <PrototypeTaskView block={block} proto={settings?.prototypes?.find((p) => p.id === block.prototypeId)}
@@ -386,7 +389,7 @@ function TreeView({ block, value, onChange }: { block: TreeTestBlock; value?: Tr
 }
 
 // ── Preference test ─────────────────────────────────────────────
-function PreferenceView({ block, value, onChange }: { block: PreferenceBlock; value?: PreferenceValue; onChange: (v: unknown) => void }) {
+function PreferenceView({ block, value, onChange, voice }: { block: PreferenceBlock; value?: PreferenceValue; onChange: (v: unknown) => void; voice: boolean }) {
   const options = useMemo(() => (block.randomize ? shuffle(block.options) : block.options), [block.options, block.randomize]);
   const [zoom, setZoom] = useState<Option | null>(null);
   return (
@@ -414,7 +417,8 @@ function PreferenceView({ block, value, onChange }: { block: PreferenceBlock; va
       {block.askWhy && value?.choice && (
         <div className="mt-6">
           <label className="mb-2 block text-[15px] font-medium">{t("¿Por qué elegiste esta opción?")}</label>
-          <textarea autoFocus className="field min-h-24 text-[15px]" maxLength={2000} value={value.why ?? ""} onChange={(e) => onChange({ ...value, why: e.target.value })} />
+          <DictationField autoFocus multiline voice={voice} label={t("¿Por qué elegiste esta opción?")} className="field min-h-24 text-[15px]" maxLength={2000}
+            value={value.why ?? ""} onChange={(why) => onChange({ ...value, why })} />
         </div>
       )}
       {zoom && (
