@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { KeyRound, Link2, LogOut, ShieldCheck, Trash2, Unlink, UserRound } from "lucide-react";
+import { KeyRound, Link2, LogOut, Plug, ShieldCheck, Trash2, Unlink, UserRound } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { timeAgo, useLoad } from "../lib/hooks";
@@ -9,6 +9,7 @@ import { Button, Card, ErrorNote, Field } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { ImageDrop } from "../components/editing";
 import { Avatar } from "../components/Avatar";
+import { OutsideAccess } from "../components/OutsideAccess";
 import { ProviderIcon, SsoButtons, ssoErrorMessage, type SsoProviderInfo } from "../components/SsoButtons";
 
 import { t } from "../lib/i18n";
@@ -128,6 +129,11 @@ export function AccountPage() {
               await api.post("/auth/logout-all"); setUser(null); nav("/login");
             })()}>{t("Cerrar sesión en todos los dispositivos")}</Button>
           </div>
+        </Section>
+
+        <Section icon={<Plug size={16} />} title={t("Acceso externo (MCP)")}
+          text={t("Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada.")}>
+          <OutsideAccess />
         </Section>
 
         <Section icon={<Trash2 size={16} className="text-bad" />} title={t("Eliminar cuenta")} text={t("Se borran de forma permanente tus proyectos, estudios, respuestas de participantes, insights e imágenes.")}>

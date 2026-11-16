@@ -91,7 +91,9 @@ export function LoginPage() {
   // El servidor vuelve con ?error=oauth_* cuando el inicio con Google/Microsoft no termina bien.
   const [error, setError] = useState<string | null>(() => ssoErrorMessage(params.get("error")));
   const [busy, setBusy] = useState(false);
-  if (user) return <Navigate to="/" replace />;
+  // Only the outside-access consent page sends people here to come back afterwards.
+  const next = params.get("next")?.startsWith("/authorize?") ? params.get("next")! : null;
+  if (user) return <Navigate to={next ?? "/"} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -109,7 +111,7 @@ export function LoginPage() {
       <p className="mt-3 text-base text-ink-2">{mode === "login" ? t("Entra para ver tus proyectos e investigaciones.") : t("Organiza toda tu investigación de UX en un solo lugar.")}</p>
       {providers.length > 0 && (
         <div className="mt-10 space-y-5">
-          <SsoButtons providers={providers} />
+          <SsoButtons providers={providers} query={next ? { next } : undefined} />
           <SsoDivider>{t("o con tu correo")}</SsoDivider>
         </div>
       )}

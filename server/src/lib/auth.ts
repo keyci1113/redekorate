@@ -37,6 +37,16 @@ export function clearSession(res: Response) {
   res.clearCookie(COOKIE, cookieOpts());
 }
 
+/**
+ * A one-minute session cookie value for the MCP server's own calls to this API on behalf of a token's user.
+ * It goes through readUser like any session, so a disabled account or "sign out everywhere" still applies.
+ */
+export async function internalSession(user: AuthUser): Promise<string> {
+  const row = await one<{ token_version: number }>("select token_version from users where id = $1", [user.id]);
+  if (!row) throw new HttpError(401, "No autenticado");
+  return jwt.sign({ ...user, tv: row.token_version } satisfies TokenPayload, SECRET, { expiresIn: 60, algorithm: "HS256" });
+}
+
 /** Token firmado de vida corta (estado del inicio de sesión externo). */
 export const signShort = (payload: object, seconds: number) => jwt.sign(payload, SECRET, { expiresIn: seconds, algorithm: "HS256" });
 export function verifyShort<T extends object>(token: string | undefined): T | null {

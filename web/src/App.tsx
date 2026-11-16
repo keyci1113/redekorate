@@ -28,6 +28,7 @@ const PublicDocPage = lazy(() => import("./pages/PublicDocPage").then((m) => ({ 
 const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgsPage })));
 const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
 const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
+const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
 function Private({ children }: { children: ReactNode }) {
@@ -58,6 +59,7 @@ export function App() {
       <Route path="/forgot" element={<ForgotPage />} />
       <Route path="/reset" element={<ResetPage />} />
       <Route path="/invite" element={<InvitePage />} />
+      <Route path="/authorize" element={<AuthorizePage />} />
       <Route path="/s/:slug" element={<RunnerPage />} />
       <Route path="/r/:token" element={<ReportPage />} />
       <Route path="/pr/:token" element={<ProjectReportPage />} />

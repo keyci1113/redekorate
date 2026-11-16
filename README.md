@@ -120,13 +120,23 @@ Only the owner adds or removes people, archives or deletes the project, or moves
 
 Owners and admins act as owners of every organization project. When a project has an explicit collaborator role and an organization role, the higher one wins. New studies in an organization project start with the organization's logo and color as their brand, and public reports show the logo next to Redekorate's. People who already have an account are added by email; people who don't get a 7-day invitation link that creates the account and joins the organization. Deleting an organization never deletes projects: they become personal projects of their owners again.
 
+## Connect AI apps (MCP)
+
+Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL>/mcp`, so Claude, ChatGPT, Cursor and other AI apps can work in your projects: list projects and studies, read results, draft or edit studies, launch or close them, and write insights and documents. They act as you, with your role in each project, and can never delete anything. Results reach them without the participant details a link may carry.
+
+- **Claude.ai or ChatGPT:** add a custom connector with the address shown under *My account → Outside access (MCP)* and sign in. You approve the app on a consent screen; *My account* lists connected apps and removes their access.
+- **Claude Code, Claude Desktop, Cursor or scripts:** create an access token in the same section (shown once, 30 days to no expiry) and send it as a bearer token, e.g. `claude mcp add --transport http redekorate https://research.yourdomain.com/mcp --header "Authorization: Bearer rdk_pat_…"`. Clients that support OAuth can skip the token and sign in instead.
+
+Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for public clients, one-hour access tokens and rotating 60-day refresh tokens, discovery through `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` (migration 015). Only SHA-256 hashes of tokens are stored. Each tool calls the app's own API as you, so access rules are exactly the app's. Bearer tokens open `/mcp` only, never the REST API.
+
 ## Security and privacy
 
 - Passwords hashed with bcrypt, sessions in an `httpOnly` cookie with a short-lived JWT, revocable from "Sign out everywhere". Optional Google and Microsoft sign-in over OpenID Connect with PKCE, state and nonce; ID tokens verified against the provider's keys.
 - Brute-force protection, constant-time login responses, single-use password-reset tokens.
 - CSRF guard, strict CSP, HSTS, zod validation on every input, parameterized SQL, ownership checks on every resource.
 - Uploads validated by magic bytes (SVG rejected), random file names, served with a no-script CSP. HTML prototypes run in a sandboxed iframe with an opaque origin.
-- Participants' IP and full user agent are never stored, only the device class. Public reports never include participant data.
+- Participants' IP and full user agent are never stored, only the device class. Public reports and the MCP server never include participant data.
+- Outside access (MCP): hashed, revocable tokens; OAuth with PKCE and exact redirect matching; tools can read, create and edit but never delete, and respect project roles.
 
 The full list is in [SECURITY.md](SECURITY.md), together with how to report a vulnerability.
 

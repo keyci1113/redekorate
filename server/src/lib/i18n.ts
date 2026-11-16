@@ -75,6 +75,10 @@ const EN: Record<string, string> = {
   "Demasiadas solicitudes. Espera un momento.": "Too many requests. Please wait a moment.",
   "Límite de participaciones alcanzado desde esta red.": "Participation limit reached from this network.",
   "Demasiadas subidas. Espera un momento.": "Too many uploads. Please wait a moment.",
+  "Esta app no está registrada en redekorate. Quita el conector y vuelve a agregarlo.": "This app is not registered with redekorate. Remove the connector and add it again.",
+  "La app envió una dirección de regreso que no registró.": "The app sent a return address it did not register.",
+  "Token no encontrado": "Token not found",
+  "Conexión no encontrada": "Connection not found",
 };
 export function translate(msg: string, lang: string | undefined): string {
   if (lang !== "en") return msg;
