@@ -14,9 +14,10 @@ import { getLang, setContentLang, type Lang } from "../lib/i18n";
 import { t } from "../lib/i18n";
 // "¿Qué quieres averiguar?" → métodos recomendados
 const GOALS = (): { label: string; keys: string[] }[] => [
-  { label: t("¿Las personas pueden usar mi diseño?"), keys: ["prototype_test", "usability_unmoderated", "first_click", "time_study", "sus"] },
+  { label: t("¿Las personas pueden usar mi diseño?"), keys: ["prototype_test", "usability_unmoderated", "first_click", "sus"] },
   { label: t("Quiero probar mi prototipo de Figma"), keys: ["prototype_test", "usability_unmoderated"] },
-  { label: t("¿Cuánto tardan en completar una tarea?"), keys: ["time_study", "prototype_test", "usability_unmoderated"] },
+  { label: t("¿Cuánto tardan en completar una tarea?"), keys: ["prototype_test", "usability_unmoderated"] },
+  { label: t("¿En qué se va el tiempo de trabajo de las personas?"), keys: ["time_study", "contextual_inquiry", "diary_study"] },
   { label: t("Quiero organizar la navegación o el contenido"), keys: ["card_sort_open", "card_sort_hybrid", "tree_test"] },
   { label: t("Quiero comparar propuestas de diseño"), keys: ["preference_test", "five_second"] },
   { label: t("¿Se entiende el mensaje de mi pantalla?"), keys: ["five_second", "first_click"] },
