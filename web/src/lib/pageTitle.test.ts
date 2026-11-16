@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { EN } from "./en";
-import { HOME_TITLE, pageTitle, TITLE_KEYS } from "./pageTitle";
+import { HOME_TITLE, isSharedLink, pageTitle, TITLE_KEYS } from "./pageTitle";
 
 describe("pageTitle", () => {
   it("names each page in the interface language", () => {
@@ -15,6 +15,11 @@ describe("pageTitle", () => {
   it("falls back to the home title for / and unknown paths", () => {
     expect(pageTitle("/", "en")).toBe(HOME_TITLE);
     expect(pageTitle("/nope/deeper", "es")).toBe(HOME_TITLE);
+  });
+
+  it("leaves shared links to the server-rendered title", () => {
+    for (const p of ["/s/abc", "/r/tok", "/pr/tok", "/d/tok"]) expect(isSharedLink(p)).toBe(true);
+    for (const p of ["/", "/studies/1/results", "/docs/9", "/s"]) expect(isSharedLink(p)).toBe(false);
   });
 
   it("has an English translation for every title", () => {

@@ -21,7 +21,8 @@ import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
 import { translate } from "./lib/i18n.js";
 import { TRACKER, TRACKER_PATH } from "./lib/protoTracker.js";
-import { publicBaseUrl, renderIndexHtml, robotsDirective, robotsTxt, sitemapXml } from "./lib/seo.js";
+import { indexingEnabled, publicBaseUrl, renderIndexHtml, robotsDirective, robotsTxt, sitemapXml } from "./lib/seo.js";
+import { linkPreview } from "./lib/linkPreview.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -91,9 +92,11 @@ if (existsSync(webDist)) {
   // index.html must always be revalidated or users keep an old asset manifest after a deploy.
   // It is filled in per request: absolute URLs for link previews, and noindex on every private page.
   const indexHtml = readFileSync(path.join(webDist, "index.html"), "utf8");
-  app.get(/.*/, (req, res) => {
+  app.get(/.*/, async (req, res) => {
+    // A failed lookup must never break the page: fall back to the generic card.
+    const preview = await linkPreview(req.path).catch((e) => { console.error("link preview", e); return null; });
     res.set({ "Cache-Control": "no-cache", "X-Robots-Tag": robotsDirective(req.path) })
-      .type("html").send(renderIndexHtml(indexHtml, baseUrl(req), req.path));
+      .type("html").send(renderIndexHtml(indexHtml, baseUrl(req), req.path, indexingEnabled(), preview));
   });
 }
 

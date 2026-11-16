@@ -11,10 +11,6 @@ const ROUTES: [RegExp, string][] = [
   [/^\/reset$/, "Nueva contraseña"],
   [/^\/invite$/, "Invitación"],
   [/^\/welcome$/, "Bienvenida"],
-  [/^\/s\/[^/]+$/, "Estudio"],
-  [/^\/r\/[^/]+$/, "Reporte de estudio"],
-  [/^\/pr\/[^/]+$/, "Reporte de proyecto"],
-  [/^\/d\/[^/]+$/, "Documento"],
   [/^\/docs\/[^/]+$/, "Documento"],
   [/^\/projects$/, "Proyectos"],
   [/^\/projects\/[^/]+\/new$/, "Nuevo estudio"],
@@ -31,6 +27,12 @@ const ROUTES: [RegExp, string][] = [
 
 /** Every title key, so a test can check each one has an English translation. */
 export const TITLE_KEYS = [...new Set(ROUTES.map(([, key]) => key))];
+
+/**
+ * Shared links (study, report, doc) get their real name from the server, the same one their
+ * link preview shows, so the app leaves that title alone.
+ */
+export const isSharedLink = (pathname: string) => /^\/(s|r|pr|d)\/[^/]+\/?$/.test(pathname);
 
 /** The browser-tab title for a path: "<Page> · redekorate", or the home title for "/" and unknown paths. */
 export function pageTitle(pathname: string, lang: Lang): string {
