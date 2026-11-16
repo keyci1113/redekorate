@@ -2181,4 +2181,6 @@ export const EN: Record<string, string> = {
 "Este navegador no pudo transcribir tu voz. Escribe tu respuesta, o abre el estudio en Chrome, Safari o Edge para dictar.": "This browser couldn't transcribe your voice. Type your answer, or open the study in Chrome, Safari or Edge to dictate.",
 "Permitir responder con voz": "Allow voice answers",
 "En las preguntas abiertas, el participante puede dictar y el navegador lo transcribe. No se guarda audio.": "On open questions the participant can dictate and the browser transcribes it. No audio is stored.",
+"Recuperar contraseña": "Reset password",
+"Invitación": "Invitation",
 };

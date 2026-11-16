@@ -23,6 +23,7 @@ services:
       DATABASE_URL: postgres://redekorate:${DB_PASSWORD}@db:5432/redekorate
       JWT_SECRET: ${JWT_SECRET:?Define JWT_SECRET en .env}
       APP_URL: ${APP_URL:-}
+      SEO_INDEXING: ${SEO_INDEXING:-}
       ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
       SMTP_HOST: ${SMTP_HOST:-}

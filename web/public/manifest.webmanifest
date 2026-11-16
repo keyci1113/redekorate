@@ -1,0 +1,15 @@
+{
+  "name": "redekorate · UX Research Platform",
+  "short_name": "redekorate",
+  "description": "Self-hosted UX research platform: prototype tests, card sorting, tree testing, surveys and shareable reports.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#501A93",
+  "icons": [
+    { "src": "/favicon.svg", "type": "image/svg+xml", "sizes": "any" },
+    { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ]
+}

@@ -1,8 +1,10 @@
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, type ReactNode } from "react";
 import { useAuth } from "./lib/auth";
 import { Spinner } from "./components/ui";
 import { Layout } from "./components/Layout";
+import { useLang } from "./lib/i18n";
+import { pageTitle } from "./lib/pageTitle";
 // Every page is its own chunk: participants opening /s/:slug only download the runner,
 // not the builder, results or document templates.
 const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
@@ -38,9 +40,18 @@ function Private({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+/** Keeps the browser-tab title in step with the route and the interface language. */
+function PageTitle() {
+  const { pathname } = useLocation();
+  const { lang } = useLang();
+  useEffect(() => { document.title = pageTitle(pathname, lang); }, [pathname, lang]);
+  return null;
+}
+
 export function App() {
   return (
     <Suspense fallback={<Spinner />}>
+    <PageTitle />
     <Routes>
       {/* Público */}
       <Route path="/login" element={<LoginPage />} />
