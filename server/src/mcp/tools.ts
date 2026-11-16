@@ -93,13 +93,15 @@ export const TOOLS: ToolDef[] = [
     name: "get_project", title: "Get project", writes: false, input: { project_id: id("project") },
     description: "One project with its studies (status, responses) and documents.",
     run: async ({ project_id }, { api, baseUrl }) => {
-      const [{ project }, { studies }, { documents }] = await Promise.all([
-        api.get(`/projects/${project_id}`), api.get(`/projects/${project_id}/studies`), api.get(`/documents?project_id=${project_id}`),
+      // Someone with access to only part of a project (e.g. tickets) still gets the parts they can open.
+      const part = <T,>(p: Promise<T>) => p.catch((e: Error) => ({ unavailable: e.message }));
+      const [{ project }, studies, documents] = await Promise.all([
+        api.get(`/projects/${project_id}`), part(api.get(`/projects/${project_id}/studies`)), part(api.get(`/documents?project_id=${project_id}`)),
       ]);
       return {
         project: { id: project.id, name: project.name, description: project.description, color: project.color, archived: project.archived, role: project.role },
-        studies: studies.map((s: any) => ({ id: s.id, title: s.title, method: s.method, status: s.status, blocks: s.block_count, responses: s.response_count, started: s.started_count, updated_at: s.updated_at, ...studyLinks(baseUrl, s) })),
-        documents: documents.map((d: any) => ({ id: d.id, kind: d.kind, title: d.title, language: d.language, updated_at: d.updated_at })),
+        studies: "unavailable" in studies ? studies : studies.studies.map((s: any) => ({ id: s.id, title: s.title, method: s.method, status: s.status, blocks: s.block_count, responses: s.response_count, started: s.started_count, updated_at: s.updated_at, ...studyLinks(baseUrl, s) })),
+        documents: "unavailable" in documents ? documents : documents.documents.map((d: any) => ({ id: d.id, kind: d.kind, title: d.title, language: d.language, updated_at: d.updated_at })),
         open_in_app: `${baseUrl}/projects/${project.id}`,
       };
     },
