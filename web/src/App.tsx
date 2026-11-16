@@ -4,7 +4,7 @@ import { useAuth } from "./lib/auth";
 import { Spinner } from "./components/ui";
 import { Layout } from "./components/Layout";
 import { useLang } from "./lib/i18n";
-import { pageTitle } from "./lib/pageTitle";
+import { isSharedLink, pageTitle } from "./lib/pageTitle";
 // Every page is its own chunk: participants opening /s/:slug only download the runner,
 // not the builder, results or document templates.
 const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
@@ -44,7 +44,7 @@ function Private({ children }: { children: ReactNode }) {
 function PageTitle() {
   const { pathname } = useLocation();
   const { lang } = useLang();
-  useEffect(() => { document.title = pageTitle(pathname, lang); }, [pathname, lang]);
+  useEffect(() => { if (!isSharedLink(pathname)) document.title = pageTitle(pathname, lang); }, [pathname, lang]);
   return null;
 }
 

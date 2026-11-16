@@ -7,6 +7,8 @@
  * password resets), and those links must never show up in search results.
  */
 
+import type { LinkPreview } from "./linkPreview.js";
+
 /** Paths a search engine may index. Both show the sign-in screen to a visitor without a session. */
 export const INDEXABLE_PATHS = ["/", "/login"] as const;
 
@@ -60,14 +62,51 @@ export const BASE_URL_TOKEN = "__APP_URL__";
 
 /**
  * Turn the built index.html into the page for one request: fill in the absolute origin and
- * add the robots meta tag, plus the canonical link when the page is indexable.
+ * add the robots meta tag, plus the canonical link when the page is indexable. A shared link
+ * (study, report, doc) passes its own preview, which replaces the generic title, description
+ * and image in the link-preview tags.
  */
-export function renderIndexHtml(html: string, baseUrl: string, pathname: string, enabled = indexingEnabled()): string {
+export function renderIndexHtml(html: string, baseUrl: string, pathname: string, enabled = indexingEnabled(), preview?: LinkPreview | null): string {
   const tags = [`<meta name="robots" content="${robotsDirective(pathname, enabled)}" />`];
   if (isIndexable(pathname, enabled)) tags.push(`<link rel="canonical" href="${escapeXml(baseUrl + CANONICAL_PATH)}" />`);
-  return html
-    .replaceAll(BASE_URL_TOKEN, escapeXml(baseUrl))
-    .replace("</head>", `    ${tags.join("\n    ")}\n  </head>`);
+  let out = html.replaceAll(BASE_URL_TOKEN, escapeXml(baseUrl));
+  if (preview) out = applyPreview(out, baseUrl, pathname, preview);
+  return out.replace("</head>", `    ${tags.join("\n    ")}\n  </head>`);
+}
+
+const setMeta = (html: string, attr: "property" | "name", key: string, value: string) =>
+  html.replace(new RegExp(`(<meta ${attr}="${key}" content=")[^"]*(")`), (_, a, b) => a + escapeXml(value) + b);
+
+function applyPreview(html: string, baseUrl: string, pathname: string, p: LinkPreview): string {
+  const title = `${p.title} · redekorate`;
+  let out = html.replace(/<title>[^<]*<\/title>/, `<title>${escapeXml(title)}</title>`);
+  out = setMeta(out, "property", "og:title", title);
+  out = setMeta(out, "name", "twitter:title", title);
+  out = setMeta(out, "name", "description", p.description);
+  out = setMeta(out, "property", "og:description", p.description);
+  out = setMeta(out, "name", "twitter:description", p.description);
+  // og:url must be the shared link itself, or Facebook and LinkedIn fetch the home page's card instead.
+  out = setMeta(out, "property", "og:url", baseUrl + pathname);
+  out = setMeta(out, "property", "og:locale", p.lang === "en" ? "en_US" : "es_ES");
+  out = setMeta(out, "property", "og:locale:alternate", p.lang === "en" ? "es_ES" : "en_US");
+  if (p.image) {
+    // A logo is square-ish: use the small-thumbnail card and drop the 1200x630 size hints.
+    out = setMeta(out, "property", "og:image", baseUrl + p.image);
+    out = setMeta(out, "name", "twitter:image", baseUrl + p.image);
+    out = setMeta(out, "property", "og:image:alt", p.title);
+    out = setMeta(out, "name", "twitter:card", "summary");
+    out = out.replace(/\s*<meta property="og:image:(width|height)" content="\d+" \/>/g, "");
+  }
+  if (p.color) {
+    // One brand theme-color replaces the light/dark pair.
+    let first = true;
+    out = out.replace(/\s*<meta name="theme-color" content="[^"]*"( media="[^"]*")? \/>/g, (m) => {
+      if (!first) return "";
+      first = false;
+      return m.replace(/content="[^"]*"( media="[^"]*")?/, `content="${escapeXml(p.color!)}"`);
+    });
+  }
+  return out;
 }
 
 /** The public origin without a trailing slash: APP_URL when set, else the request's own host. */
