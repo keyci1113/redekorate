@@ -88,6 +88,12 @@ research.tudominio.com {
 }
 ```
 
+### Buscadores y vistas previas de enlaces
+
+Los buscadores solo pueden indexar la página de inicio de sesión. Todas las demás páginas responden con `noindex` (encabezado y meta etiqueta), así que los links privados (estudios `/s/…`, reportes `/r/…` y `/pr/…`, documentos `/d/…`, invitaciones y cambios de contraseña) nunca aparecen en resultados de búsqueda. `/robots.txt` y `/sitemap.xml` se generan a partir de `APP_URL`, que también vuelve absolutas las etiquetas de vista previa de Open Graph y Twitter. Con `SEO_INDEXING=off` toda la instalación queda fuera de los buscadores.
+
+La imagen para compartir y los íconos de la app en `web/public` salen de `scripts/brand/make_social_images.py`; vuelve a correrlo si cambias el logo o el texto.
+
 ### Despliegue automático (GitHub Actions)
 
 `.github/workflows/deploy.yml` construye y levanta la app en cada push a `main` (o a mano desde la pestaña Actions). Corre en un runner self-hosted instalado en el mismo VPS:

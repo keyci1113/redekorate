@@ -147,6 +147,12 @@ research.yourdomain.com {
 
 After creating your account, set `ALLOW_REGISTRATION=false` and restart. Images and the database live in Docker volumes (`uploads`, `pgdata`); include them in your backups. Do not change `DB_PASSWORD` after the first deploy: PostgreSQL only reads it when the volume is created.
 
+### Search engines and link previews
+
+Search engines may index the sign-in page only. Every other page answers with `noindex` (header and meta tag), so private links (`/s/…` studies, `/r/…` and `/pr/…` reports, `/d/…` docs, invites, password resets) never show up in search results. `/robots.txt` and `/sitemap.xml` are generated from `APP_URL`, which also makes the Open Graph and Twitter preview tags absolute. Set `SEO_INDEXING=off` to keep the whole install out of search engines.
+
+The share image and app icons in `web/public` come from `scripts/brand/make_social_images.py`; rerun it after changing the logo or tagline.
+
 ### Automatic deploys (GitHub Actions)
 
 `.github/workflows/deploy.yml` builds and restarts the app on every push to `main` (or manually from the Actions tab). It runs on a self-hosted runner installed on the same VPS:

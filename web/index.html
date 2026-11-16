@@ -1,13 +1,61 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>redekorate · UX Research Platform</title>
+    <meta name="description" content="Self-hosted UX research platform: run prototype tests, usability tests, card sorting, tree testing, first-click tests, surveys, SUS and NPS, then share reports with insights. Open source, no per-seat fees." />
+    <meta name="keywords" content="UX research, user research, usability testing, prototype testing, card sorting, tree testing, first click test, five second test, preference test, survey tool, SUS, NPS, Kano model, research repository, self-hosted, open source, investigación UX, pruebas de usabilidad" />
+    <meta name="application-name" content="redekorate" />
+    <meta name="author" content="redekorate" />
+    <meta name="theme-color" content="#501A93" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#171920" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
+
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <title>Redekorate · UX Research</title>
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- Link previews (Slack, Teams, WhatsApp, LinkedIn, X). The server fills in __APP_URL__. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="redekorate" />
+    <meta property="og:title" content="redekorate · UX Research Platform" />
+    <meta property="og:description" content="Prototype tests, card sorting, tree testing, surveys and shareable research reports in one self-hosted tool." />
+    <meta property="og:url" content="__APP_URL__/" />
+    <meta property="og:image" content="__APP_URL__/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="redekorate, UX research platform" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="es_ES" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="redekorate · UX Research Platform" />
+    <meta name="twitter:description" content="Prototype tests, card sorting, tree testing, surveys and shareable research reports in one self-hosted tool." />
+    <meta name="twitter:image" content="__APP_URL__/og-image.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "redekorate",
+        "url": "__APP_URL__/",
+        "image": "__APP_URL__/og-image.png",
+        "applicationCategory": "BusinessApplication",
+        "applicationSubCategory": "UX research",
+        "operatingSystem": "Web",
+        "inLanguage": ["en", "es"],
+        "description": "Self-hosted UX research platform for prototype tests, usability tests, card sorting, tree testing, surveys and shareable reports.",
+        "featureList": "Prototype testing, Usability testing, First click test, Five second test, Preference test, Tree testing, Card sorting, Surveys, SUS, NPS, Kano model, Insight repository, Shareable reports",
+        "license": "https://www.gnu.org/licenses/agpl-3.0.html",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
     <script src="/theme-init.js"></script>
   </head>
   <body>
+    <noscript>redekorate is a UX research platform. Enable JavaScript to use it.</noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

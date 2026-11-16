@@ -2,7 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import compression from "compression";
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { auth } from "./routes/auth.js";
 import { oauth } from "./routes/oauth.js";
@@ -21,6 +21,7 @@ import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
 import { translate } from "./lib/i18n.js";
 import { TRACKER, TRACKER_PATH } from "./lib/protoTracker.js";
+import { publicBaseUrl, renderIndexHtml, robotsDirective, robotsTxt, sitemapXml } from "./lib/seo.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -69,18 +70,31 @@ app.use("/uploads", express.static(UPLOAD_DIR, {
   index: false, dotfiles: "deny", maxAge: "30d", immutable: true,
   setHeaders: (res, file) => {
     res.set("X-Content-Type-Options", "nosniff");
+    res.set("X-Robots-Tag", "noindex, nofollow");  // participant uploads never belong in search results
     res.set("Content-Security-Policy", file.endsWith(".html") ? PROTOTYPE_CSP : "default-src 'none'");
   },
 }));
+
+// Search engines: robots.txt and the sitemap depend on APP_URL, so they are generated, not static files.
+const baseUrl = (req: express.Request) => publicBaseUrl(process.env.APP_URL, req.protocol, req.get("host"));
+app.get("/robots.txt", (req, res) => res.type("text/plain").set("Cache-Control", "public, max-age=3600").send(robotsTxt(baseUrl(req))));
+app.get("/sitemap.xml", (req, res) => res.type("application/xml").set("Cache-Control", "public, max-age=3600").send(sitemapXml(baseUrl(req))));
 
 // Frontend compilado
 const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 if (existsSync(webDist)) {
   // Vite hashes everything under /assets, so those files can be cached forever.
   app.use("/assets", express.static(path.join(webDist, "assets"), { index: false, immutable: true, maxAge: "1y" }));
+  // The raw template has placeholders and no robots tag; send it through the rendered route instead.
+  app.get("/index.html", (_req, res) => res.redirect(301, "/"));
   app.use(express.static(webDist, { index: false, maxAge: "1h" }));
   // index.html must always be revalidated or users keep an old asset manifest after a deploy.
-  app.get(/.*/, (_req, res) => res.sendFile(path.join(webDist, "index.html"), { cacheControl: false, headers: { "Cache-Control": "no-cache" } }));
+  // It is filled in per request: absolute URLs for link previews, and noindex on every private page.
+  const indexHtml = readFileSync(path.join(webDist, "index.html"), "utf8");
+  app.get(/.*/, (req, res) => {
+    res.set({ "Cache-Control": "no-cache", "X-Robots-Tag": robotsDirective(req.path) })
+      .type("html").send(renderIndexHtml(indexHtml, baseUrl(req), req.path));
+  });
 }
 
 app.use(errorHandler);
