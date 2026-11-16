@@ -8,7 +8,7 @@ export type Section =
   | (S & { type: "text"; placeholder?: string; rows?: number })
   | (S & { type: "list"; placeholder?: string; numbered?: boolean })
   | (S & { type: "notes"; color: NoteColor; placeholder?: string })
-  | (S & { type: "fields"; fields: { id: string; label: string; placeholder?: string }[]; cols?: 1 | 2 | 3 })
+  | (S & { type: "fields"; fields: { id: string; label: string; placeholder?: string; date?: "one" | "many" }[]; cols?: 1 | 2 | 3 })
   | (S & { type: "chips"; placeholder?: string })
   | (S & { type: "bars"; placeholder?: string })
   | (S & { type: "image"; round?: boolean })

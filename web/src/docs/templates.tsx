@@ -242,7 +242,7 @@ const stakeholderMap: DocTemplate = {
   instructions: ["Haz una lista de las personas o áreas involucradas", "Ubica a cada una según su poder de decisión y su interés en el proyecto", "Define cómo te vas a relacionar con cada cuadrante"],
   credit: "Basado en la matriz poder / interés de Mendelow",
   sections: [
-    { id: "context", type: "fields", span: 12, cols: 2, fields: [{ id: "project", label: "Proyecto" }, { id: "date", label: "Fecha" }] },
+    { id: "context", type: "fields", span: 12, cols: 2, fields: [{ id: "project", label: "Proyecto" }, { id: "date", label: "Fecha", date: "one" }] },
     { id: "manage", type: "notes", color: "purple", title: "Alto poder · Alto interés — Gestionar de cerca", prompt: "Involúcralos activamente; son clave para el éxito del proyecto.", span: 6 },
     { id: "satisfy", type: "notes", color: "blue", title: "Alto poder · Bajo interés — Mantener satisfechos", prompt: "Mantenlos informados de lo importante, sin saturarlos.", span: 6 },
     { id: "inform", type: "notes", color: "green", title: "Bajo poder · Alto interés — Mantener informados", prompt: "Comunícales avances; pueden influir en la opinión de otros.", span: 6 },
@@ -524,7 +524,7 @@ const script: DocTemplate = {
   question: "¿Qué vas a decir y qué tareas vas a pedir en cada sesión?",
   instructions: ["Ajusta la introducción con tu nombre y el del producto", "Escribe las tareas como escenarios realistas, sin decir dónde hacer clic", "Define el criterio de éxito de cada tarea", "Cuando termines, genera la matriz de resultados con un clic"],
   sections: [
-    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "moderator", label: "Moderador(a)" }, { id: "product", label: "Producto" }, { id: "date", label: "Fecha" }] },
+    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "moderator", label: "Moderador(a)" }, { id: "product", label: "Producto" }, { id: "date", label: "Fecha", date: "one" }] },
     { id: "intro", type: "text", title: "Introducción", span: 12, rows: 10 },
     { id: "warmup", type: "list", title: "Preguntas para conocer al usuario", span: 6, numbered: true },
     { id: "before", type: "text", title: "Antes de comenzar con las tareas", span: 6, rows: 4 },
@@ -568,7 +568,7 @@ const timeStudy: DocTemplate = {
     "Revisa el Resumen: horas por persona, por actividad y por herramienta, y la estimación semanal",
   ],
   sections: [
-    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "org", label: "Equipo u organización" }, { id: "dates", label: "Fechas" }, { id: "goal", label: "Qué queremos saber" }] },
+    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "org", label: "Equipo u organización" }, { id: "dates", label: "Fechas", date: "many" }, { id: "goal", label: "Qué queremos saber" }] },
     { id: "study", type: "custom", component: "timestudy", span: 12 },
     { id: "findings", type: "list", title: "Hallazgos principales", span: 6 },
     { id: "next", type: "list", title: "Recomendaciones / siguientes pasos", span: 6 },
@@ -601,7 +601,7 @@ const results: DocTemplate = {
   question: "¿Qué tareas se completan con éxito y dónde se atoran?",
   instructions: ["Agrega las tareas y su descripción de éxito", "Agrega una columna por participante", "Marca Pasa, Parcial, Falla o N/A y escribe observaciones", "La tasa de éxito por tarea y la total se calculan automáticamente"],
   sections: [
-    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "project", label: "Proyecto" }, { id: "dates", label: "Fechas" }, { id: "moderator", label: "Moderador(a)" }] },
+    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "project", label: "Proyecto" }, { id: "dates", label: "Fechas", date: "many" }, { id: "moderator", label: "Moderador(a)" }] },
     { id: "matrix", type: "custom", component: "usability", span: 12 },
     { id: "findings", type: "list", title: "Hallazgos principales", span: 6 },
     { id: "next", type: "list", title: "Recomendaciones / siguientes pasos", span: 6 },
@@ -643,7 +643,7 @@ const heuristic: DocTemplate = {
   instructions: ["Cada evaluador revisa el producto por su cuenta, en su pestaña", "Marca Pasa, Falla o N/A en cada punto", "Si falla, asigna la severidad (0 a 4) y explica dónde ocurre", "Revisa los resultados globales: cumplimiento por heurística y problemas priorizados"],
   credit: "Heurísticas psicológicas basadas en Susan Weinschenk (adaptación de jordisan) · Heurísticas de Jakob Nielsen",
   sections: [
-    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "product", label: "Producto o flujo evaluado" }, { id: "company", label: "Empresa" }, { id: "date", label: "Fecha" }] },
+    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "product", label: "Producto o flujo evaluado" }, { id: "company", label: "Empresa" }, { id: "date", label: "Fecha", date: "one" }] },
     { id: "eval", type: "custom", component: "heuristic", span: 12 },
   ],
   init: () => ({ eval: { framework: "weinschenk", product: "", evaluators: [1, 2, 3].map(() => ({ id: uid(), name: "" })), answers: {} } }),

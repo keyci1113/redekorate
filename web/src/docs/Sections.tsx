@@ -6,6 +6,7 @@ import type { Bar, DocData, Entry, Note, NoteColor, Row, RowGroup, Section } fro
 import { tr, type Lang } from "../lib/i18n";
 import { copy, uid } from "../lib/hooks";
 import { ImageDrop } from "../components/editing";
+import { DatesField } from "./DatesField";
 import { cx } from "../components/ui";
 
 // Contexto del documento: idioma del documento (no el de la interfaz) y modo lectura
@@ -160,10 +161,18 @@ function NotesBody({ notes: saved, set, color, placeholder, ex }: { notes: Note[
 }
 
 function FieldsBody({ section, value, set, ex }: { section: Extract<Section, { type: "fields" }>; value: Record<string, string>; set: SetFn; ex: Record<string, string> }) {
-  const { T, readOnly } = useDoc();
+  const { T, readOnly, lang } = useDoc();
   return (
     <div className={cx("grid gap-x-4 gap-y-3", section.cols === 3 ? "sm:grid-cols-3" : section.cols === 1 ? "" : "sm:grid-cols-2")}>
-      {section.fields.map((f) => (
+      {section.fields.map((f) => f.date && !readOnly ? (
+        // A date field: the text is what everything else reads; the ISO days (key "<id>:days") drive the calendar.
+        <div key={f.id}>
+          <span className="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">{T(f.label)}</span>
+          <DatesField label={T(f.label)} mode={f.date} lang={lang} T={T} text={value[f.id] ?? ""} days={value[`${f.id}:days`] ?? ""}
+            placeholder={ex[f.id] || (f.placeholder ? T(f.placeholder) : T(f.date === "one" ? "Elegir fecha" : "Elegir fechas"))}
+            onChange={(text, days) => set({ ...value, [f.id]: text, [`${f.id}:days`]: days.join(",") })} />
+        </div>
+      ) : (
         <label key={f.id} className="block">
           <span className="text-[11px] font-semibold tracking-wide text-ink-3 uppercase">{T(f.label)}</span>
           {readOnly ? <p className="mt-0.5 text-[14px]">{value[f.id] || "—"}</p>
