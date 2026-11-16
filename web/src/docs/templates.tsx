@@ -1,8 +1,9 @@
-import { BookOpenCheck, Brain, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
+import { BookOpenCheck, Timer, Brain, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
 import type { DocCategory, DocData, DocTemplate, Entry, Note, RowGroup } from "./types";
 import type { Lang } from "../lib/i18n";
 import { uid } from "../lib/hooks";
 import { P_COLORS } from "./Affinity";
+import { defaultLists, emptyTimeStudy, type TimeStudyData } from "./timeStudyModel";
 
 const L = (lang: Lang, es: string, en: string) => (lang === "en" ? en : es);
 const notes = (...xs: string[]): Note[] => xs.map((text) => ({ id: uid(), text }));
@@ -553,6 +554,46 @@ const SCRIPT_TEXT = (lang: Lang) => lang === "en" ? {
     closing: ["En general, ¿cómo describirías tu experiencia?", "¿Qué fue lo más confuso?", "¿Qué cambiarías primero?", "¿Hay algo más que quieras contarnos?"],
   };
 
+const timeStudy: DocTemplate = {
+  kind: "time_study", name: "Estudio de tiempos", category: "Campo y entrevistas", icon: <Timer size={18} />,
+  description: "Una persona observa a otra durante su jornada y registra cada actividad: inicio, fin, categoría y herramienta. El resumen suma las horas por persona, actividad y herramienta, con estimaciones por semana.",
+  purpose: "Para saber en qué se va realmente el tiempo de trabajo y cuánto de él pasa en las herramientas que quieres mejorar",
+  question: "¿En qué actividades y herramientas se va la jornada de estas personas?",
+  instructions: [
+    "En Categorías y herramientas, agrega a las personas que vas a observar y ajusta las categorías de actividad y las herramientas a su trabajo",
+    "Marca las herramientas que estás midiendo y ponle nombre al grupo (por ejemplo, tu producto)",
+    "Planea en Calendario qué día se observa a quién",
+    "Durante la observación, registra una fila por actividad: empieza una nueva cada vez que cambia la actividad, la herramienta o el asunto, aunque dure 2 minutos",
+    "Elige solo una herramienta principal por fila y anota las demás en Otras herramientas",
+    "Revisa el Resumen: horas por persona, por actividad y por herramienta, y la estimación semanal",
+  ],
+  sections: [
+    { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "org", label: "Equipo u organización" }, { id: "dates", label: "Fechas" }, { id: "goal", label: "Qué queremos saber" }] },
+    { id: "study", type: "custom", component: "timestudy", span: 12 },
+    { id: "findings", type: "list", title: "Hallazgos principales", span: 6 },
+    { id: "next", type: "list", title: "Recomendaciones / siguientes pasos", span: 6 },
+  ],
+  init: (lang) => ({ study: emptyTimeStudy(lang) }),
+  example: (lang) => {
+    const { buckets, tools } = defaultLists(lang);
+    const [prep, call, , mail, draft, delegate] = buckets;
+    const [main, email, phone, chat] = tools;
+    const row = (start: string, end: string, bucket: string, tool: string, other: string, ref: string, notes: string) =>
+      ({ id: uid(), person: "p", date: "2026-11-02", start, end, bucket, tool, other, ref, notes });
+    const study: TimeStudyData = {
+      people: [{ id: "p", name: L(lang, "Ejemplo", "Example") }], workdays: 5, keyLabel: "", buckets, tools, schedule: [],
+      rows: [
+        row("09:00", "09:08", prep.id, main.id, email.name, L(lang, "Cliente A", "Client A"), L(lang, "Leyó el último correo y el historial antes de la llamada", "Read the last email and history before the call")),
+        row("09:08", "09:19", call.id, phone.id, main.name, L(lang, "Cliente A", "Client A"), L(lang, "Llamada; enviarán una contrapropuesta el viernes", "Call; they will send a counteroffer by Friday")),
+        row("09:19", "09:22", delegate.id, chat.id, "", L(lang, "Cliente A", "Client A"), L(lang, "Pidió a su asistente actualizar el cálculo antes de responder", "Asked their assistant to update the numbers before replying")),
+        row("09:22", "09:28", mail.id, email.id, "", L(lang, "Varios", "Multiple"), L(lang, "Bandeja: 4 respuestas, 2 marcadas para después; lo interrumpió una llamada", "Inbox triage: 4 replies sent, 2 flagged for later; interrupted once by a call")),
+        row("09:28", "09:43", draft.id, main.id, "Word/PDF", L(lang, "Cliente B", "Client B"), L(lang, "Esquema del informe de la próxima semana", "Outlined next week's report")),
+      ],
+    };
+    return { meta: { org: "", dates: "", goal: L(lang, "Cuánto tiempo pasa el equipo en el sistema principal", "How much time the team spends in the main system") }, study };
+  },
+};
+
 const results: DocTemplate = {
   kind: "usability_results", name: "Resultados de prueba de usabilidad", category: "Evaluación", icon: <Gauge size={18} />,
   description: "Matriz de tareas × participantes con Pasa / Parcial / Falla y observaciones. La tasa de éxito se calcula sola.",
@@ -618,7 +659,7 @@ const heuristic: DocTemplate = {
   },
 };
 
-export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, diaryStudy, script, results, heuristic];
+export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, timeStudy, diaryStudy, script, results, heuristic];
 export const docTemplate = (kind: string) => DOC_TEMPLATES.find((d) => d.kind === kind);
 export const DOC_ICON = Compass;
 export type { DocData };

@@ -8,6 +8,7 @@ import { taskRate, type UsabilityData } from "./UsabilityMatrix";
 import type { HeuristicData } from "./Heuristic";
 import type { BlueprintData } from "./Blueprint";
 import { heuristicCategories } from "./heuristics";
+import { logTable, normalize, summarize, type TimeStudyData } from "./timeStudyModel";
 
 type Block =
   | { t: "h"; level: 1 | 2 | 3; text: string }
@@ -64,6 +65,7 @@ export function docBlocks(tpl: DocTemplate, title: string, data: DocData, lang: 
         if (s.component === "usability") blocks.push(...usabilityBlocks((v as UsabilityData) ?? { tasks: [], users: [], results: {} }, T));
         if (s.component === "heuristic") blocks.push(...heuristicBlocks(v as HeuristicData | undefined, T, lang));
         if (s.component === "blueprint") blocks.push(...blueprintBlocks((v as BlueprintData) ?? { stages: [] }, T));
+        if (s.component === "timestudy") blocks.push(...timeStudyBlocks(v as TimeStudyData | undefined, T));
         break;
     }
     if (!blocks.length) continue;
@@ -85,6 +87,42 @@ function journeyBlocks(d: JourneyData, T: TF): Block[] {
     if (acts.length) { out.push({ t: "p", text: T("Acciones y actividades") }); out.push({ t: "list", items: acts }); }
     if (pairs.length) out.push({ t: "kv", pairs });
   });
+  return out;
+}
+
+/** The time study as the spreadsheet had it: summary, time by activity and by tool, the log, then the lists. */
+function timeStudyBlocks(raw: TimeStudyData | undefined, T: TF): Block[] {
+  const d = normalize(raw), s = summarize(d);
+  if (!d.people.length && !d.rows.length) return [];
+  const key = d.keyLabel.trim() || T("herramientas clave");
+  const who = s.people.map((p, i) => p.person.name || `${T("Persona")} ${i + 1}`);
+  const n = (x: number) => x.toFixed(1), pc = (x: number) => `${Math.round(x * 100)}%`;
+  const out: Block[] = [{ t: "h", level: 2, text: T("Resumen") }, {
+    t: "table", head: [T("Métrica"), ...who],
+    rows: [
+      [T("Días observados"), ...s.people.map((p) => String(p.days))],
+      [T("Horas registradas"), ...s.people.map((p) => n(p.hours))],
+      [T("Promedio de horas registradas por día"), ...s.people.map((p) => n(p.perDay))],
+      [T("Horas con {a} como herramienta principal", { a: key }), ...s.people.map((p) => n(p.keyHours))],
+      [T("{a}, horas estimadas por semana", { a: key }), ...s.people.map((p) => n(p.keyPerWeek))],
+    ],
+  }];
+  const head = (first: string) => [first, ...who.flatMap((w) => [`${w} (${T("Horas")})`, `${w} (${T("% del registro")})`, `${w} (${T("Horas/semana (est.)")})`])];
+  const lines = (ls: ReturnType<typeof summarize>["byBucket"], none: string) => ls.map((l) => [l.id ? l.name : none, ...l.cells.flatMap((c) => [n(c.hours), pc(c.share), n(c.perWeek)])]);
+  out.push({ t: "h", level: 3, text: T("Tiempo por actividad") }, { t: "table", head: head(T("Actividad")), rows: lines(s.byBucket, T("Sin categoría")) });
+  out.push({ t: "h", level: 3, text: T("Tiempo por herramienta principal") }, { t: "table", head: head(T("Herramienta")), rows: lines(s.byTool, T("Sin herramienta")) });
+  const log = logTable(d);
+  if (log.length) out.push({ t: "h", level: 2, text: T("Registro de tiempo") }, {
+    t: "table", rows: log,
+    head: [T("Persona"), T("Fecha"), T("Hora de inicio"), T("Hora de fin"), T("Duración (min)"), T("Categoría de actividad"), T("Herramienta principal"), T("Otras herramientas"), T("Asunto / referencia"), T("Notas del observador")],
+  });
+  if (d.schedule.length) out.push({ t: "h", level: 2, text: T("Calendario") }, {
+    t: "table", head: [T("Día"), T("Persona"), T("Fecha"), T("Observador(a)"), T("Notas")],
+    rows: d.schedule.map((x, i) => [String(i + 1), d.people.find((p) => p.id === x.person)?.name ?? "", x.date, x.observer, x.notes]),
+  });
+  out.push({ t: "h", level: 2, text: T("Categorías y herramientas") },
+    { t: "table", head: [T("Categoría de actividad"), T("Qué cuenta")], rows: d.buckets.map((b) => [b.name, b.what]) },
+    { t: "table", head: [T("Herramienta"), T("Cuenta como {a}", { a: key })], rows: d.tools.map((t) => [t.name, t.key ? T("Sí") : T("No")]) });
   return out;
 }
 

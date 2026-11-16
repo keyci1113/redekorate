@@ -6,6 +6,8 @@ import { Affinity, type AffinityData } from "./Affinity";
 import { UsabilityMatrix, type UsabilityData } from "./UsabilityMatrix";
 import { Heuristic, type HeuristicData } from "./Heuristic";
 import { Blueprint, type BlueprintData } from "./Blueprint";
+import { TimeStudy, type TimeStudyData } from "./TimeStudy";
+import { normalize } from "./timeStudyModel";
 import type { Lang } from "../lib/i18n";
 import { cx } from "../components/ui";
 import { LogoMark, Wordmark } from "../components/Logo";
@@ -28,6 +30,7 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
     const inner = s.component === "journey" ? <Journey data={(data[s.id] as JourneyData) ?? { stages: [] }} set={set(s.id)} ex={e as JourneyData | undefined} />
       : s.component === "affinity" ? <Affinity data={(data[s.id] as AffinityData) ?? { participants: [], notes: [], groups: [] }} set={set(s.id)} ex={e as AffinityData | undefined} />
       : s.component === "usability" ? <UsabilityMatrix data={(data[s.id] as UsabilityData) ?? { tasks: [], users: [], results: {} }} set={set(s.id)} ex={e as UsabilityData | undefined} />
+      : s.component === "timestudy" ? <TimeStudy data={(data[s.id] as TimeStudyData) ?? normalize(undefined)} set={set(s.id)} ex={e as TimeStudyData | undefined} />
       : s.component === "blueprint" ? <Blueprint data={(data[s.id] as BlueprintData) ?? { stages: [] }} set={set(s.id)} ex={e as BlueprintData | undefined} />
       : <Heuristic data={(data[s.id] as HeuristicData) ?? { framework: "weinschenk", product: "", evaluators: [], answers: {} }} set={set(s.id)} ex={e as HeuristicData | undefined} />;
     return <div key={s.id} className="rounded-2xl border border-line bg-surface p-4 sm:p-5">{inner}</div>;
