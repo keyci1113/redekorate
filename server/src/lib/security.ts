@@ -54,6 +54,10 @@ export const resetLimiter = limiter(60, 5, "Demasiadas solicitudes de recuperaci
 export const publicLimiter = limiter(1, 120, "Demasiadas solicitudes. Espera un momento.");
 export const sessionCreateLimiter = limiter(60, Number(process.env.SESSIONS_PER_IP_HOUR ?? 300), "Límite de participaciones alcanzado desde esta red.");
 export const uploadLimiter = limiter(10, 200, "Demasiadas subidas. Espera un momento.");
+// Outside access (OAuth for MCP clients and the MCP endpoint itself).
+export const registerLimiter = limiter(60, 30, "Demasiadas solicitudes. Espera un momento.");
+export const oauthLimiter = limiter(1, 60, "Demasiadas solicitudes. Espera un momento.");
+export const mcpLimiter = limiter(1, 240, "Demasiadas solicitudes. Espera un momento.");
 
 /** Política de contraseñas: mínimo 10 caracteres, con letras y números. */
 export function passwordProblem(pw: string): string | null {

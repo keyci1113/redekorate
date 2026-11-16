@@ -23,6 +23,9 @@ import { translate } from "./lib/i18n.js";
 import { TRACKER, TRACKER_PATH } from "./lib/protoTracker.js";
 import { indexingEnabled, publicBaseUrl, renderIndexHtml, robotsDirective, robotsTxt, sitemapXml } from "./lib/seo.js";
 import { linkPreview } from "./lib/linkPreview.js";
+import { connectApi, oauthServer, openCors } from "./routes/apiAccess.js";
+import { mcpRouter } from "./mcp/server.js";
+import { mcpLimiter } from "./lib/security.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -32,6 +35,13 @@ app.use(securityHeaders);
 app.use(compression());
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+
+const port = Number(process.env.PORT ?? 4000);
+const baseUrl = (req: express.Request) => publicBaseUrl(process.env.APP_URL, req.protocol, req.get("host"));
+
+// Outside access: OAuth for MCP clients, and the MCP endpoint (bearer tokens only, never the session cookie).
+app.use(oauthServer(baseUrl));
+app.use("/mcp", openCors, mcpLimiter, mcpRouter({ apiBase: `http://127.0.0.1:${port}/api`, baseUrl }));
 
 // API
 app.use("/api", (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
@@ -48,6 +58,7 @@ app.use("/api/documents", documents);
 app.use("/api/uploads", uploads);
 app.use("/api/admin", admin);
 app.use("/api/orgs", orgs);
+app.use("/api/connect", connectApi(baseUrl));
 app.use("/api/public", publicLimiter, publicApi);
 app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no encontrada", req.get("x-lang")) }));
 
@@ -77,7 +88,6 @@ app.use("/uploads", express.static(UPLOAD_DIR, {
 }));
 
 // Search engines: robots.txt and the sitemap depend on APP_URL, so they are generated, not static files.
-const baseUrl = (req: express.Request) => publicBaseUrl(process.env.APP_URL, req.protocol, req.get("host"));
 app.get("/robots.txt", (req, res) => res.type("text/plain").set("Cache-Control", "public, max-age=3600").send(robotsTxt(baseUrl(req))));
 app.get("/sitemap.xml", (req, res) => res.type("application/xml").set("Cache-Control", "public, max-age=3600").send(sitemapXml(baseUrl(req))));
 
@@ -102,7 +112,6 @@ if (existsSync(webDist)) {
 
 app.use(errorHandler);
 
-const port = Number(process.env.PORT ?? 4000);
 migrate()
   .then(() => app.listen(port, () => console.log(`Redekorate en http://localhost:${port}`)))
   .catch((e) => { console.error("No se pudo migrar la base de datos", e); process.exit(1); });

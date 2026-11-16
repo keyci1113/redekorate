@@ -10,6 +10,7 @@ const ROUTES: [RegExp, string][] = [
   [/^\/forgot$/, "Recuperar contraseña"],
   [/^\/reset$/, "Nueva contraseña"],
   [/^\/invite$/, "Invitación"],
+  [/^\/authorize$/, "Permitir acceso"],
   [/^\/welcome$/, "Bienvenida"],
   [/^\/docs\/[^/]+$/, "Documento"],
   [/^\/projects$/, "Proyectos"],

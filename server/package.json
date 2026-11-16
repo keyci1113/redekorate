@@ -10,6 +10,7 @@
     "test": "node --import tsx --test \"src/**/*.test.ts\""
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.2",
     "cookie-parser": "^1.4.7",
