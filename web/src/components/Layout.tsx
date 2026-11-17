@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
 import { Building2, ChevronDown, CircleHelp, LogOut, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
@@ -7,7 +7,8 @@ import { useLoad } from "../lib/hooks";
 import type { Project } from "../lib/types";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
-import { cx } from "./ui";
+import { cx, Spinner } from "./ui";
+import { ErrorBoundary } from "./ErrorBoundary";
 import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
 
@@ -137,7 +138,12 @@ export function Layout() {
         </div>
       </header>
       <main className="min-w-0 flex-1 bg-paper-2">
-        <Outlet />
+        {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks. */}
+        <ErrorBoundary resetKey={pathname}>
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
+        </ErrorBoundary>
       </main>
     </div>
   );
