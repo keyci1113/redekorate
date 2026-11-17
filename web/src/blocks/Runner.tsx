@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { TimedTaskView } from "./TimedTaskRunner";
 import { parseTree } from "./types";
+import { imageSize, imageStyle } from "./image";
 import { SUS_ITEMS } from "./registry";
 import { cx } from "../components/ui";
 import { uid } from "../lib/hooks";
@@ -75,7 +76,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
     <div className="w-full">
       {big ? (
         <div className="text-center">
-          {block.image?.url && <img src={block.image.url} alt={block.image.alt ?? ""} className="mx-auto mb-8 max-h-56 rounded-xl object-contain" />}
+          {block.image?.url && <img src={block.image.url} alt={block.image.alt ?? ""} style={imageStyle(block.image)} className={cx("mx-auto mb-8 rounded-xl object-contain", imageSize(block.image) === null && "max-h-56")} />}
           <h1 className="display text-4xl leading-tight sm:text-5xl">{block.title}</h1>
           {block.description && <p className="mx-auto mt-4 max-w-md text-[15px] leading-relaxed whitespace-pre-line text-ink-2">{block.description}</p>}
         </div>
@@ -85,7 +86,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
             {block.title}{block.required && block.type !== "context" && block.type !== "five_second" && <span className="ml-1 text-accent">*</span>}
           </h2>
           {block.description && <p className="mt-2 text-[15px] leading-relaxed whitespace-pre-line text-ink-2">{block.description}</p>}
-          {block.image?.url && !ownImage && <img src={block.image.url} alt={block.image.alt ?? ""} className="mt-5 max-h-96 w-full rounded-xl border border-line bg-surface object-contain" />}
+          {block.image?.url && !ownImage && <img src={block.image.url} alt={block.image.alt ?? ""} style={imageStyle(block.image)} className={cx("mx-auto mt-5 block rounded-xl border border-line bg-surface object-contain", imageSize(block.image) === null && "max-h-96 w-full")} />}
         </div>
       )}
 

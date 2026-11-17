@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import type { Block, FirstClickBlock, TreeNode, TreeTestBlock } from "./types";
 import { parseTree } from "./types";
+import { IMAGE_SIZE, imageSize } from "./image";
 import { isStructural } from "./registry";
 import { Field, cx } from "../components/ui";
 import { ImageDrop, OptionsEditor, Segmented, Tip, Toggle } from "../components/editing";
@@ -28,8 +29,18 @@ export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: 
       {!["preference", "card_sort", "sus", "matrix", "prototype_task", "kano"].includes(block.type) && (
         <Field group label={visual ? t("Diseño a evaluar") : t("Imagen (opcional)")} hint={visual ? t("Sube una captura o export de tu diseño. Se mostrará a tamaño completo.") : undefined}>
           {block.type === "first_click" ? <FirstClickArea block={block} set={set} /> : (
-            <ImageDrop value={block.image?.url} onChange={(url) => set({ image: url ? { url } : null })} />
+            <ImageDrop value={block.image?.url} onChange={(url) => set({ image: url ? { ...block.image, url } : null })} />
           )}
+        </Field>
+      )}
+      {block.image?.url && !visual && !["preference", "card_sort", "sus", "matrix", "prototype_task", "kano"].includes(block.type) && (
+        <Field group label={t("Tamaño de la imagen")} hint={t("Ancho de la imagen dentro de la pantalla del participante.")}>
+          <div className="flex items-center gap-3">
+            <input type="range" className="flex-1 accent-[var(--color-accent)]" min={IMAGE_SIZE.min} max={IMAGE_SIZE.max} step={IMAGE_SIZE.step} aria-label={t("Tamaño de la imagen")}
+              value={imageSize(block.image) ?? IMAGE_SIZE.max} onChange={(e) => set({ image: { ...block.image!, size: Number(e.target.value) } })} />
+            <span className="w-16 text-right text-[13px] tabular-nums text-ink-2">{imageSize(block.image) === null ? t("Automático") : `${imageSize(block.image)} %`}</span>
+            {imageSize(block.image) !== null && <button type="button" className="focus-ring rounded-md px-2 py-1 text-[13px] text-ink-3 hover:text-ink" onClick={() => set({ image: { url: block.image!.url, alt: block.image!.alt } })}>{t("Restablecer")}</button>}
+          </div>
         </Field>
       )}
 

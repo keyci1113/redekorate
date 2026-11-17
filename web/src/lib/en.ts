@@ -2417,4 +2417,8 @@ export const EN: Record<string, string> = {
 "Una opción de una lista larga": "One answer from a long list",
 "Texto antes de elegir": "Text before choosing",
 "Elige una opción": "Choose an option",
+"Tamaño de la imagen": "Image size",
+"Ancho de la imagen dentro de la pantalla del participante.": "Width of the image on the participant's screen.",
+"Automático": "Automatic",
+"Restablecer": "Reset",
 };

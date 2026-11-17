@@ -2,7 +2,7 @@ import type { FlowStep } from "./prototype";
 // Un estudio es una secuencia de bloques. Cada bloque puede tener imagen y lógica condicional.
 
 export interface Option { id: string; label: string; image?: string }
-export interface ImageRef { url: string; alt?: string }
+export interface ImageRef { url: string; alt?: string; size?: number }   // size: width as a percent of the column; unset = automatic
 
 /** Regla de lógica: "si la respuesta <op> <value>, ir a <goTo>" */
 export type LogicOp = "is" | "is_not" | "lt" | "gt" | "eq" | "success" | "fail";
