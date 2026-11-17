@@ -2,7 +2,7 @@ import { t, tc } from "../lib/i18n";
 import type { ReactNode } from "react";
 import {
   DoorOpen, Info, MessageSquareText, ListChecks, SlidersHorizontal, Gauge, ClipboardCheck, PartyPopper,
-  ThumbsUp, ListOrdered, Grid3x3, LayoutGrid, Network, Images, Timer, MousePointerClick, Smartphone, Scale, Hourglass,
+  ThumbsUp, ListOrdered, SquareChevronDown, Grid3x3, LayoutGrid, Network, Images, Timer, MousePointerClick, Smartphone, Scale, Hourglass,
 } from "lucide-react";
 import type { Block, BlockType } from "./types";
 import { uid } from "../lib/hooks";
@@ -55,6 +55,9 @@ export const BLOCKS: BlockDef[] = [
   { type: "choice", get label() { return t("Opción múltiple"); }, group: "Preguntas", collectsAnswer: true, logic: ["choice"], icon: <ListChecks size={16} />,
     get description() { return t("Una o varias opciones"); },
     create: () => ({ id: uid(), type: "choice", title: tc("Selecciona una opción"), required: true, multiple: false, allowOther: false, randomize: false, options: opts(tc("Opción 1"), tc("Opción 2"), tc("Opción 3")) }) },
+  { type: "dropdown", get label() { return t("Lista desplegable"); }, group: "Preguntas", collectsAnswer: true, logic: ["choice"], icon: <SquareChevronDown size={16} />,
+    get description() { return t("Una opción de una lista larga"); },
+    create: () => ({ id: uid(), type: "dropdown", title: tc("Selecciona una opción"), required: true, allowOther: false, placeholder: "", options: opts(tc("Opción 1"), tc("Opción 2"), tc("Opción 3")) }) },
   { type: "yes_no", get label() { return t("Sí / No"); }, group: "Preguntas", collectsAnswer: true, logic: ["choice"], icon: <ThumbsUp size={16} />,
     get description() { return t("Pregunta binaria rápida"); },
     create: () => ({ id: uid(), type: "yes_no", title: tc("¿Pudiste completar la tarea?"), required: true, yesLabel: tc("Sí"), noLabel: tc("No") }) },

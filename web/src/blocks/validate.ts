@@ -22,7 +22,7 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
     const name = t("Bloque {a} ({b})", { a: i + 1, b: blockDef(b.type)?.label });
     if (!b.title.trim()) err(b, t("{a}: falta el título o la pregunta.", { a: name }));
     switch (b.type) {
-      case "choice":
+      case "choice": case "dropdown":
         if (b.options.length < 2) err(b, t("{a}: agrega al menos 2 opciones.", { a: name }));
         if (b.options.some((o) => !o.label.trim())) warn(b, t("{a}: hay opciones sin texto.", { a: name }));
         break;

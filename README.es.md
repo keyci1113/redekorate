@@ -22,7 +22,7 @@ Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de
 | Métricas | SUS (con escala Sauro-Lewis), NPS con lógica para detractores y promotores, CSAT/CES, SEQ, UMUX-Lite |
 | Organización | Repositorio de insights, reporte compartible |
 
-**Bloques** (se combinan libremente en un "Estudio en blanco"): Bienvenida, Instrucciones, Agradecimiento, Pregunta abierta, Opción múltiple, Sí/No, Escala (números, estrellas o emojis), Ranking, Matriz, NPS, SUS, Card Sorting, Tree Test, Preference, Five Second, First Click. Todos admiten una imagen opcional.
+**Bloques** (se combinan libremente en un "Estudio en blanco"): Bienvenida, Instrucciones, Agradecimiento, Pregunta abierta, Opción múltiple, Lista desplegable (una respuesta de una lista larga, con "Otro" opcional), Sí/No, Escala (números, estrellas o emojis), Ranking, Matriz, NPS, SUS, Card Sorting, Tree Test, Preference, Five Second, First Click. Todos admiten una imagen opcional.
 
 **Prototipos (Fase 3):**
 1. En Figma, selecciona tus frames y usa **Export → PNG 2x**.

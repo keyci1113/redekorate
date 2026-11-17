@@ -6,7 +6,7 @@ import { Tip } from "../components/editing";
 
 import { t } from "../lib/i18n";
 function choiceOptions(b: Block): { id: string; label: string }[] {
-  if (b.type === "choice") return [...b.options, ...(b.allowOther ? [{ id: "__other", label: t("Otro") }] : [])];
+  if (b.type === "choice" || b.type === "dropdown") return [...b.options, ...(b.allowOther ? [{ id: "__other", label: t("Otro") }] : [])];
   if (b.type === "yes_no") return [{ id: "yes", label: b.yesLabel }, { id: "no", label: b.noLabel }];
   if (b.type === "preference") return b.options.map((o, i) => ({ id: o.id, label: o.label || t("Diseño {a}", { a: i + 1 }) }));
   return [];

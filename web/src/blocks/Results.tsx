@@ -74,13 +74,13 @@ export function BlockResult({ block, answers, index, settings }: { block: Block;
 function Body({ block, answers, settings }: { block: Block; answers: Answer[]; settings?: StudySettings }) {
   const print = usePrint();
   switch (block.type) {
-    case "choice": {
+    case "choice": case "dropdown": {
       const { rows, others, n } = choiceCounts(block, answers.map((a) => a.value as ChoiceValue));
       const max = Math.max(1, ...rows.map((r) => r.count));
       return (
         <div className="space-y-3">
           {rows.map((r, i) => <Bar key={r.id} label={r.label} count={r.count} total={n} max={max} highlight={i === 0 && r.count > 0} />)}
-          {block.multiple && <p className="text-xs text-ink-3">{t("Selección múltiple: los porcentajes pueden sumar más de 100%.")}</p>}
+          {block.type === "choice" && block.multiple && <p className="text-xs text-ink-3">{t("Selección múltiple: los porcentajes pueden sumar más de 100%.")}</p>}
           {others.length > 0 && <TextList title={t("Respuestas en \"Otro\" ({a})", { a: others.length })} items={others} />}
         </div>
       );

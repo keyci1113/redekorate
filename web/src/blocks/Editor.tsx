@@ -52,6 +52,15 @@ export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: 
         </div>
       </>}
 
+      {block.type === "dropdown" && <>
+        <OptionsEditor label={t("Opciones")} items={block.options} onChange={(options) => set({ options })} bulk
+          marker={<span className="h-4 w-4 shrink-0 rounded-full border border-line-2" />} />
+        <div className="space-y-3 border-t border-line pt-3">
+          <Field label={t("Texto antes de elegir")}><input className="field" value={block.placeholder ?? ""} placeholder={t("Elige una opción")} onChange={(e) => set({ placeholder: e.target.value })} /></Field>
+          <Toggle label={t("Incluir opción \"Otro\"")} checked={block.allowOther} onChange={(v) => set({ allowOther: v })} />
+        </div>
+      </>}
+
       {block.type === "yes_no" && (
         <div className="grid grid-cols-2 gap-3">
           <Field label={t("Texto para Sí")}><input className="field" value={block.yesLabel} onChange={(e) => set({ yesLabel: e.target.value })} /></Field>
