@@ -95,7 +95,10 @@ app.get("/sitemap.xml", (req, res) => res.type("application/xml").set("Cache-Con
 const webDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../web/dist");
 if (existsSync(webDist)) {
   // Vite hashes everything under /assets, so those files can be cached forever.
+  // A file that is not there must be a real 404, never index.html: an old tab asking for a page file from the
+  // build before a deploy would otherwise get HTML, fail with a confusing MIME error and render a blank page.
   app.use("/assets", express.static(path.join(webDist, "assets"), { index: false, immutable: true, maxAge: "1y" }));
+  app.use("/assets", (_req, res) => res.status(404).set("Cache-Control", "no-store").type("text/plain").send("Not found"));
   // The raw template has placeholders and no robots tag; send it through the rendered route instead.
   app.get("/index.html", (_req, res) => res.redirect(301, "/"));
   app.use(express.static(webDist, { index: false, maxAge: "1h" }));

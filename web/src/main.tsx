@@ -6,15 +6,21 @@ import { App } from "./App";
 import { AuthProvider } from "./lib/auth";
 import { LangProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { listenForStaleChunks } from "./lib/staleChunk";
+
+listenForStaleChunks();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
       <LangProvider>
         <BrowserRouter>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
+          <ErrorBoundary variant="screen">
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ErrorBoundary>
         </BrowserRouter>
       </LangProvider>
     </ThemeProvider>

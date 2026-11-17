@@ -2447,4 +2447,11 @@ export const EN: Record<string, string> = {
 "Pide acceso de editor a quien es dueño/a del proyecto.": "Ask the project owner for editor access.",
 "No tienes acceso para agregar personas ni cambiar roles: eso solo lo hace quien es dueño/a del proyecto.": "You don't have access to add people or change roles: only the project owner can do that.",
 "No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.": "You don't have access to invite people or change their permissions: organization admins do that.",
+"Cargando la versión nueva…": "Loading the new version…",
+"Hay una versión nueva de redekorate": "There's a new version of redekorate",
+"Esta página no se pudo mostrar": "This page couldn't be shown",
+"Recarga para seguir donde estabas.": "Reload to pick up where you were.",
+"Algo falló al mostrarla. Recarga, o vuelve al inicio; si se repite, avísanos.": "Something went wrong showing it. Reload, or go back home; if it keeps happening, let us know.",
+"Recargar": "Reload",
+"Ir al inicio": "Go to home",
 };
