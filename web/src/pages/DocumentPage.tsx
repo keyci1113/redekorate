@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+// The canvas (React Flow) is only downloaded when a diagram or sitemap is opened.
+const DiagramPage = lazy(() => import("../architecture/DiagramPage").then((m) => ({ default: m.DiagramPage })));
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Check, Copy, Gauge, Link2, MessageSquare, Save, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
@@ -12,13 +14,18 @@ import { docTemplate } from "../docs/templates";
 import type { DocData, DocRecord, Entry } from "../docs/types";
 import { canEdit } from "../lib/roles";
 import { CommentsPanel } from "../components/CommentsPanel";
+import { SaveAsModal, ShareModal } from "../docs/DocModals";
+import { isDiagramKind } from "../architecture/model";
 
 export function DocumentPage() {
   const { id } = useParams();
   const { data, error, loading, setData } = useLoad(() => api.get<{ document: DocRecord; project: Project }>(`/documents/${id}`), [id]);
   if (loading) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
-  return <Editor key={data.document.id} doc={data.document} project={data.project} onDoc={(d) => setData({ ...data, document: d })} />;
+  const onDoc = (d: DocRecord) => setData({ ...data, document: d });
+  // Diagrams and sitemaps (the Architecture section) are documents too, drawn on a canvas instead of in template sections.
+  if (isDiagramKind(data.document.kind)) return <Suspense fallback={<Spinner />}><DiagramPage key={data.document.id} doc={data.document} project={data.project} onDoc={onDoc} /></Suspense>;
+  return <Editor key={data.document.id} doc={data.document} project={data.project} onDoc={onDoc} />;
 }
 
 function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onDoc: (d: DocRecord) => void }) {
@@ -105,61 +112,5 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
       </Modal>
       <SaveAsModal open={saveAsOpen} onClose={() => setSaveAsOpen(false)} docId={doc.id} title={title} projectId={project.id} onSaved={(id) => { setSaveAsOpen(false); nav(`/docs/${id}`); }} />
     </div>
-  );
-}
-
-function ShareModal({ open, onClose, doc, onDoc }: { open: boolean; onClose: () => void; doc: DocRecord; onDoc: (d: DocRecord) => void }) {
-  const [done, setDone] = useState(false);
-  const url = doc.share_token ? `${window.location.origin}/d/${doc.share_token}` : "";
-  return (
-    <Modal open={open} onClose={onClose} title={t("Compartir documento")}>
-      <p className="text-sm text-ink-2">{t("Cualquier persona con el link podrá ver el documento en modo lectura, sin cuenta. Puedes revocarlo cuando quieras.")}</p>
-      {doc.share_token ? (
-        <div className="mt-4 space-y-3">
-          <div className="flex gap-2">
-            <input readOnly className="field font-mono text-[13px]" value={url} onFocus={(e) => e.target.select()} />
-            <Button variant="primary" icon={done ? <Check size={15} /> : <Copy size={15} />} onClick={async () => { if (await copy(url)) { setDone(true); setTimeout(() => setDone(false), 1500); } }}>{done ? t("Copiado") : t("Copiar")}</Button>
-          </div>
-          <button className="text-sm font-medium text-bad" onClick={async () => { await api.del(`/documents/${doc.id}/share`); onDoc({ ...doc, share_token: null }); }}>{t("Revocar link")}</button>
-        </div>
-      ) : (
-        <Button variant="primary" className="mt-4" icon={<Link2 size={15} />} onClick={async () => { const { token } = await api.post<{ token: string }>(`/documents/${doc.id}/share`); onDoc({ ...doc, share_token: token }); }}>{t("Crear link de lectura")}</Button>
-      )}
-    </Modal>
-  );
-}
-
-/** "Guardar como…": guarda una copia con otro nombre en este u otro proyecto */
-function SaveAsModal({ open, onClose, docId, title, projectId, onSaved }: { open: boolean; onClose: () => void; docId: string; title: string; projectId: string; onSaved: (id: string) => void }) {
-  const projects = useLoad(() => (open ? api.get<{ projects: Project[] }>("/projects") : Promise.resolve({ projects: [] as Project[] })), [open]);
-  const [name, setName] = useState("");
-  const [target, setTarget] = useState(projectId);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { if (open) { setName(`${title} (${t("copia")})`); setTarget(projectId); setErr(null); } }, [open, title, projectId]);
-  async function save() {
-    setBusy(true); setErr(null);
-    try {
-      const { document } = await api.post<{ document: DocRecord }>(`/documents/${docId}/duplicate`, { project_id: target, title: name.trim() || title });
-      onSaved(document.id);
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
-  }
-  return (
-    <Modal open={open} onClose={onClose} title={t("Guardar como…")}>
-      <p className="text-sm text-ink-2">{t("Guarda una copia de este documento, con todo lo que llenaste, en este u otro proyecto. El original no cambia.")}</p>
-      <div className="mt-4 space-y-4">
-        <Field label={t("Nombre del documento")}><input autoFocus className="field" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && save()} /></Field>
-        <Field label={t("Proyecto")}>
-          <select className="field" value={target} onChange={(e) => setTarget(e.target.value)}>
-            {(projects.data?.projects ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}{p.id === projectId ? ` · ${t("actual")}` : ""}</option>)}
-          </select>
-        </Field>
-        {err && <ErrorNote>{err}</ErrorNote>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>{t("Cancelar")}</Button>
-          <Button variant="primary" icon={<Save size={15} />} disabled={busy || !target} onClick={save}>{t("Guardar copia")}</Button>
-        </div>
-      </div>
-    </Modal>
   );
 }

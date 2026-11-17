@@ -4,7 +4,7 @@
  * read, create and edit. The API client below has no DELETE, and participant details never leave this layer.
  */
 import { z } from "zod";
-import { BLOCK_REFERENCE, BLOCK_TYPES, METHODS } from "./reference.js";
+import { BLOCK_REFERENCE, BLOCK_TYPES, DIAGRAM_REFERENCE, DIAGRAM_SHAPES, METHODS } from "./reference.js";
 
 /** The REST API as the token's user. No delete on purpose. */
 export interface Api {
@@ -130,7 +130,7 @@ export const TOOLS: ToolDef[] = [
   }),
   tool({
     name: "get_document", title: "Get document", writes: false, input: { document_id: id("document") },
-    description: "A research document (personas, journey maps, plans, scripts…): its kind, language and content.",
+    description: "A research document (personas, journey maps, plans, scripts…) or an Architecture diagram or sitemap: its kind, language and content.",
     run: async ({ document_id }, { api }) => {
       const { document: d } = await api.get(`/documents/${document_id}`);
       return { id: d.id, project_id: d.project_id, kind: d.kind, title: d.title, language: d.language, data: d.data, updated_at: d.updated_at };
@@ -140,6 +140,11 @@ export const TOOLS: ToolDef[] = [
     name: "study_block_reference", title: "Study block reference", writes: false, input: {},
     description: "How study blocks are shaped. Read this before create_study or update_study.",
     run: async () => ({ methods: METHODS, reference: BLOCK_REFERENCE }),
+  }),
+  tool({
+    name: "diagram_reference", title: "Diagram reference", writes: false, input: {},
+    description: "How diagrams and sitemaps (the Architecture section) are shaped. Read this before creating or editing one.",
+    run: async () => ({ kinds: ["diagram", "sitemap"], shapes: DIAGRAM_SHAPES, reference: DIAGRAM_REFERENCE }),
   }),
 
   // ---------- write (never delete) ----------
@@ -226,7 +231,7 @@ export const TOOLS: ToolDef[] = [
   tool({
     name: "create_document", title: "Create document", writes: true,
     input: {
-      project_id: id("project"), kind: z.string().min(1).max(60).describe("Template kind, e.g. proto_persona, journey_map, interview_guide, research_plan; read a document of the same kind with get_document to copy its data shape"),
+      project_id: id("project"), kind: z.string().min(1).max(60).describe("Template kind, e.g. proto_persona, journey_map, interview_guide, research_plan; read a document of the same kind with get_document to copy its data shape. \"diagram\" and \"sitemap\" are the Architecture section: read diagram_reference first"),
       title: z.string().trim().min(1).max(200), language: Lang, data: z.record(z.string(), z.unknown()).optional(),
     },
     description: "Create a research document in a project.",

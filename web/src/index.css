@@ -258,3 +258,29 @@ article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb,
   .anim-view, .anim-expand { animation: rk-fade 150ms linear; }
   .press:active { transform: none; }
 }
+
+/* Architecture canvas (React Flow). Its own colors are mapped onto the app's tokens, so light and dark mode need nothing else. */
+.rk-diagram .react-flow {
+  --xy-background-color: var(--color-paper);
+  --xy-edge-stroke: var(--color-ink-2);
+  --xy-selection-background-color: color-mix(in oklab, var(--color-accent) 10%, transparent);
+  --xy-selection-border: 1px solid var(--color-accent);
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-paper-2);
+  --xy-controls-button-color: var(--color-ink-2);
+  --xy-controls-button-border-color: var(--color-line);
+  --xy-minimap-background-color: var(--color-surface);
+  --xy-minimap-mask-background-color: color-mix(in oklab, var(--color-paper-2) 70%, transparent);
+  --xy-handle-background-color: var(--color-surface);
+  --xy-handle-border-color: var(--color-accent);
+  --xy-resize-background-color: var(--color-accent);
+  font-family: var(--font-sans);
+}
+.rk-diagram .react-flow__controls, .rk-diagram .react-flow__minimap { border: 1px solid var(--color-line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow-lift); }
+.rk-diagram .react-flow__node-shape { background: transparent; border: 0; padding: 0; }
+.rk-diagram .react-flow__node-shape.selectable:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+/* Connection points: hidden until the pointer is on a shape, a shape is selected, or an arrow is being drawn. */
+.rk-diagram .rk-handle { width: 10px; height: 10px; border-width: 2px; opacity: 0; transition: opacity 120ms; }
+.rk-diagram .react-flow__node:hover .rk-handle, .rk-diagram .react-flow__node.selected .rk-handle, .rk-diagram.is-connecting .rk-handle { opacity: 1; }
+.rk-diagram.is-readonly .rk-handle { opacity: 0 !important; pointer-events: none; }
+.rk-diagram .rk-handle:hover { box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 25%, transparent); }
