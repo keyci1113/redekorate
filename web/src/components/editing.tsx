@@ -45,7 +45,7 @@ export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact,
           compact ? "h-20 px-2" : "h-32 px-4", over ? "border-accent bg-accent-soft" : "border-line-2 bg-paper/60 hover:border-accent hover:bg-accent-soft/50")}>
         {busy ? <Loader2 size={18} className="animate-spin text-accent" /> : <ImagePlus size={18} className="text-accent" />}
         <span className="text-[13px] font-medium text-ink-2">{busy ? t("Subiendo…") : label}</span>
-        {!compact && <span className="text-[11px] text-ink-3">{hint ?? t("Arrastra, pega o haz clic · PNG, JPG, WEBP · máx. 10 MB")}</span>}
+        {!compact && <span className="text-[11px] text-ink-3">{hint ?? t("Arrastra, pega o haz clic · PNG, JPG, GIF, WEBP · máx. 10 MB")}</span>}
       </button>
       {err && <p className="mt-1 text-xs text-bad">{err}</p>}
       <input ref={input} type="file" accept="image/png,image/jpeg,image/gif,image/webp" hidden onChange={(e) => send(e.target.files?.[0])} />

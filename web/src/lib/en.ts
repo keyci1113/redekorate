@@ -102,7 +102,7 @@ export const EN: Record<string, string> = {
 "Arrastra todos los archivos al botón": "Drag all the files onto the button",
 "Arrastra una tarjeta a un grupo, o tócala y luego toca el grupo.": "Drag a card to a group, or tap it and then tap the group.",
 "Arrastra varias a la vez · el nombre del archivo será el de la pantalla": "Drag several at once · the file name becomes the screen name",
-"Arrastra, pega o haz clic · PNG, JPG, WEBP · máx. 10 MB": "Drag, paste or click · PNG, JPG, WEBP · max. 10 MB",
+"Arrastra, pega o haz clic · PNG, JPG, GIF, WEBP · máx. 10 MB": "Drag, paste or click · PNG, JPG, GIF, WEBP · max. 10 MB",
 "Asigna roles: una persona modera y el resto toma notas": "Assign roles: one person moderates and the rest take notes",
 "Atractiva": "Attractive",
 "Atractivas": "Attractive",
