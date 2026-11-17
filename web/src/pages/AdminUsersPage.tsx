@@ -6,6 +6,7 @@ import { useAuth } from "../lib/auth";
 import type { AdminUser, Invite, Role } from "../lib/types";
 import { Button, Card, ErrorNote, Field, Spinner, Tag, cx } from "../components/ui";
 import { Avatar } from "../components/Avatar";
+import { MaintenanceCard } from "../components/MaintenanceCard";
 import { getLang, t } from "../lib/i18n";
 
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString(getLang() === "en" ? "en-US" : "es", { day: "numeric", month: "short", year: "numeric" }) : "—");
@@ -42,6 +43,7 @@ export function AdminUsersPage() {
       {error && <div className="mt-4"><ErrorNote>{error}</ErrorNote></div>}
 
       <div className="mt-8 space-y-4">
+        <MaintenanceCard />
         <Card className="p-6">
           <p className="flex items-center gap-2 font-semibold"><Mail size={16} /> {t("Invitar a alguien")}</p>
           <p className="mt-1 text-sm text-ink-3">{t("La invitación llega por correo, vale 7 días y permite crear la cuenta aunque el registro esté cerrado.")}</p>

@@ -62,6 +62,7 @@ const EN: Record<string, string> = {
   "Recurso no encontrado": "Resource not found",
   "Respuesta demasiado grande": "Response too large",
   "Ruta no encontrada": "Route not found",
+  "En mantenimiento. Vuelve en unos minutos.": "Down for maintenance. Back in a few minutes.",
   "Solicitud no permitida": "Request not allowed",
   "Ya existe una cuenta con ese correo": "An account with that email already exists",
   "Estudio no encontrado": "Study not found",

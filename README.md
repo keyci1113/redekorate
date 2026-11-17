@@ -159,6 +159,35 @@ research.yourdomain.com {
 
 After creating your account, set `ALLOW_REGISTRATION=false` and restart. Images and the database live in Docker volumes (`uploads`, `pgdata`); include them in your backups. Do not change `DB_PASSWORD` after the first deploy: PostgreSQL only reads it when the volume is created.
 
+### Maintenance screen
+
+The app handles maintenance by itself:
+
+- **During a deploy:** when the server restarts, any open tab shows *We're updating redekorate* and reloads by itself once the app answers again. A tab still running the old build also reloads when it opens a page whose files changed.
+- **While you work on the instance:** an admin turns on *Maintenance mode* under *Users*, with an optional message such as when it will be back. Until it is switched off, everyone who is not an admin gets the maintenance screen, including study participants and MCP. Admins keep working and see a banner. The switch is stored in the database (`app_settings`), so a deploy or restart doesn't turn it off.
+
+While the container restarts, the proxy has nothing to forward to, so a page opened in that moment gets the proxy's own error. To show a friendly page there too, copy `deploy/maintenance.html` to the host and serve it on 502, 503 and 504:
+
+```
+# Caddy
+research.yourdomain.com {
+  reverse_proxy localhost:4000
+  handle_errors 502 503 504 {
+    root * /srv/redekorate
+    rewrite * /maintenance.html
+    file_server
+  }
+}
+```
+
+```
+# Nginx, inside the server block
+error_page 502 503 504 /maintenance.html;
+location = /maintenance.html { root /srv/redekorate; internal; }
+```
+
+The page is self-contained and reloads every 15 seconds. API calls still get the proxy's 502, which the web app recognizes.
+
 ### Search engines and link previews
 
 Search engines may index the sign-in page only. Every other page answers with `noindex` (header and meta tag), so private links (`/s/…` studies, `/r/…` and `/pr/…` reports, `/d/…` docs, invites, password resets) never show up in search results. `/robots.txt` and `/sitemap.xml` are generated from `APP_URL`, which also makes the Open Graph and Twitter preview tags absolute. Set `SEO_INDEXING=off` to keep the whole install out of search engines.

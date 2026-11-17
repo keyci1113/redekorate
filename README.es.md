@@ -90,6 +90,15 @@ research.tudominio.com {
 }
 ```
 
+### Pantalla de mantenimiento
+
+La app se encarga sola del mantenimiento:
+
+- **Durante un deploy:** cuando el servidor se reinicia, cualquier pestaña abierta muestra *Estamos actualizando redekorate* y se recarga sola en cuanto la app vuelve a responder. Una pestaña que todavía corre la versión anterior también se recarga si abre una página cuyos archivos cambiaron.
+- **Mientras trabajas en la instancia:** una persona administradora activa el *Modo mantenimiento* en *Usuarios*, con un mensaje opcional (por ejemplo, cuándo vuelve). Hasta que se desactive, quien no es admin ve la pantalla de mantenimiento, incluidos participantes de estudios y MCP. Las personas administradoras siguen trabajando y ven un aviso arriba. El interruptor se guarda en la base de datos (`app_settings`), así que un deploy o un reinicio no lo apaga.
+
+Mientras el contenedor se reinicia, el proxy no tiene a quién reenviar, así que una página que se abre justo en ese momento recibe el error del proxy. Para mostrar ahí también una página amable, copia `deploy/maintenance.html` al servidor y sírvela en 502, 503 y 504 (los ejemplos para Caddy y Nginx están en el [README en inglés](README.md#maintenance-screen)). La página no depende de la app y se recarga cada 15 segundos.
+
 ### Buscadores y vistas previas de enlaces
 
 Los buscadores solo pueden indexar la página de inicio de sesión. Todas las demás páginas responden con `noindex` (encabezado y meta etiqueta), así que los links privados (estudios `/s/…`, reportes `/r/…` y `/pr/…`, documentos `/d/…`, invitaciones y cambios de contraseña) nunca aparecen en resultados de búsqueda. `/robots.txt` y `/sitemap.xml` se generan a partir de `APP_URL`, que también vuelve absolutas las etiquetas de vista previa de Open Graph y Twitter. Con `SEO_INDEXING=off` toda la instalación queda fuera de los buscadores.

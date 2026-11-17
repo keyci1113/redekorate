@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Served by the reverse proxy (Caddy or Nginx, see README) while the app container restarts during a deploy,
+     when the app itself can't answer. Self-contained: no requests to the app. Reloads itself every 15 seconds. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta http-equiv="refresh" content="15">
+<title>Updating · redekorate</title>
+<style>
+  :root { --bg: #FBFAF8; --ink: #1B1722; --ink-2: #5B5566; --accent: #5902A1; color-scheme: light dark; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #16131B; --ink: #F3F0F7; --ink-2: #ABA4B6; --accent: #BF7DF5; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  main { max-width: 440px; }
+  .mark { width: 44px; height: 44px; margin: 0 auto; border-radius: 12px; background: linear-gradient(135deg, #BF7DF5, #5902A1); }
+  h1 { margin: 24px 0 0; font-size: 24px; line-height: 1.25; }
+  p { margin: 12px 0 0; color: var(--ink-2); }
+  .es { margin-top: 28px; padding-top: 20px; border-top: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+  .es h1 { font-size: 18px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 6px; animation: pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+  small { display: block; margin-top: 24px; color: var(--ink-2); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="mark" aria-hidden="true"></div>
+  <h1>We're updating redekorate</h1>
+  <p>It takes about a minute. Everything already saved is safe, and this page reloads by itself.</p>
+  <div class="es" lang="es">
+    <h1>Estamos actualizando redekorate</h1>
+    <p>Tarda alrededor de un minuto. Lo que ya se guardó está a salvo, y esta página se recarga sola.</p>
+  </div>
+  <small><span class="dot" aria-hidden="true"></span>Checking again every 15 seconds · Revisando cada 15 segundos</small>
+</main>
+</body>
+</html>

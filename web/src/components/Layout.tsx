@@ -13,6 +13,7 @@ import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
 
 import { t } from "../lib/i18n";
+import { MaintenanceBanner } from "./MaintenanceScreen";
 
 /** Botón con panel desplegable: se cierra con Escape, al hacer clic afuera o al cambiar de página. */
 function Disclosure({ button, buttonClass, label, align = "left", children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; children: ReactNode }) {
@@ -138,6 +139,7 @@ export function Layout() {
         </div>
       </header>
       <main className="min-w-0 flex-1 bg-paper-2">
+        <MaintenanceBanner />
         {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks. */}
         <ErrorBoundary resetKey={pathname}>
           <Suspense fallback={<Spinner />}>
