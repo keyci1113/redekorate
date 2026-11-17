@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ASSIGNABLE_PROJECT_ROLES, assignableOrgRoles, atLeast, canComment, canEdit, canManageOrg, isOwner } from "./roles";
+import { ASSIGNABLE_PROJECT_ROLES, assignableOrgRoles, atLeast, canComment, canEdit, canManageOrg, editLimit, isOwner } from "./roles";
 
 describe("project roles", () => {
   it("ranks viewer < commenter < editor < owner", () => {
@@ -38,5 +38,16 @@ describe("organization roles", () => {
     expect(assignableOrgRoles("owner")).toEqual(["owner", "admin", "member"]);
     expect(assignableOrgRoles("admin")).toEqual(["admin", "member"]);
     expect(assignableOrgRoles("member")).toEqual(["admin", "member"]);
+  });
+});
+
+describe("edit limit", () => {
+  it("names what keeps someone from editing, so the page can tell them", () => {
+    expect(editLimit("owner")).toBe(null);
+    expect(editLimit("editor")).toBe(null);
+    expect(editLimit("commenter")).toBe("commenter");
+    expect(editLimit("viewer")).toBe("viewer");
+    expect(editLimit(null)).toBe("viewer");
+    expect(editLimit(undefined)).toBe("viewer");
   });
 });

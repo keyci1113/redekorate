@@ -12,6 +12,7 @@ import { SaveAsModal, ShareModal } from "../docs/DocModals";
 import type { DocData, DocRecord } from "../docs/types";
 import { DiagramCanvas } from "./DiagramCanvas";
 import { layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, type DiagramData } from "./model";
+import { AccessNotice } from "../components/AccessNotice";
 
 /** A diagram or sitemap document: the same header as other documents, with the canvas filling the rest of the screen. */
 export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: Project; onDoc: (d: DocRecord) => void }) {
@@ -69,6 +70,7 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
         </>}
       </header>
 
+      {readOnly && <AccessNotice role={project.role} className="mx-3 mt-2 shrink-0" />}
       <div className="min-h-0 flex-1">
         {doc.kind === "sitemap"
           ? <SitemapEditor outline={String(content.outline ?? "")} lang={doc.language} title={title} readOnly={readOnly} onChange={(outline) => setContent({ ...content, outline })} />

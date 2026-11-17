@@ -16,6 +16,7 @@ import { canEdit } from "../lib/roles";
 import { CommentsPanel } from "../components/CommentsPanel";
 import { SaveAsModal, ShareModal } from "../docs/DocModals";
 import { isDiagramKind } from "../architecture/model";
+import { AccessNotice } from "../components/AccessNotice";
 
 export function DocumentPage() {
   const { id } = useParams();
@@ -96,6 +97,7 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
         <div className="mb-4 flex justify-end print:hidden">
           <button onClick={() => setGuide(!guide)} className="text-xs font-medium text-accent">{guide ? t("Ocultar instrucciones") : t("Mostrar instrucciones")}</button>
         </div>
+        {readOnly && <AccessNotice role={project.role} className="mb-4 print:hidden" />}
         <DocumentView readOnly={readOnly} tpl={tpl} title={title} data={content} lang={lang} onChange={setContent} showGuide={guide} />
         <div className="mt-10 flex justify-between border-t border-line pt-4 print:hidden">
           <Button variant="ghost" icon={<Copy size={14} />} onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}>{t("Duplicar")}</Button>
