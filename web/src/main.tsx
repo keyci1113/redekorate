@@ -8,6 +8,7 @@ import { LangProvider } from "./lib/i18n";
 import { ThemeProvider } from "./lib/theme";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { listenForStaleChunks } from "./lib/staleChunk";
+import { MaintenanceScreen } from "./components/MaintenanceScreen";
 
 listenForStaleChunks();
 
@@ -19,6 +20,7 @@ createRoot(document.getElementById("root")!).render(
           <ErrorBoundary variant="screen">
             <AuthProvider>
               <App />
+              <MaintenanceScreen />
             </AuthProvider>
           </ErrorBoundary>
         </BrowserRouter>

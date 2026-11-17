@@ -26,6 +26,7 @@ import { linkPreview } from "./lib/linkPreview.js";
 import { connectApi, oauthServer, openCors } from "./routes/apiAccess.js";
 import { mcpRouter } from "./mcp/server.js";
 import { mcpLimiter } from "./lib/security.js";
+import { getMaintenance, maintenanceGate } from "./lib/maintenance.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -35,6 +36,8 @@ app.use(securityHeaders);
 app.use(compression());
 app.use(express.json({ limit: "2mb" }));
 app.use(cookieParser());
+// Maintenance mode: answers 503 to the API and MCP for everyone but admins while an admin has it on.
+app.use(maintenanceGate);
 
 const port = Number(process.env.PORT ?? 4000);
 const baseUrl = (req: express.Request) => publicBaseUrl(process.env.APP_URL, req.protocol, req.get("host"));
@@ -46,7 +49,11 @@ app.use("/mcp", openCors, mcpLimiter, mcpRouter({ apiBase: `http://127.0.0.1:${p
 // API
 app.use("/api", (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
 app.use("/api", csrfGuard);
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+// The web app's maintenance screen polls this until the app is back (after a deploy) or maintenance is off.
+app.get("/api/health", async (_req, res) => {
+  const m = await getMaintenance();
+  res.json({ ok: true, maintenance: m.on ? { message: m.message, since: m.since } : null });
+});
 app.use("/api/auth/oauth", oauth);
 app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);

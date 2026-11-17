@@ -1,4 +1,5 @@
 import { getLang, t } from "./i18n";
+import { downFromResponse, setDown } from "./maintenance";
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
@@ -7,13 +8,27 @@ export class ApiError extends Error {
 const BASE_HEADERS = () => ({ "x-requested-with": "redekorate", "x-lang": getLang() });
 
 async function handle<T>(res: Response): Promise<T> {
+  const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new ApiError(res.status, data.error ?? t("Error {a}", { a: res.status }));
+  if (!res.ok) {
+    const down = downFromResponse(res.status, data, isJson);
+    if (down) setDown(down);
+    throw new ApiError(res.status, data.error ?? t("Error {a}", { a: res.status }));
+  }
   return data as T;
 }
 
+/** fetch that reports an unreachable server (it is restarting during a deploy) instead of failing silently. */
+async function send(input: string, init: RequestInit): Promise<Response> {
+  try { return await fetch(input, init); } catch (e) {
+    // Offline or a cancelled request is not the server being down. MaintenanceScreen double-checks with /api/health.
+    if ((e as Error).name !== "AbortError" && (typeof navigator === "undefined" || navigator.onLine)) setDown({ kind: "deploy" });
+    throw e;
+  }
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(`/api${url}`, {
+  const res = await send(`/api${url}`, {
     method,
     credentials: "same-origin",
     headers: body !== undefined ? { ...BASE_HEADERS(), "content-type": "application/json" } : BASE_HEADERS(),
@@ -31,14 +46,14 @@ export const api = {
   async upload(file: File): Promise<string> {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/uploads", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
+    const res = await send("/api/uploads", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
     return (await handle<{ url: string }>(res)).url;
   },
   /** Prototipo HTML (p. ej. descargado de Claude): el servidor le agrega el script de seguimiento. */
   async uploadPrototype(file: File): Promise<string> {
     const fd = new FormData();
     fd.append("file", file);
-    const res = await fetch("/api/uploads/prototype", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
+    const res = await send("/api/uploads/prototype", { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
     return (await handle<{ url: string }>(res)).url;
   },
 };

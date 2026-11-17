@@ -5,6 +5,7 @@ import { one, query } from "../lib/db.js";
 import { requireAdmin, requireAuth, type Role } from "../lib/auth.js";
 import { HttpError, parse } from "../lib/http.js";
 import { sendMail } from "../lib/mail.js";
+import { getMaintenance, setMaintenance } from "../lib/maintenance.js";
 
 export const admin = Router();
 admin.use(requireAuth, requireAdmin);
@@ -12,6 +13,13 @@ admin.use(requireAuth, requireAdmin);
 const sha256 = (s: string) => crypto.createHash("sha256").update(s).digest("hex");
 const role = z.enum(["admin", "member"]);
 const USER_COLS = "id, email, name, role, avatar, created_at, last_login_at, disabled_at";
+
+/** Maintenance mode: everyone but admins sees the maintenance screen until it is switched off. */
+admin.get("/maintenance", async (_req, res) => res.json({ maintenance: await getMaintenance() }));
+admin.put("/maintenance", async (req, res) => {
+  const b = parse(z.object({ on: z.boolean(), message: z.string().trim().max(300).default("") }), req.body);
+  res.json({ maintenance: await setMaintenance(b.on, b.message, req.user!.id) });
+});
 
 admin.get("/users", async (_req, res) => {
   const users = await query(
