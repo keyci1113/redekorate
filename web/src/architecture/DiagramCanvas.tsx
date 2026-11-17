@@ -1,11 +1,14 @@
-import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type RefObject } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type RefObject } from "react";
 import {
   Background, BackgroundVariant, BaseEdge, ConnectionMode, Controls, EdgeLabelRenderer, Handle, MarkerType, MiniMap, NodeResizer, Panel, Position,
   ReactFlow, ReactFlowProvider, SelectionMode, applyEdgeChanges, applyNodeChanges, getBezierPath, getNodesBounds, getSmoothStepPath, getStraightPath,
   useReactFlow, type Connection, type Edge, type EdgeChange, type EdgeProps, type FinalConnectionState, type Node, type NodeChange, type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowLeftRight, ArrowRight, Copy, Download, Hand, Minus, MousePointer2, Redo2, Spline, Trash2, Type, Undo2 } from "lucide-react";
+import {
+  AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowLeftRight, ArrowRight, Bold, Copy,
+  Download, Hand, Italic, List, ListOrdered, Minus, MousePointer2, Redo2, Spline, Strikethrough, Trash2, Type, Underline, Undo2,
+} from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
 import { t } from "../lib/i18n";
 import { uid } from "../lib/hooks";
@@ -13,11 +16,12 @@ import { useTheme } from "../lib/theme";
 import { cx } from "../components/ui";
 import {
   COLORS, DEFAULT_COLOR, DEFAULT_SIZE, SHAPES, alignedLine, onOutline, type ArrowStyle, type ColorId, type DEdge, type DNode, type DiagramData, type LineStyle, type PathStyle,
-  type Shape, type Side, type TextSize,
+  TEXT_COLORS, type Shape, type Side, type TextAlign, type TextColor, type TextSize, type TextVAlign,
 } from "./model";
+import { domToRich, parseRich, toEditorHtml, type Seg } from "./richText";
 import { ShapeIcon, ShapeSvg, fillOf, strokeOf, textBox, textOf } from "./shapes";
 
-type ShapeData = { shape: Shape; text: string; color: ColorId; size?: TextSize };
+type ShapeData = { shape: Shape; text: string; color: ColorId; size?: TextSize; align?: TextAlign; valign?: TextVAlign; textColor?: TextColor };
 type FNode = Node<ShapeData, "shape">;
 type LineData = { label?: string; line: LineStyle; arrow: ArrowStyle; path: PathStyle };
 type FEdge = Edge<LineData, "line">;
@@ -37,7 +41,20 @@ const TOOL_GROUPS: { label: string; shapes: Shape[] }[] = [
   { label: "Arquitectura de información", shapes: ["page", "pages"] },
   { label: "Pizarra", shapes: ["note", "text", "frame"] },
 ];
-const SIZE_PX: Record<TextSize, number> = { s: 12, m: 14, l: 19 };
+const SIZE_PX: Record<TextSize, number> = { s: 12, m: 14, l: 19, xl: 26 };
+/** Fixed text colors, picked to read on the light pastel fills; "auto" follows the fill and the theme. */
+const TEXT_COLOR_CSS: Record<Exclude<TextColor, "auto">, string> = {
+  ink: "#16191F", gray: "#5B6270", red: "#C2262E", orange: "#C2410C", green: "#15803D", blue: "#1D4ED8", purple: "#7E22CE", white: "#FFFFFF",
+};
+const TEXT_COLOR_NAMES: Record<TextColor, string> = {
+  auto: "Automático", ink: "Negro", gray: "Gris", red: "Rojo", orange: "Naranja", green: "Verde", blue: "Azul", purple: "Morado", white: "Blanco",
+};
+const JUSTIFY: Record<TextVAlign, string> = { top: "flex-start", middle: "center", bottom: "flex-end" };
+/** Optional text settings, copied only when set so stored diagrams stay small. */
+const textOpts = (d: { size?: TextSize; align?: TextAlign; valign?: TextVAlign; textColor?: TextColor }) => ({
+  ...(d.size ? { size: d.size } : {}), ...(d.align ? { align: d.align } : {}), ...(d.valign ? { valign: d.valign } : {}),
+  ...(d.textColor && d.textColor !== "auto" ? { textColor: d.textColor } : {}),
+});
 
 // ---------- stored diagram <-> React Flow ----------
 
@@ -51,7 +68,7 @@ function toFlow(d: DiagramData): Snap {
   return {
     nodes: d.nodes.map((n) => ({
       id: n.id, type: "shape", position: { x: n.x, y: n.y }, width: n.w, height: n.h, zIndex: n.shape === "frame" ? -1 : 0,
-      data: { shape: n.shape, text: n.text, color: n.color, ...(n.size ? { size: n.size } : {}) },
+      data: { shape: n.shape, text: n.text, color: n.color, ...textOpts(n) },
     })),
     edges: d.edges.map((e) => withMarkers({
       id: e.id, type: "line", source: e.from, target: e.to, sourceHandle: e.fromSide ?? null, targetHandle: e.toSide ?? null,
@@ -65,7 +82,7 @@ function fromFlow(nodes: FNode[], edges: FEdge[]): DiagramData {
     nodes: nodes.map((n): DNode => ({
       id: n.id, shape: n.data.shape, x: Math.round(n.position.x), y: Math.round(n.position.y),
       w: Math.round(n.width ?? n.measured?.width ?? DEFAULT_SIZE[n.data.shape][0]), h: Math.round(n.height ?? n.measured?.height ?? DEFAULT_SIZE[n.data.shape][1]),
-      text: n.data.text, color: n.data.color, ...(n.data.size ? { size: n.data.size } : {}),
+      text: n.data.text, color: n.data.color, ...textOpts(n.data),
     })),
     edges: edges.map((e): DEdge => ({
       id: e.id, from: e.source, to: e.target,
@@ -89,17 +106,70 @@ interface Ctx {
   readOnly: boolean; editing: string | null; editingEdge: string | null;
   startEdit: (id: string) => void; endEdit: () => void; setText: (id: string, text: string) => void;
   setLabel: (id: string, label: string) => void; snapshot: () => void;
+  /** Makes a shape taller while its text is being written, so the text never hides behind a scrollbar. */
+  grow: (id: string, h: number) => void;
 }
 const DiagramCtx = createContext<Ctx>({
-  readOnly: true, editing: null, editingEdge: null, startEdit: () => {}, endEdit: () => {}, setText: () => {}, setLabel: () => {}, snapshot: () => {},
+  readOnly: true, editing: null, editingEdge: null, startEdit: () => {}, endEdit: () => {}, setText: () => {}, setLabel: () => {}, snapshot: () => {}, grow: () => {},
 });
 
-function EditText({ value, onChange, onDone, className, style }: { value: string; onChange: (v: string) => void; onDone: () => void; className?: string; style?: CSSProperties }) {
+/** Formatted text as React elements; nothing is injected as HTML. */
+function Segs({ segs }: { segs: Seg[] }) {
+  return <>{segs.map((g, i) => {
+    const deco = [g.u && "underline", g.s && "line-through"].filter(Boolean).join(" ");
+    return g.b || g.i || deco
+      ? <span key={i} style={{ fontWeight: g.b ? 700 : undefined, fontStyle: g.i ? "italic" : undefined, textDecoration: deco || undefined }}>{g.t}</span>
+      : <span key={i}>{g.t}</span>;
+  })}</>;
+}
+
+/** Formatted text as lines, bulleted lists and numbered lines. */
+function RichText({ text }: { text: string }) {
+  const lines = parseRich(text);
+  const out: ReactNode[] = [];
+  for (let i = 0; i < lines.length;) {
+    const l = lines[i];
+    // A numbered line shows the number exactly as written, so "1. Set up" in older diagrams looks as before.
+    if (l.kind === "p" || l.kind === "ol") {
+      const segs = l.kind === "ol" ? [{ ...l.segs[0], t: `${"\u2003".repeat(l.depth)}${l.n}. ` }, ...l.segs] : l.segs;
+      out.push(<div key={i}>{segs.length ? <Segs segs={segs} /> : "\u00a0"}</div>);
+      i++; continue;
+    }
+    const kind = l.kind, start = i, items: ReactNode[] = [];
+    for (; i < lines.length && lines[i].kind === kind; i++) items.push(<li key={i} style={{ marginInlineStart: lines[i].depth ? `${lines[i].depth * 1.1}em` : undefined }}><Segs segs={lines[i].segs} /></li>);
+    out.push(<ul key={start} className="list-inside list-disc">{items}</ul>);
+  }
+  return <div className="w-full">{out}</div>;
+}
+
+/** The in-shape editor: what you see is what is saved, as markup (see richText.ts). */
+function RichEditor({ value, onChange, onDone, onGrow }: { value: string; onChange: (v: string) => void; onDone: () => void; onGrow: (el: HTMLElement) => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current!;
+    el.innerHTML = toEditorHtml(value) || "<div><br></div>";
+    el.focus();
+    const r = document.createRange(); r.selectNodeContents(el);
+    const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r);
+    onGrow(el);
+    // Set once: React must not rewrite what the person is typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const cmd = (name: string) => { document.execCommand(name); };
   return (
-    <textarea autoFocus value={value} aria-label={t("Texto")} onChange={(e) => onChange(e.target.value)} onBlur={onDone}
-      onFocus={(e) => e.currentTarget.select()}
-      onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) e.currentTarget.blur(); }}
-      className={cx("nodrag nowheel nopan h-full w-full resize-none bg-transparent outline-none", className)} style={style} />
+    <div ref={ref} contentEditable suppressContentEditableWarning role="textbox" aria-multiline aria-label={t("Texto")} data-rk-editor
+      className="nodrag nowheel nopan w-full cursor-text outline-none [&_ol]:list-inside [&_ol]:list-decimal [&_ul]:list-inside [&_ul]:list-disc"
+      onInput={(e) => { onChange(domToRich(e.currentTarget)); onGrow(e.currentTarget); }}
+      onBlur={(e) => { if ((e.relatedTarget as HTMLElement | null)?.closest("[data-rk-texttools]")) return; onDone(); }}
+      onPaste={(e) => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+        if (e.key === "Escape" || (e.key === "Enter" && mod)) { e.preventDefault(); e.currentTarget.blur(); return; }
+        if (mod && e.shiftKey && k === "x") { e.preventDefault(); cmd("strikeThrough"); return; }
+        if (mod && e.shiftKey && (k === "8" || k === "*")) { e.preventDefault(); cmd("insertUnorderedList"); return; }
+        if (mod && e.shiftKey && (k === "7" || k === "&")) { e.preventDefault(); cmd("insertOrderedList"); return; }
+      }} />
   );
 }
 
@@ -109,19 +179,29 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
   const box = textBox(data.shape, w, h);
   const editing = ctx.editing === id;
   const frame = data.shape === "frame", note = data.shape === "note", text = data.shape === "text";
-  const align = note || text || frame ? "items-start justify-start text-left" : "items-center justify-center text-center";
-  const style = { fontSize: SIZE_PX[data.size ?? (frame ? "s" : "m")], color: frame || text ? "var(--color-ink)" : textOf(data.color), lineHeight: 1.3 };
+  const left = note || text || frame;
+  const align = data.align ?? (left ? "left" : "center"), valign = data.valign ?? (left ? "top" : "middle");
+  const color = data.textColor && data.textColor !== "auto" ? TEXT_COLOR_CSS[data.textColor] : frame || text ? "var(--color-ink)" : textOf(data.color);
+  const style: CSSProperties = { fontSize: SIZE_PX[data.size ?? (frame ? "s" : "m")], color, lineHeight: 1.3, textAlign: align, justifyContent: JUSTIFY[valign] };
+  // While typing, the shape gets taller until the text fits (never shorter, never wider).
+  const grow = (el: HTMLElement) => {
+    if (frame) return;
+    const need = el.scrollHeight;
+    let H = h;
+    for (let k = 0; k < 60; k++) { const b = textBox(data.shape, w, H); if (H - b.top - b.bottom >= need) break; H += 8; }
+    if (H > h) ctx.grow(id, H);
+  };
   return (
     <div className="relative h-full w-full" onDoubleClick={(e) => { if (!ctx.readOnly) { e.stopPropagation(); ctx.startEdit(id); } }}>
       {!ctx.readOnly && <NodeResizer isVisible={selected} minWidth={30} minHeight={24} color="var(--color-accent)" onResizeStart={ctx.snapshot}
         handleClassName="!h-2.5 !w-2.5 !rounded-sm !border-2 !border-[var(--color-accent)] !bg-[var(--color-surface)]" />}
       <ShapeSvg shape={data.shape} w={w} h={h} color={data.color} selected={selected && !ctx.readOnly && text} />
       {text && selected && !ctx.readOnly && <span className="pointer-events-none absolute inset-0 rounded border border-dashed border-[var(--color-accent)]" />}
-      <div className={cx("absolute flex overflow-hidden break-words whitespace-pre-wrap", align, frame && "font-semibold")}
+      <div className={cx("absolute flex flex-col break-words whitespace-pre-wrap", editing ? "overflow-visible" : "overflow-hidden", frame && "font-semibold")}
         style={{ top: box.top, right: box.right, bottom: box.bottom, left: box.left, ...style }}>
         {editing
-          ? <EditText value={data.text} onChange={(v) => ctx.setText(id, v)} onDone={ctx.endEdit} className={cx(!(note || text || frame) && "text-center")} style={{ ...style, ...(note || text || frame ? {} : { paddingTop: Math.max(0, (h - box.top - box.bottom) / 2 - 10) }) }} />
-          : data.text ? <span className="max-h-full">{data.text}</span>
+          ? <RichEditor value={data.text} onChange={(v) => ctx.setText(id, v)} onDone={ctx.endEdit} onGrow={grow} />
+          : data.text ? <RichText text={data.text} />
           : !ctx.readOnly && (note || text) ? <span className="opacity-40">{t("Escribe algo")}</span> : null}
       </div>
       {(["top", "right", "bottom", "left"] as const).map((side) => (
@@ -238,10 +318,11 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
   // ----- editing -----
   const setText = useCallback((id: string, text: string) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, data: { ...n.data, text } } : n))), []);
   const setLabel = useCallback((id: string, label: string) => setEdges((es) => es.map((e) => (e.id === id ? { ...e, data: { ...e.data!, label } } : e))), []);
+  const grow = useCallback((id: string, h: number) => setNodes((ns) => ns.map((n) => (n.id === id ? { ...n, height: h } : n))), []);
   const ctx = useMemo<Ctx>(() => ({
     readOnly, editing: editing && !editing.startsWith("edge:") ? editing : null, editingEdge: editing?.startsWith("edge:") ? editing.slice(5) : null,
-    startEdit: (id) => { snapshot(); setEditing(id); }, endEdit: () => setEditing(null), setText, setLabel, snapshot,
-  }), [readOnly, editing, snapshot, setText, setLabel]);
+    startEdit: (id) => { snapshot(); setEditing(id); }, endEdit: () => setEditing(null), setText, setLabel, snapshot, grow,
+  }), [readOnly, editing, snapshot, setText, setLabel, grow]);
 
   const onNodesChange = useCallback((c: NodeChange<FNode>[]) => setNodes((ns) => applyNodeChanges(c, ns)), []);
   const onEdgesChange = useCallback((c: EdgeChange<FEdge>[]) => setEdges((es) => applyEdgeChanges(c, es)), []);
@@ -459,6 +540,12 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
             <ExportButton disabled={empty} onExport={exportAs} />
             {actions}
           </Panel>
+          {!readOnly && ctx.editing && nodes.some((n) => n.id === ctx.editing) && (
+            <Panel position="top-center" className="!mt-3">
+              <TextTools data={nodes.find((n) => n.id === ctx.editing)!.data}
+                patch={(p) => setNodes((ns) => ns.map((n) => (n.id === ctx.editing ? { ...n, data: { ...n.data, ...p } } : n)))} />
+            </Panel>
+          )}
           {!readOnly && (selNodes.length > 0 || selEdges.length > 0) && !editing && (
             <Panel position="top-center" className="!mt-3">
               <Inspector nodes={selNodes} edges={selEdges} patchNodes={patchNodes} patchEdges={patchEdges} remove={removeSelected}
@@ -549,7 +636,7 @@ function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, la
   nodes: FNode[]; edges: FEdge[]; patchNodes: (f: (d: ShapeData) => Partial<ShapeData>) => void; patchEdges: (p: Partial<LineData>) => void;
   remove: () => void; duplicate: () => void; label: () => void;
 }) {
-  const shapeNow = same(nodes.map((n) => n.data.shape)), colorNow = same(nodes.map((n) => n.data.color)), sizeNow = same(nodes.map((n) => n.data.size ?? "m"));
+  const shapeNow = same(nodes.map((n) => n.data.shape)), colorNow = same(nodes.map((n) => n.data.color));
   const sep = <span className="mx-0.5 h-6 w-px bg-line" />;
   return (
     <div className="flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface p-1.5 shadow-[var(--shadow-lift)]">
@@ -567,9 +654,7 @@ function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, la
           {!shapeNow && <option value="">{t("Varias")}</option>}
           {SHAPES.map((s) => <option key={s} value={s}>{t(SHAPE_NAMES[s])}</option>)}
         </select>
-        <Seg label={t("Tamaño del texto")} value={sizeNow} onChange={(size) => patchNodes(() => ({ size }))} options={[
-          { id: "s", label: t("Texto chico"), icon: <Type size={11} /> }, { id: "m", label: t("Texto mediano"), icon: <Type size={14} /> }, { id: "l", label: t("Texto grande"), icon: <Type size={17} /> },
-        ]} />
+        <TextSettings datas={nodes.map((n) => n.data)} patch={(p) => patchNodes(() => p)} />
         {sep}
         <IconBtn label={t("Duplicar")} keys="⌘D" onClick={duplicate}><Copy size={15} /></IconBtn>
       </>}
@@ -592,6 +677,85 @@ function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, la
       </>}
       {sep}
       <IconBtn label={t("Eliminar")} keys="⌫" onClick={remove}><Trash2 size={15} /></IconBtn>
+    </div>
+  );
+}
+
+const LEFT_SHAPES = new Set<Shape>(["note", "text", "frame"]);
+
+/** Size, alignment and color of the text as a whole: in the inspector, and in the bar shown while typing. */
+function TextSettings({ datas, patch, keepFocus }: { datas: ShapeData[]; patch: (p: Partial<ShapeData>) => void; keepFocus?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const def = (d: ShapeData) => LEFT_SHAPES.has(d.shape);
+  const size = same(datas.map((d) => d.size ?? (d.shape === "frame" ? "s" : "m")));
+  const align = same(datas.map((d) => d.align ?? (def(d) ? "left" : "center")));
+  const valign = same(datas.map((d) => d.valign ?? (def(d) ? "top" : "middle")));
+  const color = same(datas.map((d) => d.textColor ?? "auto"));
+  const hold = keepFocus ? (e: { preventDefault: () => void }) => e.preventDefault() : undefined;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" onMouseDown={hold}>
+      <Seg label={t("Tamaño del texto")} value={size} onChange={(s) => patch({ size: s })} options={[
+        { id: "s", label: t("Texto chico"), icon: <Type size={11} /> }, { id: "m", label: t("Texto mediano"), icon: <Type size={14} /> },
+        { id: "l", label: t("Texto grande"), icon: <Type size={17} /> }, { id: "xl", label: t("Texto muy grande"), icon: <Type size={20} /> },
+      ]} />
+      <Seg label={t("Alineación")} value={align} onChange={(a) => patch({ align: a })} options={[
+        { id: "left", label: t("Alinear a la izquierda"), icon: <AlignLeft size={15} /> }, { id: "center", label: t("Centrar"), icon: <AlignCenter size={15} /> },
+        { id: "right", label: t("Alinear a la derecha"), icon: <AlignRight size={15} /> },
+      ]} />
+      <Seg label={t("Posición vertical")} value={valign} onChange={(v) => patch({ valign: v })} options={[
+        { id: "top", label: t("Arriba"), icon: <AlignVerticalJustifyStart size={15} /> }, { id: "middle", label: t("En medio"), icon: <AlignVerticalJustifyCenter size={15} /> },
+        { id: "bottom", label: t("Abajo"), icon: <AlignVerticalJustifyEnd size={15} /> },
+      ]} />
+      <div className="relative">
+        <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} title={t("Color del texto")} aria-label={t("Color del texto")}
+          className="focus-ring flex h-7 w-8 flex-col items-center justify-center rounded-md text-ink-2 hover:bg-ink/5">
+          <span className="text-[13px] font-bold leading-none">A</span>
+          <span className="mt-0.5 h-1 w-4 rounded-full border border-line-2" style={{ background: color && color !== "auto" ? TEXT_COLOR_CSS[color] : "linear-gradient(90deg,#16191F 50%,#fff 50%)" }} />
+        </button>
+        {open && (
+          <div className="absolute left-1/2 z-20 mt-1 grid w-max -translate-x-1/2 grid-cols-5 gap-1 rounded-lg border border-line bg-surface p-1.5 shadow-[var(--shadow-lift)]" role="group" aria-label={t("Color del texto")}>
+            {TEXT_COLORS.map((c) => (
+              <button key={c} type="button" title={t(TEXT_COLOR_NAMES[c])} aria-label={t(TEXT_COLOR_NAMES[c])} aria-pressed={color === c}
+                onClick={() => { patch({ textColor: c === "auto" ? undefined : c }); setOpen(false); }}
+                className={cx("flex h-6 w-6 items-center justify-center rounded-full border border-line-2 text-[10px] font-bold", color === c && "ring-2 ring-accent ring-offset-1 ring-offset-surface")}
+                style={{ background: c === "auto" ? "linear-gradient(135deg,#16191F 50%,#fff 50%)" : TEXT_COLOR_CSS[c] }} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Shown while a shape's text is being written: marks on the selected words, then the settings for the whole text. */
+function TextTools({ data, patch }: { data: ShapeData; patch: (p: Partial<ShapeData>) => void }) {
+  const [state, setState] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    const read = () => {
+      const q = (c: string) => { try { return document.queryCommandState(c); } catch { return false; } };
+      setState({ bold: q("bold"), italic: q("italic"), underline: q("underline"), strikeThrough: q("strikeThrough"), insertUnorderedList: q("insertUnorderedList"), insertOrderedList: q("insertOrderedList") });
+    };
+    read();
+    document.addEventListener("selectionchange", read);
+    return () => document.removeEventListener("selectionchange", read);
+  }, []);
+  const mark = (name: string, label: string, keys: string, icon: ReactNode) => (
+    <button key={name} type="button" title={`${label} (${keys})`} aria-label={label} aria-pressed={!!state[name]}
+      onMouseDown={(e) => e.preventDefault()} onClick={() => { document.execCommand(name); }}
+      className={cx("focus-ring flex h-7 min-w-7 items-center justify-center rounded-md px-1 text-ink-2 hover:bg-ink/5 hover:text-ink", state[name] && "bg-accent-soft text-accent")}>{icon}</button>
+  );
+  return (
+    <div data-rk-texttools className="flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-1 rounded-xl border border-line bg-surface p-1.5 shadow-[var(--shadow-lift)]" role="toolbar" aria-label={t("Formato del texto")}
+      onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("input,select")) e.preventDefault(); }}>
+      {mark("bold", t("Negrita"), "⌘B", <Bold size={15} />)}
+      {mark("italic", t("Cursiva"), "⌘I", <Italic size={15} />)}
+      {mark("underline", t("Subrayado"), "⌘U", <Underline size={15} />)}
+      {mark("strikeThrough", t("Tachado"), "⇧⌘X", <Strikethrough size={15} />)}
+      <span className="mx-0.5 h-6 w-px bg-line" />
+      {mark("insertUnorderedList", t("Lista con viñetas"), "⇧⌘8", <List size={15} />)}
+      {mark("insertOrderedList", t("Lista numerada"), "⇧⌘7", <ListOrdered size={15} />)}
+      <span className="mx-0.5 h-6 w-px bg-line" />
+      <TextSettings datas={[data]} patch={patch} keepFocus />
     </div>
   );
 }

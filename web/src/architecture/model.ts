@@ -18,15 +18,25 @@ export type Shape = (typeof SHAPES)[number];
 
 export const COLORS = ["none", "gray", "yellow", "orange", "pink", "purple", "blue", "green"] as const;
 export type ColorId = (typeof COLORS)[number];
-export const TEXT_SIZES = ["s", "m", "l"] as const;
+export const TEXT_SIZES = ["s", "m", "l", "xl"] as const;
 export type TextSize = (typeof TEXT_SIZES)[number];
+export const TEXT_ALIGNS = ["left", "center", "right"] as const;
+export type TextAlign = (typeof TEXT_ALIGNS)[number];
+export const TEXT_VALIGNS = ["top", "middle", "bottom"] as const;
+export type TextVAlign = (typeof TEXT_VALIGNS)[number];
+/** Text colors on top of the shape's fill. "auto" (or none) follows the fill, readable in light and dark mode. */
+export const TEXT_COLORS = ["auto", "ink", "gray", "red", "orange", "green", "blue", "purple", "white"] as const;
+export type TextColor = (typeof TEXT_COLORS)[number];
 
 export type Side = "top" | "right" | "bottom" | "left";
 export type LineStyle = "solid" | "dashed";
 export type ArrowStyle = "end" | "both" | "none";
 export type PathStyle = "elbow" | "curved" | "straight";
 
-export interface DNode { id: string; shape: Shape; x: number; y: number; w: number; h: number; text: string; color: ColorId; size?: TextSize }
+export interface DNode { id: string; shape: Shape; x: number; y: number; w: number; h: number; text: string; color: ColorId; size?: TextSize;
+  /** Formatting of the text as a whole; bold, italic, lists and the like live in the text itself (see richText.ts). */
+  align?: TextAlign; valign?: TextVAlign; textColor?: TextColor;
+}
 export interface DEdge {
   id: string; from: string; to: string; fromSide?: Side; toSide?: Side;
   label?: string; line?: LineStyle; arrow?: ArrowStyle; path?: PathStyle;
@@ -64,6 +74,9 @@ export function normalizeDiagram(raw: unknown): DiagramData {
       text: str(o.text), color: pick(o.color, COLORS, DEFAULT_COLOR[shape] ?? "none"),
     };
     if (o.size !== undefined) node.size = pick(o.size, TEXT_SIZES, "m");
+    if (TEXT_ALIGNS.includes(o.align as TextAlign)) node.align = o.align as TextAlign;
+    if (TEXT_VALIGNS.includes(o.valign as TextVAlign)) node.valign = o.valign as TextVAlign;
+    if (TEXT_COLORS.includes(o.textColor as TextColor) && o.textColor !== "auto") node.textColor = o.textColor as TextColor;
     nodes.push(node);
   }
   const edges: DEdge[] = [];
