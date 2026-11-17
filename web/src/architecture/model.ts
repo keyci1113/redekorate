@@ -243,3 +243,28 @@ export function sitemapToDiagram(outline: string, lang: Lang): DiagramData {
   const d = layoutSitemap(parseOutline(outline), lang);
   return { nodes: d.nodes.map((x) => ({ ...x, id: `s-${x.id}` })), edges: d.edges.map((x) => ({ ...x, id: `s-${x.id}`, from: `s-${x.from}`, to: `s-${x.to}` })) };
 }
+
+/** Half the size of a connection dot. React Flow starts and ends lines on the outer edge of the dot, which leaves a gap. */
+export const HANDLE_HALF = 5;
+/** Two shapes this close to lined up get one straight line instead of a tiny zig-zag. */
+export const ALIGN_SNAP = 16;
+
+type End = { x: number; y: number; side: Side };
+
+/** Move a line end from the outer edge of its dot back onto the shape's outline. */
+export function onOutline({ x, y, side }: End): End {
+  const d = HANDLE_HALF;
+  return side === "top" ? { x, y: y + d, side } : side === "bottom" ? { x, y: y - d, side } : side === "left" ? { x: x + d, y, side } : { x: x - d, y, side };
+}
+
+/**
+ * A straight line when two facing sides are almost lined up (bottom to top, right to left, and so on),
+ * drawn on the target's axis so the arrowhead lands square on it. Null when an elbow or curve is needed.
+ */
+export function alignedLine(s: End, t: End): { x1: number; y1: number; x2: number; y2: number } | null {
+  const vertical = (s.side === "bottom" && t.side === "top" && t.y > s.y) || (s.side === "top" && t.side === "bottom" && t.y < s.y);
+  const horizontal = (s.side === "right" && t.side === "left" && t.x > s.x) || (s.side === "left" && t.side === "right" && t.x < s.x);
+  if (vertical && Math.abs(t.x - s.x) <= ALIGN_SNAP) return { x1: t.x, y1: s.y, x2: t.x, y2: t.y };
+  if (horizontal && Math.abs(t.y - s.y) <= ALIGN_SNAP) return { x1: s.x, y1: t.y, x2: t.x, y2: t.y };
+  return null;
+}
