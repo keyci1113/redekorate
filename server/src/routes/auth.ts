@@ -7,6 +7,7 @@ import { clearSession, readUser, requireAuth, signSession, type AuthUser, type R
 import { HttpError, parse } from "../lib/http.js";
 import { authLimiter, passwordProblem, resetLimiter } from "../lib/security.js";
 import { sendMail } from "../lib/mail.js";
+import { AVATAR_RE } from "../lib/avatar.js";
 
 export const auth = Router();
 
@@ -106,7 +107,7 @@ auth.get("/me", async (req, res) => {
 // ── Cuenta ──────────────────────────────────────────────────────
 auth.patch("/me", requireAuth, async (req, res) => {
   // Nombre y/o foto. La foto debe ser un archivo subido a esta instancia (/uploads/…), nunca una URL externa.
-  const b = parse(z.object({ name: z.string().trim().min(1).max(120).optional(), avatar: z.string().regex(/^\/uploads\/[a-z0-9]+\.(png|jpg|gif|webp)$/).nullable().optional() }), req.body);
+  const b = parse(z.object({ name: z.string().trim().min(1).max(120).optional(), avatar: z.string().regex(AVATAR_RE).nullable().optional() }), req.body);
   const user = await one(
     "update users set name = coalesce($2, name), avatar = case when $3::boolean then $4 else avatar end where id = $1 returning id, email, name, role, avatar, onboarded_at",
     [req.user!.id, b.name ?? null, b.avatar !== undefined, b.avatar ?? null]);
