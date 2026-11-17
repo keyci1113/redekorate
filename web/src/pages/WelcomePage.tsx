@@ -9,8 +9,8 @@ import type { Organization, Project, Study, User } from "../lib/types";
 import { TEMPLATES, templateByKey } from "../templates/catalog";
 import { CATEGORY_ICON } from "../templates/icons";
 import { Button, ErrorNote, Field, Spinner, cx } from "../components/ui";
-import { ImageDrop, Segmented } from "../components/editing";
-import { Avatar } from "../components/Avatar";
+import { Segmented } from "../components/editing";
+import { AvatarField } from "../components/AvatarField";
 import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
 import { PROJECT_COLORS } from "../components/ProjectForm";
@@ -100,11 +100,8 @@ function ProfileStep({ user, onUser, busy, onNext }: { user: User; onUser: (u: U
       <h1 className="display text-4xl sm:text-5xl">{t("Hola, {a}", { a: user.name.split(" ")[0] })}</h1>
       <p className="mt-3 text-base text-ink-2">{t("Empecemos por cómo te verán las personas con las que colabores.")}</p>
       <div className="mt-8 space-y-5">
-        <Field group label={t("Foto de perfil")} hint={t("Opcional. Cuadrada funciona mejor.")}>
-          <div className="flex items-center gap-4">
-            <Avatar name={name || user.name} avatar={user.avatar} size={64} />
-            <div className="w-40"><ImageDrop compact cover value={user.avatar} label={t("Subir foto")} onChange={async (url) => { const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); onUser(u); }} /></div>
-          </div>
+        <Field group label={t("Foto de perfil")} hint={t("Opcional. Después de subirla puedes moverla y acercarla.")}>
+          <AvatarField name={name || user.name} avatar={user.avatar} onSave={async (url) => { const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); onUser(u); }} />
         </Field>
         <Field label={t("Nombre")}><input className="field h-12 text-base" required value={name} autoComplete="name" onChange={(e) => setName(e.target.value)} /></Field>
         <Field group label={t("Idioma de la interfaz")} hint={t("Cada estudio y documento tiene su propio idioma, independiente de este.")}>

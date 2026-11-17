@@ -7,8 +7,7 @@ import { timeAgo, useLoad } from "../lib/hooks";
 import type { Identity, User } from "../lib/types";
 import { Button, Card, ErrorNote, Field } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
-import { ImageDrop } from "../components/editing";
-import { Avatar } from "../components/Avatar";
+import { AvatarField } from "../components/AvatarField";
 import { OutsideAccess } from "../components/OutsideAccess";
 import { ProviderIcon, SsoButtons, ssoErrorMessage, type SsoProviderInfo } from "../components/SsoButtons";
 
@@ -59,15 +58,10 @@ export function AccountPage() {
           <form className="space-y-4" onSubmit={profile.run(async () => {
             const { user: u } = await api.patch<{ user: User }>("/auth/me", { name }); setUser(u); return t("Perfil actualizado");
           })}>
-            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Usuarios y en los colaboradores de cada proyecto. Cuadrada funciona mejor.")}>
-              <div className="flex items-center gap-4">
-                <Avatar name={user?.name ?? ""} avatar={user?.avatar} size={64} />
-                <div className="w-40">
-                  <ImageDrop compact cover value={user?.avatar} label={t("Subir foto")} onChange={async (url) => {
-                    const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); setUser(u);
-                  }} />
-                </div>
-              </div>
+            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Usuarios y en los colaboradores de cada proyecto. Arrástrala y acércala para encuadrarla en el círculo.")}>
+              <AvatarField name={user?.name ?? ""} avatar={user?.avatar} onSave={async (url) => {
+                const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); setUser(u);
+              }} />
             </Field>
             <Field label={t("Nombre")}><input className="field" required value={name} onChange={(e) => setName(e.target.value)} /></Field>
             <Field label={t("Correo")} hint={t("El correo es tu usuario de acceso.")}><input className="field bg-paper" value={user?.email} disabled /></Field>
