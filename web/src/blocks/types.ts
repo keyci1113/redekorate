@@ -21,6 +21,8 @@ export interface ThankYouBlock extends Base { type: "thank_you" }
 // Preguntas
 export interface OpenQuestionBlock extends Base { type: "open_question"; multiline: boolean; placeholder?: string }
 export interface ChoiceBlock extends Base { type: "choice"; multiple: boolean; options: Option[]; allowOther: boolean; randomize: boolean }
+/** One answer picked from a list that stays closed until opened: for long lists (countries, departments, products). */
+export interface DropdownBlock extends Base { type: "dropdown"; options: Option[]; allowOther: boolean; placeholder?: string }
 export interface YesNoBlock extends Base { type: "yes_no"; yesLabel: string; noLabel: string }
 export interface ScaleBlock extends Base { type: "scale"; min: number; max: number; minLabel: string; maxLabel: string; style: "numbers" | "stars" | "emoji" }
 export interface RankingBlock extends Base { type: "ranking"; items: Option[]; randomize: boolean }
@@ -58,7 +60,7 @@ export interface PrototypeTaskBlock extends Base {
 
 export type Block =
   | WelcomeBlock | ContextBlock | ThankYouBlock
-  | OpenQuestionBlock | ChoiceBlock | YesNoBlock | ScaleBlock | RankingBlock | MatrixBlock
+  | OpenQuestionBlock | ChoiceBlock | DropdownBlock | YesNoBlock | ScaleBlock | RankingBlock | MatrixBlock
   | NpsBlock | SusBlock
   | CardSortBlock | TreeTestBlock
   | PreferenceBlock | FiveSecondBlock | FirstClickBlock

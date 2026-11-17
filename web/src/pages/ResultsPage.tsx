@@ -95,7 +95,7 @@ export function formatAnswer(block: Block, value: unknown, settings?: StudySetti
   if (value === undefined || value === null) return "—";
   const lbl = (opts: { id: string; label: string }[], id: string) => opts.find((o) => o.id === id)?.label ?? id;
   switch (block.type) {
-    case "choice": {
+    case "choice": case "dropdown": {
       const v = value as ChoiceValue;
       return v.selected.map((id) => (id === "__other" ? t("Otro: {a}", { a: v.other ?? "" }) : lbl(block.options, id))).join(", ");
     }

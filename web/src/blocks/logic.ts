@@ -20,7 +20,7 @@ export function isSuccess(block: Block, value: unknown): boolean | null {
 
 /** Valor "elegido" para reglas de tipo opción */
 function chosen(block: Block, value: unknown): string[] {
-  if (block.type === "choice") return (value as ChoiceValue | undefined)?.selected ?? [];
+  if (block.type === "choice" || block.type === "dropdown") return (value as ChoiceValue | undefined)?.selected ?? [];
   if (block.type === "yes_no") return value ? [String(value)] : [];
   if (block.type === "preference") { const v = value as PreferenceValue | undefined; return v ? [v.choice] : []; }
   return [];

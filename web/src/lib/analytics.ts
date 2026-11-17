@@ -63,7 +63,7 @@ export function nps(values: number[]) {
 }
 
 // ── Opción múltiple ───────────────────────────────────────────
-export function choiceCounts(block: ChoiceBlock, values: ChoiceValue[]) {
+export function choiceCounts(block: Pick<ChoiceBlock, "options" | "allowOther">, values: ChoiceValue[]) {
   const counts = new Map<string, number>();
   const others: string[] = [];
   for (const v of values) {

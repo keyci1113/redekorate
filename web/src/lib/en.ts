@@ -2413,4 +2413,8 @@ export const EN: Record<string, string> = {
 "En el lienzo, agrega figuras desde la barra de la izquierda, haz doble clic para escribir y arrastra desde uno de sus puntos hasta otra figura para unirlas con una flecha.": "On the canvas, add shapes from the bar on the left, double-click to type, and drag from one of a shape's dots to another shape to join them with an arrow.",
 "En un mapa del sitio, escribe una página por línea y usa Tab para ponerla dentro de la de arriba: el árbol se dibuja solo. «Abrir como diagrama» lo pasa al lienzo para acomodarlo a mano.": "In a sitemap, write one page per line and press Tab to put it inside the one above: the tree draws itself. “Open as diagram” moves it to the canvas to arrange by hand.",
 "Se guarda solo. Exporta a PNG o SVG, o comparte un link de lectura.": "It saves on its own. Export to PNG or SVG, or share a read-only link.",
+"Lista desplegable": "Dropdown",
+"Una opción de una lista larga": "One answer from a long list",
+"Texto antes de elegir": "Text before choosing",
+"Elige una opción": "Choose an option",
 };

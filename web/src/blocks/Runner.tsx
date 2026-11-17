@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronRight, CornerDownLeft, GripVertical, Maximize2, Plus, Star, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type {
-  Block, CardSortBlock, CardSortValue, ChoiceBlock, ChoiceValue, FirstClickBlock, FirstClickValue, FiveSecondBlock,
+  Block, CardSortBlock, CardSortValue, ChoiceBlock, ChoiceValue, DropdownBlock, FirstClickBlock, FirstClickValue, FiveSecondBlock,
   MatrixBlock, Option, PreferenceBlock, PreferenceValue, RankingBlock, TimedTaskValue, TreeNode, TreeTestBlock, TreeTestValue,
 } from "./types";
 import { TimedTaskView } from "./TimedTaskRunner";
@@ -34,6 +34,10 @@ export function isAnswered(block: Block, value: unknown): boolean {
       const v = value as ChoiceValue | undefined;
       if (!v) return false;
       return v.selected.length > 0 && (v.selected.includes("__other") ? !!v.other?.trim() : true);
+    }
+    case "dropdown": {
+      const v = value as ChoiceValue | undefined;
+      return !!v?.selected[0] && (v.selected[0] === "__other" ? !!v.other?.trim() : true);
     }
     case "yes_no": return value === "yes" || value === "no";
     case "scale": case "nps": return typeof value === "number";
@@ -91,6 +95,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
           value={(value as string) ?? ""} onChange={onChange} />
       )}
       {block.type === "choice" && <ChoiceView block={block} value={value as ChoiceValue | undefined} onChange={onChange} />}
+      {block.type === "dropdown" && <DropdownView block={block} value={value as ChoiceValue | undefined} onChange={onChange} />}
       {block.type === "yes_no" && (
         <div className="grid grid-cols-2 gap-3">
           {(["yes", "no"] as const).map((k) => (
@@ -152,6 +157,22 @@ function ChoiceView({ block, value, onChange }: { block: ChoiceBlock; value?: Ch
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** A native select: it opens the phone's own picker, works with the keyboard and screen readers, and handles long lists. */
+function DropdownView({ block, value, onChange }: { block: DropdownBlock; value?: ChoiceValue; onChange: (v: unknown) => void }) {
+  const picked = value?.selected[0] ?? "";
+  return (
+    <div className="space-y-2">
+      <select aria-label={block.title} value={picked} onChange={(e) => onChange({ selected: e.target.value ? [e.target.value] : [], other: value?.other })}
+        className={cx("field h-12 text-[15px]", !picked && "text-ink-3")}>
+        <option value="" disabled={block.required}>{block.placeholder?.trim() || t("Elige una opción")}</option>
+        {block.options.map((o, i) => <option key={o.id} value={o.id}>{o.label || t("Opción {a}", { a: i + 1 })}</option>)}
+        {block.allowOther && <option value="__other">{t("Otro")}</option>}
+      </select>
+      {picked === "__other" && <input autoFocus className="field" placeholder={t("Especifica…")} maxLength={300} value={value?.other ?? ""} onChange={(e) => onChange({ selected: ["__other"], other: e.target.value })} />}
     </div>
   );
 }

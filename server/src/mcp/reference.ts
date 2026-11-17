@@ -6,7 +6,7 @@
 
 export const BLOCK_TYPES = [
   "welcome", "context", "thank_you",
-  "open_question", "choice", "yes_no", "scale", "ranking", "matrix",
+  "open_question", "choice", "dropdown", "yes_no", "scale", "ranking", "matrix",
   "nps", "sus",
   "card_sort", "tree_test",
   "preference", "five_second", "first_click",
@@ -34,6 +34,7 @@ Structure
 Questions
   open_question  multiline: boolean, placeholder?: string
   choice         multiple: boolean, options: Option[], allowOther: boolean, randomize: boolean
+  dropdown       options: Option[], allowOther: boolean, placeholder?: string   (one answer from a list that stays closed; for long lists)
   yes_no         yesLabel: string, noLabel: string
   scale          min: number, max: number, minLabel: string, maxLabel: string, style: "numbers"|"stars"|"emoji"
   ranking        items: Option[], randomize: boolean
