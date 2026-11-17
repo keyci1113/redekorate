@@ -11,6 +11,8 @@ import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag } from
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
+import { ArchitecturePanel } from "../architecture/ArchitecturePanel";
+import { isDiagramKind } from "../architecture/model";
 import { ParticipantsPanel } from "../components/ParticipantsPanel";
 import { ReportsPanel } from "../components/ReportsPanel";
 import { MembersPanel, sharedLabel } from "../components/MembersPanel";
@@ -23,8 +25,8 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
-  const [tab, setTab] = useState<"studies" | "docs" | "insights" | "participants" | "report" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
+  const [tab, setTab] = useState<"studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -39,6 +41,9 @@ export function ProjectPage() {
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
   const p = project.data.project;
   const list = studies.data?.studies ?? [];
+  // Diagrams and sitemaps are stored as documents but live in their own Architecture tab.
+  const allDocs = docs.data?.documents ?? [];
+  const uxDocs = allDocs.filter((d) => !isDiagramKind(d.kind)), diagrams = allDocs.filter((d) => isDiagramKind(d.kind));
   const role = p.role;
   const canEdit = roleCanEdit(role);
   const isOwner = roleIsOwner(role);
@@ -71,7 +76,8 @@ export function ProjectPage() {
       <div className="mt-8">
         <Tabs value={tab} onChange={setTab} items={[
           { id: "studies", label: t("Estudios"), count: list.length },
-          { id: "docs", label: t("Documentos"), count: docs.data?.documents.length ?? 0 },
+          { id: "docs", label: t("Documentos"), count: uxDocs.length },
+          { id: "architecture", label: t("Arquitectura"), count: diagrams.length },
           { id: "insights", label: t("Repositorio de insights"), count: insights.data?.insights.length ?? 0 },
           { id: "participants", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
@@ -90,7 +96,8 @@ export function ProjectPage() {
             {list.map((s, i) => <StudyRow key={s.id} s={s} first={i === 0} canEdit={canEdit} onChange={() => { studies.reload(); insights.reload(); }} />)}
           </div>
         ))}
-        {tab === "docs" && <DocsPanel projectId={p.id} docs={docs.data?.documents ?? []} onChange={docs.reload} preselect={params.get("new")} canEdit={canEdit} />}
+        {tab === "docs" && <DocsPanel projectId={p.id} docs={uxDocs} onChange={docs.reload} preselect={params.get("new")} canEdit={canEdit} />}
+        {tab === "architecture" && <ArchitecturePanel projectId={p.id} diagrams={diagrams} onChange={docs.reload} canEdit={canEdit} />}
         {tab === "insights" && (
           <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
         )}

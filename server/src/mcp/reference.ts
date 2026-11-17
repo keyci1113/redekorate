@@ -55,3 +55,28 @@ Other
 
 Study settings: { language: "es"|"en" (what participants see), brand?: { color?: "#RRGGBB" } }.
 Tip: read an existing study with get_study to copy its exact shape.`;
+
+/** The shapes the Architecture canvas draws (web/src/architecture/model.ts SHAPES); reference.test.ts keeps the two lists equal. */
+export const DIAGRAM_SHAPES = [
+  "rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder",
+  "page", "pages", "note", "text", "frame",
+] as const;
+
+export const DIAGRAM_REFERENCE = `The Architecture section holds two document kinds; create them with create_document and edit them with update_document.
+
+kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, system architecture, IA diagrams).
+  data: { nodes: Node[], edges: Edge[] }
+  Node  { id: string, shape, x: number, y: number, w: number, h: number, text: string, color, size?: "s"|"m"|"l" }
+        x, y = top-left corner in canvas pixels (y grows downward); a typical shape is 160 x 80, keep ~60 px between shapes.
+  shape ${DIAGRAM_SHAPES.join(" | ")}
+        rounded = process step, diamond = decision, parallelogram = input/output, cylinder = database,
+        page / pages = a page / a group of pages (information architecture), note = sticky note,
+        text = free text with no outline, frame = a labelled area drawn behind the shapes inside it.
+  color none | gray | yellow | orange | pink | purple | blue | green
+  Edge  { id: string, from: nodeId, to: nodeId, fromSide?: "top"|"right"|"bottom"|"left", toSide?: same,
+          label?: string, line?: "solid"|"dashed", arrow?: "end"|"both"|"none", path?: "elbow"|"curved"|"straight" }
+
+kind "sitemap": information architecture written as an outline; the app draws the tree.
+  data: { outline: string }   one page per line, two spaces of indent per level, e.g. "Home\n  Products\n    Detail\n  Contact"
+
+Read an existing diagram with get_document to copy its exact shape.`;
