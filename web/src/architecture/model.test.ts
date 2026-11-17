@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SITEMAP, isDiagramKind, layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, starter } from "./model";
+import { SITEMAP, isDiagramKind, layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, starter, alignedLine, onOutline, HANDLE_HALF, ALIGN_SNAP } from "./model";
 
 describe("parseOutline", () => {
   test("indent puts a line under the nearest less-indented line above it", () => {
@@ -91,5 +91,22 @@ describe("starters", () => {
     expect(normalizeDiagram(d)).toEqual(d);
     expect(d.nodes).toHaveLength(outlineStats(parseOutline(outline)).pages);
     expect(d.edges).toHaveLength(d.nodes.length - 1);
+  });
+});
+
+describe("arrow geometry", () => {
+  test("line ends sit on the shape outline, not outside the dot", () => {
+    expect(onOutline({ x: 100, y: 205, side: "bottom" })).toEqual({ x: 100, y: 200, side: "bottom" });
+    expect(onOutline({ x: 100, y: 295, side: "top" })).toEqual({ x: 100, y: 300, side: "top" });
+    expect(onOutline({ x: 55, y: 10, side: "right" }).x).toBe(55 - HANDLE_HALF);
+  });
+  test("nearly lined-up shapes get one straight line on the target's axis", () => {
+    expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 146, y: 160, side: "top" })).toEqual({ x1: 146, y1: 100, x2: 146, y2: 160 });
+    expect(alignedLine({ x: 0, y: 50, side: "right" }, { x: 200, y: 44, side: "left" })).toEqual({ x1: 0, y1: 44, x2: 200, y2: 44 });
+  });
+  test("an elbow is kept when the offset is real or the sides do not face each other", () => {
+    expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140 + ALIGN_SNAP + 1, y: 160, side: "top" })).toBeNull();
+    expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140, y: 40, side: "top" })).toBeNull();
+    expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140, y: 160, side: "left" })).toBeNull();
   });
 });

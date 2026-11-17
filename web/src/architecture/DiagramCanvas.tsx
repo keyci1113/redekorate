@@ -12,7 +12,7 @@ import { uid } from "../lib/hooks";
 import { useTheme } from "../lib/theme";
 import { cx } from "../components/ui";
 import {
-  COLORS, DEFAULT_COLOR, DEFAULT_SIZE, SHAPES, type ArrowStyle, type ColorId, type DEdge, type DNode, type DiagramData, type LineStyle, type PathStyle,
+  COLORS, DEFAULT_COLOR, DEFAULT_SIZE, SHAPES, alignedLine, onOutline, type ArrowStyle, type ColorId, type DEdge, type DNode, type DiagramData, type LineStyle, type PathStyle,
   type Shape, type Side, type TextSize,
 } from "./model";
 import { ShapeIcon, ShapeSvg, fillOf, strokeOf, textBox, textOf } from "./shapes";
@@ -131,12 +131,19 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
   );
 });
 
-function LineEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data, selected, markerEnd, markerStart }: EdgeProps<FEdge>) {
+function LineEdge({ id, sourceX: sx0, sourceY: sy0, targetX: tx0, targetY: ty0, sourcePosition, targetPosition, data, selected, markerEnd, markerStart }: EdgeProps<FEdge>) {
   const ctx = useContext(DiagramCtx);
   const kind = data?.path ?? "elbow";
-  const [path, lx, ly] = kind === "curved" ? getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition })
-    : kind === "straight" ? getStraightPath({ sourceX, sourceY, targetX, targetY })
-    : getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, borderRadius: 10, offset: 22 });
+  // Lines touch the shape's outline, not the far side of the hidden dot.
+  const from = onOutline({ x: sx0, y: sy0, side: sourcePosition as Side });
+  const to = onOutline({ x: tx0, y: ty0, side: targetPosition as Side });
+  const p = { sourceX: from.x, sourceY: from.y, targetX: to.x, targetY: to.y, sourcePosition, targetPosition };
+  // Shapes that are nearly lined up get one clean straight line, never a small zig-zag.
+  const line = kind === "straight" ? null : alignedLine(from, to);
+  const [path, lx, ly] = line ? getStraightPath({ sourceX: line.x1, sourceY: line.y1, targetX: line.x2, targetY: line.y2 })
+    : kind === "curved" ? getBezierPath(p)
+    : kind === "straight" ? getStraightPath(p)
+    : getSmoothStepPath({ ...p, borderRadius: 10, offset: 22 });
   const editing = ctx.editingEdge === id;
   return (
     <>
