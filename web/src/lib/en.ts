@@ -2441,4 +2441,10 @@ export const EN: Record<string, string> = {
 "Tachado": "Strikethrough",
 "Lista con viñetas": "Bulleted list",
 "Lista numerada": "Numbered list",
+"No tienes acceso para editar: como comentarista puedes ver y comentar, pero no crear ni cambiar nada.": "You don't have edit access: as a commenter you can view and comment, but not create or change anything.",
+"No tienes acceso para editar: con solo lectura puedes ver, pero no crear, cambiar ni comentar.": "You don't have edit access: with read-only access you can view, but not create, change or comment.",
+"Pide acceso de editor a {a}.": "Ask {a} for editor access.",
+"Pide acceso de editor a quien es dueño/a del proyecto.": "Ask the project owner for editor access.",
+"No tienes acceso para agregar personas ni cambiar roles: eso solo lo hace quien es dueño/a del proyecto.": "You don't have access to add people or change roles: only the project owner can do that.",
+"No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.": "You don't have access to invite people or change their permissions: organization admins do that.",
 };

@@ -7,6 +7,7 @@ import { ASSIGNABLE_PROJECT_ROLES } from "../lib/roles";
 import { Button, Card, ErrorNote, Field, Tag } from "./ui";
 import { Avatar } from "./Avatar";
 import { t } from "../lib/i18n";
+import { NoAccessNote } from "./AccessNotice";
 
 export const roleLabel = (r: ProjectRole) => (r === "owner" ? t("Dueño/a") : r === "editor" ? t("Editor") : r === "commenter" ? t("Comentarista") : t("Solo lectura"));
 /** Etiqueta de un proyecto compartido: "Editor · Dueño/a: Ana". Misma forma en la lista y en la cabecera. */
@@ -27,6 +28,7 @@ export function MembersPanel({ projectId, myRole, members, onChange }: { project
       <Card className="p-4">
         <p className="font-semibold">{t("Colaboradores")}</p>
         <p className="mt-1 text-sm text-ink-2">{t("Editores crean y modifican estudios, documentos, insights y participantes. Comentaristas ven todo y dejan comentarios. Solo lectura ve resultados y documentos sin cambiar nada. Solo quien es dueño agrega personas, archiva o elimina el proyecto.")}</p>
+        {!owner && <NoAccessNote className="mt-3">{t("No tienes acceso para agregar personas ni cambiar roles: eso solo lo hace quien es dueño/a del proyecto.")}</NoAccessNote>}
         {owner && (
           <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={add}>
             <div className="flex-1"><Field label={t("Correo de una cuenta existente")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>

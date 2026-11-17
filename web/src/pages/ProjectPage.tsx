@@ -21,6 +21,7 @@ import { templateByKey } from "../templates/catalog";
 import { CATEGORY_ICON, FallbackIcon } from "../templates/icons";
 
 import { t } from "../lib/i18n";
+import { AccessNotice } from "../components/AccessNotice";
 export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -72,6 +73,7 @@ export function ProjectPage() {
           <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Nuevo estudio")}</Button>
         </div>}
       </div>
+      <AccessNotice role={role} owner={p.owner_name} className="mt-4 max-w-2xl" />
 
       <div className="mt-8">
         <Tabs value={tab} onChange={setTab} items={[

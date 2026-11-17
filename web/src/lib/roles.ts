@@ -20,3 +20,10 @@ export const canManageOrg = (role: OrgRole | null | undefined) => orgAtLeast(rol
 export const ASSIGNABLE_PROJECT_ROLES: Exclude<ProjectRole, "owner">[] = ["editor", "commenter", "viewer"];
 /** Roles an organization admin can assign; only owners can also assign "owner". */
 export const assignableOrgRoles = (mine: OrgRole | null | undefined): OrgRole[] => (mine === "owner" ? ["owner", "admin", "member"] : ["admin", "member"]);
+
+/**
+ * What stops someone from editing, so the page can say so instead of only hiding the buttons:
+ * "commenter" (can view and comment), "viewer" (can only view), or null when they can edit.
+ */
+export const editLimit = (role: ProjectRole | null | undefined): "commenter" | "viewer" | null =>
+  canEdit(role) ? null : canComment(role) ? "commenter" : "viewer";

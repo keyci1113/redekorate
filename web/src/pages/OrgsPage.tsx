@@ -11,6 +11,7 @@ import { Avatar } from "../components/Avatar";
 import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
 import { getLang, t } from "../lib/i18n";
+import { NoAccessNote } from "../components/AccessNotice";
 
 export const orgRoleLabel = (r: OrgRole) => (r === "owner" ? t("Dueño/a") : r === "admin" ? t("Admin") : t("Miembro"));
 const fmt = (d: string) => new Date(d).toLocaleDateString(getLang() === "en" ? "en-US" : "es", { day: "numeric", month: "short", year: "numeric" });
@@ -144,6 +145,7 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
       <Card className="p-4">
         <p className="font-semibold">{t("Personas")}</p>
         <p className="mt-1 text-sm text-ink-2">{t("Miembros ven todos los proyectos de la organización y pueden comentar. Admins además cambian ajustes y personas. Solo quien es dueño elimina la organización.")}</p>
+        {!manage && <NoAccessNote className="mt-3">{t("No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.")}</NoAccessNote>}
         {manage && (
           <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={add}>
             <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>

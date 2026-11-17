@@ -25,6 +25,7 @@ import { canEdit as roleCanEdit } from "../lib/roles";
 import { CommentsPanel } from "../components/CommentsPanel";
 
 import { t } from "../lib/i18n";
+import { AccessNotice } from "../components/AccessNotice";
 interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole }
 type TabId = "summary" | "responses" | "insights" | "comments" | "share";
 
@@ -62,6 +63,8 @@ export function ResultsPage() {
         </div>
       </div>
 
+      <AccessNotice role={data.role} className="mt-4 max-w-2xl" />
+
       {study.status === "live" && (
         <Card className="mt-6 flex flex-wrap items-center gap-3 p-4">
           <p className="text-sm font-medium">{t("Link para participantes")}</p>
@@ -83,7 +86,7 @@ export function ResultsPage() {
       <div className="mt-6">
         {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings} />}
         {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} onChange={reload} canEdit={canEdit} />}
-        {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} />}
+        {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} canEdit={canEdit} />}
         {tab === "comments" && <CommentsPanel projectId={study.project_id} studyId={study.id} role={data.role} />}
         {tab === "share" && canEdit && <SharePanel study={study} />}
       </div>
