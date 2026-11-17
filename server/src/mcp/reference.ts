@@ -74,6 +74,10 @@ kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, sys
         page / pages = a page / a group of pages (information architecture), note = sticky note,
         text = free text with no outline, frame = a labelled area drawn behind the shapes inside it.
   color none | gray | yellow | orange | pink | purple | blue | green
+  Text settings (all optional): size "s"|"m"|"l"|"xl", align "left"|"center"|"right", valign "top"|"middle"|"bottom",
+        textColor "ink"|"gray"|"red"|"orange"|"green"|"blue"|"purple"|"white" (leave it out to follow the fill).
+  Formatting inside text: **bold**, *italic*, __underline__, ~~strikethrough~~; a line starting "- " is a bullet and
+        "1. " a numbered item (indent two spaces per level); a backslash keeps the next character literal.
   Edge  { id: string, from: nodeId, to: nodeId, fromSide?: "top"|"right"|"bottom"|"left", toSide?: same,
           label?: string, line?: "solid"|"dashed", arrow?: "end"|"both"|"none", path?: "elbow"|"curved"|"straight" }
 
