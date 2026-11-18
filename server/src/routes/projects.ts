@@ -116,27 +116,40 @@ projects.get("/:id/insights", async (req, res) => {
   res.json({ insights: rows });
 });
 
-// Reporte de proyecto: un link que combina los resultados de los estudios que elijas.
+// Project report: one link with the studies, documents and project-wide parts you pick.
+/** What a report link may hold besides studies and documents. */
+const REPORT_SECTIONS = ["overview", "insights"] as const;
 projects.get("/:id/shares", async (req, res) => {
   await ownProject(req.params.id, req.user!.id);
   const rows = await query(
     `select rs.*, coalesce(
        (select jsonb_agg(s.title order by s.updated_at desc) from studies s where s.id = any(rs.study_ids)), '[]'::jsonb
-     ) as study_titles
+     ) as study_titles, coalesce(
+       (select jsonb_agg(d.title order by array_position(rs.document_ids, d.id)) from documents d where d.id = any(rs.document_ids)), '[]'::jsonb
+     ) as document_titles
      from report_shares rs where rs.project_id = $1 and rs.revoked_at is null order by rs.created_at desc`,
     [req.params.id],
   );
   res.json({ shares: rows });
 });
 
+const ReportShareInput = z.object({
+  study_ids: z.array(z.string().uuid()).max(50).default([]),
+  document_ids: z.array(z.string().uuid()).max(100).default([]),
+  sections: z.array(z.enum(REPORT_SECTIONS)).max(REPORT_SECTIONS.length).default([]),
+}).refine((v) => v.study_ids.length + v.document_ids.length + v.sections.length > 0, "Elige al menos una parte del proyecto");
+
 projects.post("/:id/shares", async (req, res) => {
   await ownProject(req.params.id, req.user!.id, "editor");
-  const b = parse(z.object({ study_ids: z.array(z.string().uuid()).min(1).max(50) }), req.body);
-  const owned = await query("select id from studies where project_id = $1 and id = any($2)", [req.params.id, b.study_ids]);
-  if (owned.length !== b.study_ids.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
+  const b = parse(ReportShareInput, req.body);
+  const studyIds = [...new Set(b.study_ids)], docIds = [...new Set(b.document_ids)], sections = REPORT_SECTIONS.filter((x) => b.sections.includes(x));
+  const owned = await query("select id from studies where project_id = $1 and id = any($2)", [req.params.id, studyIds]);
+  if (owned.length !== studyIds.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
+  const docs = await query("select id from documents where project_id = $1 and id = any($2)", [req.params.id, docIds]);
+  if (docs.length !== docIds.length) throw new HttpError(400, "Alguno de los documentos no pertenece a este proyecto");
   const share = await one(
-    "insert into report_shares(project_id, study_ids, token) values ($1,$2,$3) returning *",
-    [req.params.id, b.study_ids, tokenId()],
+    "insert into report_shares(project_id, study_ids, document_ids, sections, token) values ($1,$2,$3,$4,$5) returning *",
+    [req.params.id, studyIds, docIds, sections, tokenId()],
   );
   res.status(201).json({ share });
 });

@@ -92,16 +92,19 @@ publicApi.get("/reports/:token", async (req, res) => {
 });
 
 publicApi.get("/project-reports/:token", async (req, res) => {
-  const share = await one(
-    "select project_id, study_ids from report_shares where token = $1 and revoked_at is null and project_id is not null",
+  const share = await one<{ project_id: string; study_ids: string[]; document_ids: string[]; sections: string[] }>(
+    "select project_id, study_ids, document_ids, sections from report_shares where token = $1 and revoked_at is null and project_id is not null",
     [req.params.token],
   );
   if (!share) throw notFound("Reporte");
+  const has = (x: string) => share.sections.includes(x);
   const project = await one(
-    "select p.name, p.color, o.name as org_name, o.logo as org_logo from projects p left join organizations o on o.id = p.organization_id where p.id = $1", [share.project_id]);
+    "select p.name, p.color, p.description, o.name as org_name, o.logo as org_logo from projects p left join organizations o on o.id = p.organization_id where p.id = $1", [share.project_id]);
+  // The description only travels when the report includes the overview.
+  if (project && !has("overview")) project.description = null;
   const studies = await query(
-    `select id, title, method, status, blocks, settings, published_at from studies where id = any($1) order by array_position($1, id)`,
-    [share.study_ids],
+    `select id, title, method, status, blocks, settings, published_at from studies where id = any($1) and project_id = $2 order by array_position($1, id)`,
+    [share.study_ids, share.project_id],
   );
   const reports = await Promise.all(studies.map(async (s: { id: string; [k: string]: unknown }) => {
     const sessions = await query("select id, started_at, completed_at from sessions where study_id = $1", [s.id]);
@@ -112,7 +115,14 @@ publicApi.get("/project-reports/:token", async (req, res) => {
     );
     return { study: s, sessions, answers, insights };
   }));
-  res.json({ project, reports });
+  // Documents and diagrams in the order they were picked; a document deleted since simply drops out.
+  const documents = share.document_ids.length ? await query(
+    `select id, kind, title, language, data, updated_at from documents where id = any($1) and project_id = $2 order by array_position($1, id)`,
+    [share.document_ids, share.project_id]) : [];
+  const insights = has("insights") ? await query(
+    `select i.id, i.title, i.body, i.tags, i.severity, i.confidence, i.created_at, s.title as study_title
+     from insights i left join studies s on s.id = i.study_id where i.project_id = $1 order by i.created_at desc`, [share.project_id]) : null;
+  res.json({ project, sections: share.sections, reports, documents, insights });
 });
 
 publicApi.get("/docs/:token", async (req, res) => {

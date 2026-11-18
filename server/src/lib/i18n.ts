@@ -1,5 +1,8 @@
 // Mensajes del servidor en inglés (el cliente envía x-lang: en|es)
 const EN: Record<string, string> = {
+  "Elige al menos una parte del proyecto": "Choose at least one part of the project",
+  "Alguno de los estudios no pertenece a este proyecto": "One of the studies does not belong to this project",
+  "Alguno de los documentos no pertenece a este proyecto": "One of the documents does not belong to this project",
   "Ese link no es público.": "That link is not public.",
   "No se encontró el dominio del link.": "The link's domain could not be found.",
   "El link no es válido.": "The link is not valid.",
