@@ -1,4 +1,4 @@
-import { useEffect, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { ArrowLeft, CheckCircle2, TriangleAlert, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { StudyStatus, Severity } from "../lib/types";
@@ -52,18 +52,27 @@ export function Field({ label, hint, children, group }: { label: string; hint?: 
 }
 
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+  const titleId = useId();
+  const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [open, onClose]);
+  // Move focus into the dialog (unless a field there already took it) and give it back to what opened it on close.
+  useEffect(() => {
+    if (!open) return;
+    const before = document.activeElement as HTMLElement | null;
+    if (!box.current?.contains(document.activeElement)) box.current?.focus();
+    return () => { if (before?.isConnected) before.focus(); };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div className={cx("w-full rounded-2xl border border-line bg-surface shadow-xl", wide ? "max-w-2xl" : "max-w-md")} onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cx("w-full rounded-2xl border border-line bg-surface shadow-xl outline-none", wide ? "max-w-2xl" : "max-w-md")} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
-          <h2 className="text-[15px] font-semibold">{title}</h2>
+          <h2 id={titleId} className="text-[15px] font-semibold">{title}</h2>
           <button onClick={onClose} className="focus-ring rounded-md p-1 text-ink-3 hover:bg-ink/5 hover:text-ink" aria-label={t("Cerrar")}><X size={18} /></button>
         </div>
         <div className="p-5">{children}</div>

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, BarChart3, Check, PenLine } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BarChart3, Check, PenLine } from "lucide-react";
 import type { RecentStudy } from "../../lib/recent";
 import { fmtNum, fmtPct, locale, plural, relTime, t } from "../../lib/i18n";
 import { aggregateCompletion, completion, groupActivity, isLowCompletion, peakDay, sortInsights, splitWeeks, type Day } from "../../lib/home";
@@ -9,6 +9,7 @@ import { templateByKey } from "../../templates/catalog";
 import { SeverityBadge, cx } from "../ui";
 import { CompletionBar, LowChip, Section, SectionState, TrendBars, completionSr, fmtDay } from "./bits";
 import type { Dash, Draft, HomeInsight, Load, RecentOpen } from "./types";
+import { responsesByStudy, type Drill, type DrillRow } from "./drill";
 
 const methodName = (m: string) => templateByKey(m)?.name ?? m;
 const longDay = (d: string) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
@@ -93,17 +94,42 @@ export function DaySummary({ data, load }: { data: Dash | null; load: Load }) {
 }
 
 // ── KPIs ────────────────────────────────────────────────────────────
-function Kpi({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+/** A KPI card; its label is a button whose hit area covers the card and opens the detail behind the number. */
+function Kpi({ label, value, onOpen, children }: { label: string; value: string; onOpen: () => void; children?: React.ReactNode }) {
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-line bg-surface p-4">
-      <p className="text-sm text-ink-2">{label}</p>
+    <div className="relative flex min-w-0 flex-col rounded-xl border border-line bg-surface p-4 transition hover:border-line-2 hover:shadow-(--shadow-lift) has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent">
+      <button type="button" onClick={onOpen} aria-haspopup="dialog" title={t("Ver detalle")} className="flex items-center justify-between gap-2 text-left text-sm text-ink-2 outline-none after:absolute after:inset-0 after:rounded-xl">
+        {label}<ArrowUpRight size={14} aria-hidden className="shrink-0" />
+      </button>
       <p className="mt-1 font-display text-[2rem] leading-tight font-bold tabular-nums">{value}</p>
       <div className="mt-auto pt-3 text-xs text-ink-2">{children}</div>
     </div>
   );
 }
 
-export function KpiRow({ data, load }: { data: Dash | null; load: Load }) {
+/** What each KPI opens: the studies or insights behind it, built from what the home page already loaded. */
+function kpiDrills(data: Dash): Record<"responses" | "live" | "completion" | "insights", Drill> {
+  const byId = new Map(data.live.map((s) => [s.id, s]));
+  const finished = (s: Dash["live"][number]) => t("{a} de {b} terminaron", { a: s.responses, b: s.started });
+  const weekStart = data.trend[Math.max(0, data.trend.length - 7)]?.day ?? "";
+  const responses: DrillRow[] = responsesByStudy(data.study_trend, weekStart).flatMap(({ study_id, n }) => {
+    const s = byId.get(study_id);
+    return s ? [{ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: s.project_name, end: plural(n, { one: "{n} respuesta", other: "{n} respuestas" }) }] : [];
+  });
+  const rated = data.live.map((s) => ({ s, rate: completion(s.responses, s.started) })).filter((x): x is { s: Dash["live"][number]; rate: number } => x.rate !== null).sort((a, b) => a.rate - b.rate);
+  return {
+    responses: { title: t("Respuestas esta semana"), rows: responses, empty: t("Esta semana no han llegado respuestas."), note: t("Por estudio activo.") },
+    live: { title: t("Estudios activos"), empty: t("No hay estudios activos."),
+      rows: data.live.map((s) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: s.last_response_at ? relTime(s.last_response_at) : undefined })) },
+    completion: { title: t("Tasa de completado por estudio"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto."),
+      rows: rated.map(({ s, rate }) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: fmtPct(rate), tone: isLowCompletion(rate) ? "warn" as const : undefined })) },
+    // The home page loads only the most severe insights; the count says when there are more.
+    insights: { title: t("Insights"), empty: t("Aún no hay insights."), note: t("Primero los más graves."), total: data.insight_counts.total,
+      rows: sortInsights(data.insights).map((i) => ({ key: i.id, to: `/projects/${i.project_id}?tab=insights`, title: i.title, sub: [i.project_name, relTime(i.created_at)].join(" · "), severity: i.severity })) },
+  };
+}
+
+export function KpiRow({ data, load, onOpen }: { data: Dash | null; load: Load; onOpen: (d: Drill) => void }) {
   if (load.loading) return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">{[0, 1, 2, 3].map((i) => <div key={i} className="h-40 animate-pulse rounded-xl bg-ink/5 motion-reduce:animate-none" />)}</div>;
   if (load.error || !data) return null;
   const { totals, trend, live, insight_counts: ic } = data;
@@ -111,27 +137,28 @@ export function KpiRow({ data, load }: { data: Dash | null; load: Load }) {
   const peak = peakDay(trend);
   const agg = aggregateCompletion(live);
   const liveShare = totals.studies ? totals.live / totals.studies : 0;
+  const open = (k: keyof ReturnType<typeof kpiDrills>) => () => onOpen(kpiDrills(data)[k]);
   return (
     <section aria-label={t("Indicadores")} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi label={t("Respuestas esta semana")} value={fmtNum(thisWeek)}>
+      <Kpi label={t("Respuestas esta semana")} value={fmtNum(thisWeek)} onOpen={open("responses")}>
         <TrendBars days={trend as Day[]} height={40} summary={t("Esta semana {a} respuestas; la semana pasada {b}.", { a: fmtNum(thisWeek), b: fmtNum(lastWeek) })} />
         <p className="mt-2 tabular-nums">
           {t("{a} en total", { a: fmtNum(totals.responses) })}
           {peak && <> · {t("Pico: {a} el {b}", { a: fmtNum(peak.n), b: fmtDay(peak.day) })}</>}
         </p>
       </Kpi>
-      <Kpi label={t("Estudios activos")} value={t("{a} de {b}", { a: fmtNum(totals.live), b: fmtNum(totals.studies) })}>
+      <Kpi label={t("Estudios activos")} value={t("{a} de {b}", { a: fmtNum(totals.live), b: fmtNum(totals.studies) })} onOpen={open("live")}>
         <span className="block h-2 overflow-hidden rounded-full bg-ink/10" aria-hidden><span className="block h-full rounded-full bg-accent" style={{ width: `${liveShare * 100}%` }} /></span>
         <p className="mt-2">{plural(totals.projects_live, { one: "En {n} proyecto", other: "En {n} proyectos" })}</p>
       </Kpi>
-      <Kpi label={t("Tasa de completado promedio")} value={agg.rate === null ? "—" : fmtPct(agg.rate)}>
+      <Kpi label={t("Tasa de completado promedio")} value={agg.rate === null ? "—" : fmtPct(agg.rate)} onOpen={open("completion")}>
         <span className="flex items-center gap-2"><span className="w-full"><CompletionBar rate={agg.rate} /></span>{isLowCompletion(agg.rate) && <LowChip />}</span>
         <span className="sr-only">{completionSr(agg.rate)}</span>
         <p className="mt-2 tabular-nums">
           {plural(agg.done, { one: "{n} terminó", other: "{n} terminaron" })} {plural(agg.started, { one: "de {n} que inició", other: "de {n} que iniciaron" })}
         </p>
       </Kpi>
-      <Kpi label={t("Insights")} value={fmtNum(ic.total)}>
+      <Kpi label={t("Insights")} value={fmtNum(ic.total)} onOpen={open("insights")}>
         <span className="flex flex-wrap gap-1.5">
           <span className="rounded-full bg-bad-soft px-2 py-0.5 font-semibold text-bad">{plural(ic.critical, { one: "{n} crítico", other: "{n} críticos" })}</span>
           <span className="rounded-full bg-caution-soft px-2 py-0.5 font-semibold text-caution-ink">{plural(ic.high, { one: "{n} alto", other: "{n} altos" })}</span>

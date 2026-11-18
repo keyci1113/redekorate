@@ -5,6 +5,7 @@ import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ORG_COLS, accessJoins, accessWhere, atLeast, requireProject, roleSql, type ProjectRole } from "../lib/access.js";
+import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
 
 export const projects = Router();
 projects.use(requireAuth);
@@ -15,6 +16,7 @@ const ProjectInput = z.object({
   name: z.string().trim().min(1).max(160),
   description: z.string().max(4000).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  category: z.enum(PROJECT_CATEGORIES).optional(),
   archived: z.boolean().optional(),
   organization_id: z.string().uuid().nullable().optional(),   // null = personal project
 });
@@ -28,7 +30,11 @@ async function requireOrgMember(orgId: string | null | undefined, userId: string
 /** Proyecto accesible con al menos `min` (viewer < commenter < editor < owner). Lanza 404/403. */
 export const ownProject = (id: string, userId: string, min: ProjectRole = "viewer") => requireProject(id, userId, min);
 
+const ProjectListQuery = z.object({ category: z.enum(PROJECT_CATEGORIES).optional() });
+
+/** Every project the person can open; `?category=` narrows the list to one kind of work. */
 projects.get("/", async (req, res) => {
+  const filter = parse(ProjectListQuery, req.query);
   const rows = await query(
     `select p.*, ${roleSql("$1")} as role, u.name as owner_name, ${ORG_COLS},
        (select count(*)::int from studies s where s.project_id = p.id) as study_count,
@@ -42,8 +48,8 @@ projects.get("/", async (req, res) => {
        (select count(*)::int from documents d where d.project_id = p.id) as document_count
      ${accessJoins("$1")}
        join users u on u.id = p.owner_id
-     where ${accessWhere("$1")} order by p.updated_at desc`,
-    [req.user!.id],
+     where ${accessWhere("$1")} and ($2::text is null or p.category = $2) order by p.updated_at desc`,
+    [req.user!.id, filter.category ?? null],
   );
   res.json({ projects: rows });
 });
@@ -52,8 +58,8 @@ projects.post("/", async (req, res) => {
   const b = parse(ProjectInput, req.body);
   await requireOrgMember(b.organization_id, req.user!.id);
   const p = await one(
-    "insert into projects(owner_id, name, description, color, organization_id) values ($1,$2,$3,coalesce($4,'#5B5BD6'),$5) returning *",
-    [req.user!.id, b.name, b.description ?? "", b.color ?? null, b.organization_id ?? null],
+    "insert into projects(owner_id, name, description, color, organization_id, category) values ($1,$2,$3,coalesce($4,'#5B5BD6'),$5,coalesce($6,'ux_research')) returning *",
+    [req.user!.id, b.name, b.description ?? "", b.color ?? null, b.organization_id ?? null, b.category ?? null],
   );
   res.status(201).json({ project: p });
 });
@@ -64,7 +70,7 @@ projects.get("/:id", async (req, res) => {
 
 projects.patch("/:id", async (req, res) => {
   const b = parse(ProjectInput.partial(), req.body);
-  // Editar nombre, descripción y color: editor. Archivar, desarchivar o cambiar de espacio: solo el dueño.
+  // Name, description, color and category: editors. Archiving, unarchiving or moving it to another space: the owner only.
   const moves = b.organization_id !== undefined;
   const cur = await ownProject(req.params.id, req.user!.id, b.archived === undefined && !moves ? "editor" : "owner");
   if (moves && cur.owner_id !== req.user!.id) throw new HttpError(403, "Solo quien es dueño del proyecto puede moverlo de espacio");
@@ -73,9 +79,10 @@ projects.patch("/:id", async (req, res) => {
     `update projects set
        name = coalesce($2, name), description = coalesce($3, description),
        color = coalesce($4, color), archived = coalesce($5, archived),
-       organization_id = case when $6::boolean then $7 else organization_id end, updated_at = now()
+       organization_id = case when $6::boolean then $7 else organization_id end,
+       category = coalesce($8, category), updated_at = now()
      where id = $1 returning *`,
-    [req.params.id, b.name ?? null, b.description ?? null, b.color ?? null, b.archived ?? null, moves, b.organization_id ?? null],
+    [req.params.id, b.name ?? null, b.description ?? null, b.color ?? null, b.archived ?? null, moves, b.organization_id ?? null, b.category ?? null],
   );
   res.json({ project: p });
 });

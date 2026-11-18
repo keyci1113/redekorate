@@ -14,6 +14,8 @@ import { lastStudy } from "../lib/recent";
 import { GettingStarted } from "../components/home/GettingStarted";
 import { Link } from "react-router-dom";
 import { CircleHelp } from "lucide-react";
+import { DrillModal } from "../components/home/DrillModal";
+import type { Drill } from "../components/home/drill";
 
 export function DashboardPage() {
   const nav = useNavigate();
@@ -22,6 +24,7 @@ export function DashboardPage() {
   const { data, error, loading, reload, setData } = useLoad(() => api.get<Dash>("/dashboard"), []);
   // Preferencia de vista por usuario (no hay preferencias en el backend: localStorage con try/catch)
   const [view, setView] = useState<HomeView>(() => loadView(uid));
+  const [drill, setDrill] = useState<Drill | null>(null);
   const changeView = (v: HomeView) => { setView(v); saveView(uid, v); };
   const load: Load = { loading: loading && !data, error: data ? null : error, reload };
 
@@ -55,7 +58,8 @@ export function DashboardPage() {
       <HomeHeader name={user?.name.split(" ")[0] ?? ""} draft={data?.drafts[0]} loading={load.loading} />
       {data && user && <GettingStarted userId={user.id} totals={data.totals} />}
       {(() => { const r = data?.recent ?? lastStudy(); return load.loading ? <div className="h-20 animate-pulse rounded-xl bg-ink/5 motion-reduce:animate-none" aria-hidden /> : r ? <LastOpened recent={r} /> : <DaySummary data={data} load={load} />; })()}
-      <KpiRow data={data} load={load} />
+      <KpiRow data={data} load={load} onOpen={setDrill} />
+      <DrillModal drill={drill} onClose={() => setDrill(null)} />
       <LiveStudies live={data?.live ?? []} trend={data?.trend ?? []} studyTrend={data?.study_trend ?? []} load={load} view={view} onViewChange={changeView} />
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <RecentInsights insights={data?.insights ?? []} load={load} firstLive={data?.live[0]?.id} onReview={review} />

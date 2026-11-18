@@ -3,6 +3,7 @@ import { Pipette } from "lucide-react";
 import { Button, ErrorNote, Field, cx } from "./ui";
 import { OrgLogo } from "./OrgLogo";
 import type { Organization } from "../lib/types";
+import { DEFAULT_CATEGORY, PROJECT_CATEGORIES, categoryLabel, type ProjectCategory } from "../lib/projectCategories";
 
 import { t } from "../lib/i18n";
 /** Project colors, around the color wheel. Each one reaches 4.5:1 with white text on it (the project's reports use it as a
@@ -42,7 +43,7 @@ export function ProjectColorPicker({ value, onChange }: { value: string; onChang
   );
 }
 
-export interface ProjectValues { name: string; description: string; color: string; organization_id: string | null }
+export interface ProjectValues { name: string; description: string; color: string; organization_id: string | null; category: ProjectCategory }
 
 /**
  * Name, description, color and workspace of a project. The workspace selector appears when `orgs` is given
@@ -55,7 +56,7 @@ export function ProjectForm({ initial, orgs, onSubmit, submitLabel }: {
   onSubmit: (v: ProjectValues) => Promise<void>;
   submitLabel: string;
 }) {
-  const [v, setV] = useState<ProjectValues>({ name: "", description: "", color: PROJECT_COLORS[0], organization_id: null, ...initial });
+  const [v, setV] = useState<ProjectValues>({ name: "", description: "", color: PROJECT_COLORS[0], organization_id: null, category: DEFAULT_CATEGORY, ...initial });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function submit(e: FormEvent) {
@@ -72,6 +73,11 @@ export function ProjectForm({ initial, orgs, onSubmit, submitLabel }: {
     <form onSubmit={submit} className="space-y-4">
       <Field label={t("Nombre del proyecto")}><input autoFocus required className="field" placeholder={t("p. ej. Rediseño app de Rutas")} value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
       <Field label={t("Descripción")}><textarea className="field min-h-20" placeholder={t("Objetivo, cliente, contexto…")} value={v.description} onChange={(e) => setV({ ...v, description: e.target.value })} /></Field>
+      <Field label={t("Tipo de proyecto")} hint={t("Investigación UX, desarrollo de software, IA, automatizaciones, TI… Sirve para filtrar tus proyectos.")}>
+        <select className="field" value={v.category} onChange={(e) => setV({ ...v, category: e.target.value as ProjectCategory })}>
+          {PROJECT_CATEGORIES.map((c) => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+        </select>
+      </Field>
       {orgs && orgs.length > 0 && (
         <Field group label={t("Espacio")} hint={t("En una organización, todas sus personas ven el proyecto y pueden comentar; tú sigues siendo dueño/a.")}>
           <div className="grid grid-cols-2 gap-2">

@@ -13,6 +13,7 @@ export function LiveStudiesPage() {
       <div>
         <Link to="/" className="focus-ring rounded text-sm text-ink-2 hover:text-ink">{t("← Inicio")}</Link>
         <h1 className="page-title mt-2">{t("Estudios activos")}</h1>
+        <p className="mt-2 max-w-2xl text-[0.9375rem] text-ink-2">{t("Un estudio es una prueba o encuesta que envías a participantes: pruebas de prototipo, encuestas, card sorting…")}</p>
       </div>
       <LiveStudiesList live={data?.live ?? []} load={{ loading: loading && !data, error: data ? null : error, reload }} />
     </div>
