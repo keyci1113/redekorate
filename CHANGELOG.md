@@ -4,6 +4,11 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Security scan of uploaded files.**
+  - **One step for every upload.** Images and HTML prototypes go through `server/src/lib/fileScan.ts` before their bytes are written.
+  - **Built-in checks, always on.** The real type (magic bytes) must match, so a file with HTML markers but binary content behind them is refused. The same step refuses PDFs with active content (`/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile`, `/AA`, `/RichMedia`, `/XFA`, also hex-escaped or inside compressed object streams), Office files with macros and text files that are HTML/SVG pages with scripts, ready for any upload path that accepts those types. Prototypes are meant to run (sandboxed), so they get only the type check and the antivirus.
+  - **Optional antivirus.** With `CLAMAV_HOST` set, every file is streamed to ClamAV (`clamd` INSTREAM over TCP, no new dependency). When clamd is configured but cannot answer, uploads are refused with a *try again* message; `CLAMAV_FAIL_OPEN=true` lets them through. The README has a `docker-compose.override.yml` snippet for a `clamav/clamav` service.
+  - **Messages.** A refused file gets a `422` (or a `503` when the antivirus is down) with a translated message that says why; the reason is logged on the server. The web upload screens already show it.
 - **No more blank pages when moving around the app.**
   - **What happened.** After a deploy, a tab opened before it still asked for the old build's page files. The server answered those with the app's HTML page instead of a 404, the browser refused it, and with nothing to catch the error React removed the whole app: a blank white page until a manual reload. Any other error while showing a page did the same.
   - **Now.** A page file that fails to load reloads the tab once, onto the new build. Any other error shows a short message with *Reload* and *Go to home*, inside the app frame so the menu still works, and clears when you move to another page.
