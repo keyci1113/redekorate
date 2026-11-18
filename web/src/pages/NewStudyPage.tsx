@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Clock, Plus, Search, Sparkles, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
@@ -7,7 +7,7 @@ import type { Project, Study } from "../lib/types";
 import { BLANK, CATEGORIES, TEMPLATES, type Category, type Template } from "../templates/catalog";
 import { CATEGORY_ICON } from "../templates/icons";
 import { blockDef } from "../blocks/registry";
-import { Button, ErrorNote, Field, Modal, cx } from "../components/ui";
+import { BackLink, Button, ErrorNote, Field, Modal, cx } from "../components/ui";
 import { Segmented } from "../components/editing";
 import { getLang, setContentLang, type Lang } from "../lib/i18n";
 
@@ -45,7 +45,7 @@ export function NewStudyPage() {
 
   return (
     <div className="page">
-      <Link to={`/projects/${id}`} className="text-sm text-ink-3 hover:text-ink">← {project.data?.project.name ?? t("Proyecto")}</Link>
+      <BackLink to={`/projects/${id}`} color={project.data?.project.color} label={project.data?.project.name ?? t("Proyecto")} section={t("Estudios")} />
 
       {firstTime && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-good/20 bg-good-soft px-4 py-3 text-sm text-good">

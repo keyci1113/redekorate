@@ -4,6 +4,12 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Interface review fixes.**
+  - **Project tabs.** A plain underline tab bar: the active tab gets an accent underline, counts are small badges that only show when there is something to count, and a thin divider separates the research tabs from the team's space. On narrower screens the row scrolls, runs to the screen edges and fades on the side that has more. "Repositorio de insights" is now "Insights". The `?tab=` links are unchanged.
+  - **A way back everywhere.** Documents, diagrams and sitemaps, the study builder, results and a new study open with the same back link: "← Project · Section", with the project's color, back to the tab they belong to. On a phone the full-screen pages show just the arrow. The document header also drops button labels on a phone so the title has room.
+  - **Page transitions.** A new page fades in (180 ms). Changing a tab or a filter, which only changes the query string, does not replay it, and with reduced motion it is off.
+  - **Project colors.** 18 colors around the color wheel, each with 4.5:1 contrast for white text, plus a custom color from the system picker. Also on the welcome wizard. The server already accepts only `#rrggbb`.
+  - **Insight title.** The title field of an insight is labeled "Title" again, not "Redekorate".
 - **No more blank pages when moving around the app.**
   - **What happened.** After a deploy, a tab opened before it still asked for the old build's page files. The server answered those with the app's HTML page instead of a 404, the browser refused it, and with nothing to catch the error React removed the whole app: a blank white page until a manual reload. Any other error while showing a page did the same.
   - **Now.** A page file that fails to load reloads the tab once, onto the new build. Any other error shows a short message with *Reload* and *Go to home*, inside the app frame so the menu still works, and clears when you move to another page.

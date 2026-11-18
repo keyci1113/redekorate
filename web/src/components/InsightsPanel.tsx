@@ -127,7 +127,7 @@ function InsightForm({ initial, studies, defaultStudy, onSubmit }: {
   }
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label={t("Redekorate")}><input autoFocus required className="field font-medium" placeholder={t("p. ej. Los cajeros no encuentran cómo aplicar descuentos")} value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} /></Field>
+      <Field label={t("Título")}><input autoFocus required className="field font-medium" placeholder={t("p. ej. Los cajeros no encuentran cómo aplicar descuentos")} value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} /></Field>
       <Field label={t("Detalle y evidencia")} hint={t("Qué observaste, citas, cuántos participantes, recomendación.")}>
         <textarea className="field min-h-32" value={v.body} onChange={(e) => setV({ ...v, body: e.target.value })} />
       </Field>

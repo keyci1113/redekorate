@@ -14,7 +14,7 @@ import type { StudySettings } from "../lib/settings";
 import { isDirect, screenName, type PrototypeTaskValue } from "../blocks/prototype";
 import { blockDef } from "../blocks/registry";
 import { susScore, answeredBlocks } from "../lib/analytics";
-import { Button, Card, Empty, ErrorNote, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
+import { BackLink, Button, Card, Empty, ErrorNote, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
 import { BlockResults, Overview } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
@@ -36,6 +36,8 @@ export function ResultsPage() {
   const { data, error, loading, reload } = useLoad(() => api.get<Results>(`/studies/${id}/results`), [id]);
   const st = data?.study;
   useEffect(() => { if (st) rememberStudy({ id: st.id, title: st.title, method: st.method, project_id: st.project_id, where: "results" }); }, [st]);
+  // Only for the way back ("← Project · Studies"); until it loads the link just says "Project".
+  const project = useLoad(() => (st ? api.get<{ project: Project }>(`/projects/${st.project_id}`) : Promise.resolve(null)), [st?.project_id]);
   if (loading && !data) return <Spinner />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
   const { study, sessions, answers, insights } = data;
@@ -43,7 +45,7 @@ export function ResultsPage() {
 
   return (
     <div className="page">
-      <Link to={`/projects/${study.project_id}`} className="text-sm text-ink-3 hover:text-ink">{t("← Proyecto")}</Link>
+      <BackLink to={`/projects/${study.project_id}`} color={project.data?.project.color} label={project.data?.project.name ?? t("Proyecto")} section={t("Estudios")} />
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="label">{templateByKey(study.method)?.name ?? study.method}</p>

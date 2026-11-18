@@ -143,7 +143,10 @@ export function Layout() {
         {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks. */}
         <ErrorBoundary resetKey={pathname}>
           <Suspense fallback={<Spinner />}>
-            <Outlet />
+            {/* Keyed by the path only: a new page fades in, while a tab or filter change (?tab=…) keeps the page as it is. */}
+            <div key={pathname} className="rk-page-in">
+              <Outlet />
+            </div>
           </Suspense>
         </ErrorBoundary>
       </main>
