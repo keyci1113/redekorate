@@ -13,7 +13,7 @@ import { Segmented } from "../components/editing";
 import { AvatarField } from "../components/AvatarField";
 import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
-import { PROJECT_COLORS } from "../components/ProjectForm";
+import { PROJECT_COLORS, ProjectColorPicker } from "../components/ProjectForm";
 import { AuthShell } from "./LoginPage";
 
 /** Methods offered on the last step: one per common first question. */
@@ -155,9 +155,7 @@ function ProjectStep({ org, busy, onCreate }: { org: Organization | null; busy: 
       <div className="mt-8 space-y-5">
         <Field label={t("Nombre del proyecto")}><input autoFocus className="field h-12 text-base" placeholder={t("p. ej. Rediseño app de Rutas")} value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <Field group label={t("Color")}>
-          <div className="flex gap-2">
-            {PROJECT_COLORS.map((c) => <button key={c} type="button" onClick={() => setColor(c)} aria-label={c} className={cx("focus-ring h-8 w-8 rounded-lg transition", color === c && "ring-2 ring-ink ring-offset-2")} style={{ background: c }} />)}
-          </div>
+          <ProjectColorPicker value={color} onChange={setColor} />
         </Field>
         <p className="flex items-center gap-2 text-sm text-ink-2">
           <FolderPlus size={15} className="text-ink-3" />

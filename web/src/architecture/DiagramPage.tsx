@@ -6,7 +6,7 @@ import { timeAgo } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import type { Project } from "../lib/types";
 import { canEdit } from "../lib/roles";
-import { Button, Modal } from "../components/ui";
+import { BackLink, Button, Modal } from "../components/ui";
 import { CommentsPanel } from "../components/CommentsPanel";
 import { SaveAsModal, ShareModal } from "../docs/DocModals";
 import type { DocData, DocRecord } from "../docs/types";
@@ -48,12 +48,10 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-paper">
+    <div className="rk-page-in flex h-dvh flex-col bg-paper">
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-(--page-gutter)">
-        <Link to={back} className="focus-ring flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-ink-3 hover:text-ink">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: project.color }} /><span className="hidden max-w-40 truncate sm:inline">{project.name}</span>
-        </Link>
-        <span className="text-line-2">/</span>
+        <BackLink compact to={back} color={project.color} label={project.name} section={t("Arquitectura")} />
+        <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
         <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={t("Título del diagrama")} className="focus-ring min-w-24 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}

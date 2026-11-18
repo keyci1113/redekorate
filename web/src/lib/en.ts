@@ -2477,4 +2477,6 @@ export const EN: Record<string, string> = {
 "Volvemos a las 3 p. m.": "Back at 3 pm.",
 "Actualizar mensaje": "Update message",
 "Activar modo mantenimiento": "Turn on maintenance mode",
+"Volver a {a}": "Back to {a}",
+"Secciones del proyecto": "Project sections",
 };

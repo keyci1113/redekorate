@@ -4,6 +4,12 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Interface review fixes.**
+  - **Project tabs.** A plain underline tab bar: the active tab gets an accent underline, counts are small badges that only show when there is something to count, and a thin divider separates the research tabs from the team's space. On narrower screens the row scrolls, runs to the screen edges and fades on the side that has more. "Repositorio de insights" is now "Insights". The `?tab=` links are unchanged.
+  - **A way back everywhere.** Documents, diagrams and sitemaps, the study builder, results and a new study open with the same back link: "← Project · Section", with the project's color, back to the tab they belong to. On a phone the full-screen pages show just the arrow. The document header also drops button labels on a phone so the title has room.
+  - **Page transitions.** A new page fades in (180 ms). Changing a tab or a filter, which only changes the query string, does not replay it, and with reduced motion it is off.
+  - **Project colors.** 18 colors around the color wheel, each with 4.5:1 contrast for white text, plus a custom color from the system picker. Also on the welcome wizard. The server already accepts only `#rrggbb`.
+  - **Insight title.** The title field of an insight is labeled "Title" again, not "Redekorate".
 - **Security scan of uploaded files.**
   - **One step for every upload.** Images and HTML prototypes go through `server/src/lib/fileScan.ts` before their bytes are written.
   - **Built-in checks, always on.** The real type (magic bytes) must match, so a file with HTML markers but binary content behind them is refused. The same step refuses PDFs with active content (`/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile`, `/AA`, `/RichMedia`, `/XFA`, also hex-escaped or inside compressed object streams), Office files with macros and text files that are HTML/SVG pages with scripts, ready for any upload path that accepts those types. Prototypes are meant to run (sandboxed), so they get only the type check and the antivirus.

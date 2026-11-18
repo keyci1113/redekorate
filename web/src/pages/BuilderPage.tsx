@@ -13,7 +13,7 @@ import { BlockEditor } from "../blocks/Editor";
 import { LogicEditor } from "../blocks/LogicEditor";
 import { BlockView, isWide } from "../blocks/Runner";
 import { validateStudy, type Issue } from "../blocks/validate";
-import { Button, ErrorNote, Field, Modal, Spinner, StatusBadge, cx } from "../components/ui";
+import { BackLink, Button, ErrorNote, Field, Modal, Spinner, StatusBadge, cx } from "../components/ui";
 import { ImageDrop, PaneHandle, Segmented, Toggle, useSortable } from "../components/editing";
 import { BRAND_COLORS, defaultConsent, brandStyle, voiceOn, type StudySettings } from "../lib/settings";
 import { templateByKey } from "../templates/catalog";
@@ -115,14 +115,11 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   const errorsCount = issues.filter((i) => i.level === "error").length;
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="rk-page-in flex h-screen flex-col">
       {/* Barra superior */}
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
-        <Link to={`/projects/${project.id}`} className="focus-ring flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-ink-3 hover:text-ink">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: project.color }} />
-          <span className="hidden max-w-40 truncate sm:inline">{project.name}</span>
-        </Link>
-        <span className="text-line-2">/</span>
+        <BackLink compact to={`/projects/${project.id}`} color={project.color} label={project.name} section={t("Estudios")} />
+        <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
         <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t("Título del estudio")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} /> {t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : ""}
