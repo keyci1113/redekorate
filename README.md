@@ -137,6 +137,7 @@ Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for p
 - Brute-force protection, constant-time login responses, single-use password-reset tokens.
 - CSRF guard, strict CSP, HSTS, zod validation on every input, parameterized SQL, ownership checks on every resource.
 - Uploads validated by magic bytes (SVG rejected), random file names, served with a no-script CSP. HTML prototypes run in a sandboxed iframe with an opaque origin.
+- Every upload goes through a security scan before it is stored: the real type must match the extension, text that is really a scripted HTML/SVG page is refused, and an optional ClamAV antivirus can check every file (see [Upload security scan](#upload-security-scan)).
 - Participants' IP and full user agent are never stored, only the device class. Public reports and the MCP server never include participant data.
 - Outside access (MCP): hashed, revocable tokens; OAuth with PKCE and exact redirect matching; tools can read, create and edit but never delete, and respect project roles.
 
@@ -187,6 +188,51 @@ location = /maintenance.html { root /srv/redekorate; internal; }
 ```
 
 The page is self-contained and reloads every 15 seconds. API calls still get the proxy's 502, which the web app recognizes.
+
+### Upload security scan
+
+Every uploaded file (images and HTML prototypes) goes through one scan step (`server/src/lib/fileScan.ts`) before its bytes are written. A refused file gets a `422` with a message that says why, in the user's language, and the reason is logged on the server (`[fileScan] rejected upload …`).
+
+**Built-in checks, always on, no setup:**
+
+- **Real type.** The first bytes must match the type: a file with image or HTML markers but other bytes behind them is refused.
+- **PDFs with active content** are refused: `/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile(s)`, `/AA` (automatic actions), `/RichMedia` and `/XFA`, also when the names are hex-escaped or hidden in compressed object streams. A PDF that only opens on a page (`/OpenAction` without JavaScript) is fine.
+- **Office files with macros** are refused (`vbaProject.bin`, Excel 4.0 macro sheets, or a VBA project in a legacy `.doc`).
+- **Text files** (`.md`, `.txt`, `.csv`) that are really HTML or SVG pages with scripts are refused. HTML prototypes are meant to run (in a sandbox), so they only get the type check and the antivirus.
+
+The upload routes accept only images and HTML prototypes today; the PDF, Office and text checks are there for any upload path that takes those types. The built-in checks look for the risky features, not for known malware. For signature-based detection, add ClamAV.
+
+**Optional antivirus (ClamAV).** When `CLAMAV_HOST` is set, every file is streamed to `clamd` (the `INSTREAM` command over TCP, no extra dependency) and a match is refused. If clamd is configured but does not answer (down, still loading its signatures, timed out, or the file is over its `StreamMaxLength`), the upload is refused with a *try again in a few minutes* message and a `503`: the check fails closed. Set `CLAMAV_FAIL_OPEN=true` to accept files without the antivirus while it is down (the built-in checks still run).
+
+| Variable | Default | |
+|---|---|---|
+| `CLAMAV_HOST` | *(empty: no antivirus)* | Host name of clamd, for example `clamav` in Docker Compose. |
+| `CLAMAV_PORT` | `3310` | clamd's TCP port. |
+| `CLAMAV_TIMEOUT_MS` | `30000` | How long to wait for a verdict. |
+| `CLAMAV_FAIL_OPEN` | `false` | `true` accepts uploads when clamd cannot answer. |
+
+To run it with Docker Compose, put this in a `docker-compose.override.yml` next to `docker-compose.yml` (Compose merges it on its own, so the main file stays as it is) and run `docker compose up -d`:
+
+```yaml
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav   # signatures, kept up to date by freshclam inside the container
+    # clamd listens on 3310 inside the Docker network only: do not publish the port.
+  app:
+    depends_on:
+      clamav: { condition: service_started }
+    environment:
+      CLAMAV_HOST: clamav
+      # CLAMAV_FAIL_OPEN: "true"   # accept uploads while clamd is down
+
+volumes:
+  clamav-db:
+```
+
+ClamAV needs about 1.5 to 2 GB of RAM, and a minute or two after it starts to load its signatures; uploads made in that minute are refused with *try again*. clamd's default `StreamMaxLength` is 25 MB, above the largest upload (`UPLOAD_MAX_MB`, 10 by default); if you raise the upload limit past it, raise it too with your own `clamd.conf`.
 
 ### Search engines and link previews
 

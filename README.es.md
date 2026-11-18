@@ -59,6 +59,7 @@ Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de
 - Encabezados con Helmet: CSP estricta (`script-src 'self'`, `frame-ancestors 'none'`), HSTS, `nosniff` y Referrer-Policy.
 - Toda la entrada se valida con zod y todo el SQL va parametrizado. Cada recurso verifica que pertenezca al usuario.
 - Imágenes: se valida el formato real del archivo por sus primeros bytes (PNG, JPG, GIF, WEBP; SVG se rechaza porque puede contener scripts). Máximo 10 MB, nombres aleatorios y se sirven con `CSP default-src 'none'`.
+- Análisis de seguridad de cada archivo subido (imágenes y prototipos HTML) antes de guardarlo: el tipo real debe coincidir con la extensión, se rechazan los textos que en realidad son páginas HTML o SVG con scripts, y un antivirus ClamAV opcional puede revisar cada archivo. Ver [Análisis de archivos subidos](#análisis-de-archivos-subidos).
 - Límites de uso en las rutas públicas, en la creación de sesiones y en las subidas.
 - El servidor no arranca en producción sin un `JWT_SECRET` de al menos 32 caracteres. El contenedor corre sin root y la base de datos no se expone.
 
@@ -98,6 +99,35 @@ La app se encarga sola del mantenimiento:
 - **Mientras trabajas en la instancia:** una persona administradora activa el *Modo mantenimiento* en *Usuarios*, con un mensaje opcional (por ejemplo, cuándo vuelve). Hasta que se desactive, quien no es admin ve la pantalla de mantenimiento, incluidos participantes de estudios y MCP. Las personas administradoras siguen trabajando y ven un aviso arriba. El interruptor se guarda en la base de datos (`app_settings`), así que un deploy o un reinicio no lo apaga.
 
 Mientras el contenedor se reinicia, el proxy no tiene a quién reenviar, así que una página que se abre justo en ese momento recibe el error del proxy. Para mostrar ahí también una página amable, copia `deploy/maintenance.html` al servidor y sírvela en 502, 503 y 504 (los ejemplos para Caddy y Nginx están en el [README en inglés](README.md#maintenance-screen)). La página no depende de la app y se recarga cada 15 segundos.
+
+### Análisis de archivos subidos
+
+Cada archivo subido (imágenes y prototipos HTML) pasa por un análisis (`server/src/lib/fileScan.ts`) antes de guardarse. Si se rechaza, la respuesta es un `422` con un mensaje que explica por qué, en el idioma de quien sube, y el motivo queda en el log del servidor (`[fileScan] rejected upload …`).
+
+**Revisiones incluidas, siempre activas:** el tipo real (sus primeros bytes) debe coincidir con el tipo del archivo; se rechazan los PDF con `/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile(s)`, `/AA`, `/RichMedia` o `/XFA` (también escritos en hexadecimal o dentro de flujos de objetos comprimidos), los documentos de Office con macros (`vbaProject.bin`) y los archivos de texto que en realidad son páginas HTML o SVG con scripts. Los prototipos HTML están hechos para ejecutarse (en un sandbox), así que solo pasan la revisión de tipo y el antivirus. Hoy las subidas aceptan solo imágenes y prototipos HTML; las revisiones de PDF, Office y texto quedan listas para cualquier ruta que acepte esos tipos.
+
+**Antivirus opcional (ClamAV).** Con `CLAMAV_HOST` definido, cada archivo se envía a `clamd` (comando `INSTREAM` por TCP, sin dependencias nuevas) y se rechaza si encuentra algo. Si clamd está configurado pero no responde, la subida se rechaza con un mensaje de *inténtalo de nuevo* y un `503`; `CLAMAV_FAIL_OPEN=true` acepta los archivos sin antivirus mientras tanto. Otras variables: `CLAMAV_PORT` (3310) y `CLAMAV_TIMEOUT_MS` (30000).
+
+Con Docker Compose, crea un `docker-compose.override.yml` junto a `docker-compose.yml` (Compose lo combina solo) y corre `docker compose up -d`:
+
+```yaml
+services:
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    volumes:
+      - clamav-db:/var/lib/clamav
+  app:
+    depends_on:
+      clamav: { condition: service_started }
+    environment:
+      CLAMAV_HOST: clamav
+
+volumes:
+  clamav-db:
+```
+
+ClamAV necesita entre 1,5 y 2 GB de RAM y uno o dos minutos para cargar sus firmas al arrancar. Detalles en el [README en inglés](README.md#upload-security-scan).
 
 ### Buscadores y vistas previas de enlaces
 
