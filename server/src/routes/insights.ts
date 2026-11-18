@@ -5,6 +5,7 @@ import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
 import { requireProject } from "../lib/access.js";
+import { patchOf } from "../lib/schemas.js";
 
 export const insights = Router();
 insights.use(requireAuth);
@@ -17,6 +18,8 @@ const Fields = z.object({
   confidence: z.enum(["low", "medium", "high"]).default("medium"),
   evidence: z.array(z.unknown()).default([]),
 });
+
+export const InsightPatch = patchOf(Fields).extend({ reviewed: z.boolean().optional() });
 
 insights.post("/", async (req, res) => {
   const b = parse(Fields.extend({ project_id: z.string().uuid(), study_id: z.string().uuid().nullable().optional() }), req.body);
@@ -42,7 +45,8 @@ async function ownInsight(id: string, userId: string) {
 
 insights.patch("/:id", async (req, res) => {
   await ownInsight(req.params.id, req.user!.id);
-  const b = Fields.partial().extend({ reviewed: z.boolean().optional() }).parse(req.body);
+  // patchOf, not .partial(): .partial() keeps the defaults, so { reviewed: true } wiped body, tags and evidence.
+  const b = InsightPatch.parse(req.body);
   // Marcar o desmarcar como revisado
   if (b.reviewed === true) await query("update insights set reviewed_at = coalesce(reviewed_at, now()), reviewed_by = coalesce(reviewed_by, $2) where id = $1", [req.params.id, req.user!.id]);
   if (b.reviewed === false) await query("update insights set reviewed_at = null, reviewed_by = null where id = $1", [req.params.id]);

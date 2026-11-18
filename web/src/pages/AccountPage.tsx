@@ -126,7 +126,7 @@ export function AccountPage() {
         </Section>
 
         <Section icon={<Plug size={16} />} title={t("Acceso externo (MCP)")}
-          text={t("Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada.")}>
+          text={t("Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada. También pueden lanzar, cerrar y publicar estudios, y eso lo ven los participantes al momento. Cuando reemplazan el contenido de un estudio o un documento, la versión anterior queda guardada y se puede restaurar.")}>
           <OutsideAccess />
         </Section>
 
