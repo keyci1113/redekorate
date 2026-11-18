@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
@@ -7,7 +7,7 @@ import { OrgChip } from "./OrgsPage";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Insight, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
-import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, type TabItem } from "../components/ui";
+import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, cx, type TabItem } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
@@ -60,16 +60,16 @@ export function ProjectPage() {
     <div className="page">
       <BackLink to="/projects" label={t("Proyectos")} />
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl">
+        <div className="max-w-3xl min-w-[min(100%,24rem)] flex-1">
           <div className="flex items-center gap-3">
             <span className="h-3.5 w-3.5 rounded" style={{ background: p.color }} />
             <h1 className="page-title">{p.name}</h1>
             {p.organization_id && <OrgChip id={p.organization_id} name={p.org_name ?? ""} logo={p.org_logo} color={p.org_color} />}
             {role && !isOwner && <Tag>{sharedLabel(role, p.owner_name)}</Tag>}
           </div>
-          {p.description && <p className="mt-2 text-[15px] whitespace-pre-line text-ink-2">{p.description}</p>}
+          {p.description && <Description text={p.description} />}
         </div>
-        {canEdit && <div className="flex gap-2">
+        {canEdit && <div className="flex shrink-0 gap-2">
           <Button variant="ghost" icon={<Pencil size={15} />} onClick={() => setEditOpen(true)}>{t("Editar")}</Button>
           <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Nuevo estudio")}</Button>
         </div>}
@@ -165,6 +165,28 @@ function StudyRow({ s, first, canEdit, onChange }: { s: Study; first: boolean; c
           }}><Trash2 size={14} /> {t("Eliminar")}</button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** A project's description: three lines at first, the rest behind "Show more" so a long brief doesn't push the tabs down. */
+function Description({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const [long, setLong] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setLong(open || el.scrollHeight > el.clientHeight + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [text, open]);
+  return (
+    <div className="mt-2">
+      <p ref={ref} className={cx("text-[15px] leading-relaxed whitespace-pre-line text-pretty text-ink-2", !open && "line-clamp-3")}>{text}</p>
+      {long && <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="focus-ring mt-1 rounded text-sm font-medium text-accent hover:underline">{open ? t("Ver menos") : t("Ver más")}</button>}
     </div>
   );
 }

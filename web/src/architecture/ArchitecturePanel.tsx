@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderTree as Sitemap, GitFork, Link2, Network, Palette, Plus, Shapes, Workflow } from "lucide-react";
+import { FolderTree as Sitemap, GitFork,  Network, Palette, Plus, Shapes, Workflow } from "lucide-react";
 import { api } from "../lib/api";
-import { timeAgo } from "../lib/hooks";
 import { getLang, t, tr, type Lang } from "../lib/i18n";
 import { Button, Empty, ErrorNote, Field, Modal, cx } from "../components/ui";
 import { Segmented } from "../components/editing";
 import type { DocRecord } from "../docs/types";
+import { DocCard } from "../docs/DocCard";
 import { starter, type StarterId } from "./model";
 
 const STARTERS: { id: StarterId; name: string; text: string; icon: ReactNode }[] = [
@@ -35,14 +35,8 @@ export function ArchitecturePanel({ projectId, diagrams, onChange, canEdit = tru
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {diagrams.map((d) => (
-            <button key={d.id} onClick={() => nav(`/docs/${d.id}`)} className="focus-ring flex flex-col rounded-xl border border-line bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:border-accent hover:shadow-lg hover:shadow-accent/10">
-              <div className="flex items-start justify-between gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-accent">{d.kind === "sitemap" ? <Sitemap size={18} /> : d.kind === "moodboard" ? <Palette size={18} /> : <Shapes size={18} />}</span>
-                {d.share_token && <span title={t("Compartido")} className="text-good"><Link2 size={14} /></span>}
-              </div>
-              <p className="mt-3 font-semibold leading-snug">{d.title}</p>
-              <p className="mt-0.5 text-xs text-ink-3">{kindLabel(d.kind)} · {t("editado {a}", { a: timeAgo(d.updated_at) })}</p>
-            </button>
+            <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} kind={kindLabel(d.kind)}
+              icon={d.kind === "sitemap" ? <Sitemap size={18} /> : d.kind === "moodboard" ? <Palette size={18} /> : <Shapes size={18} />} />
           ))}
         </div>
       )}
