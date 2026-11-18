@@ -61,11 +61,9 @@ test("images and prototypes that pass the scan are stored", { skip }, async () =
 test("files the security scan refuses leave nothing on disk", { skip }, async () => {
   const before = await onDisk();
   assert.equal((await upload("", "doc.pdf", Buffer.from("%PDF-1.7\n1 0 obj << /OpenAction << /S /JavaScript /JS (app.alert(1)) >> >> endobj\n%%EOF"))).status, 415, "only images, by content");
-  // Valid HTML markers but bytes that are not UTF-8 text: the type check refuses it.
-  const binary = Buffer.concat([Buffer.from("<html><body>"), Buffer.from([0xff, 0xfe, 0xfd]), Buffer.from("</body></html>")]);
-  const mismatch = await upload("/prototype", "proto.html", binary, "en");
-  assert.equal(mismatch.status, 422);
-  assert.match(mismatch.body.error, /does not match its type/, "the reason is translated");
+  // Valid HTML markers around binary bytes (null bytes are never in text): refused before anything is written.
+  const binary = Buffer.concat([Buffer.from("<html><body>"), Buffer.from([0x00, 0x01, 0x02]), Buffer.from("</body></html>")]);
+  assert.equal((await upload("/prototype", "proto.html", binary, "en")).status, 415);
   assert.equal(await onDisk(), before);
 });
 

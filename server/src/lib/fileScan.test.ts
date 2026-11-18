@@ -163,3 +163,7 @@ test("the built-in checks run before the antivirus is asked", async () => {
 test("every rejection message has an English translation", () => {
   for (const m of Object.values(SCAN_MESSAGES)) assert.notEqual(translate(m, "en"), m, m);
 });
+
+test("a Latin-1 HTML prototype is still text", () => {
+  assert.equal(inspect(Buffer.from("<html><body><p>Caf\xe9 y se\xf1al</p><script>go()</script></body></html>", "latin1"), "html", { allowScripts: true }), null);
+});

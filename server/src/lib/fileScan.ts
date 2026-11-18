@@ -37,9 +37,12 @@ export type Magic = "png" | "jpg" | "gif" | "webp" | "pdf" | "zip" | "ole" | "we
 
 const starts = (buf: Buffer, bytes: number[], at = 0) => buf.length >= at + bytes.length && bytes.every((b, i) => buf[at + i] === b);
 const ascii = (buf: Buffer, from: number, to: number) => buf.toString("latin1", from, to);
-function isUtf8Text(buf: Buffer) {
-  if (buf.includes(0)) return false;
-  try { new TextDecoder("utf-8", { fatal: true }).decode(buf); return true; } catch { return false; }
+/**
+ * Text in any 8-bit encoding (UTF-8, Latin-1, Windows-1252: older HTML exports often are not UTF-8).
+ * Binaries are caught by their magic bytes above or by the null bytes they almost always contain.
+ */
+function isText(buf: Buffer) {
+  return !buf.includes(0);
 }
 
 /** What the bytes really are, whatever the file is called. */
@@ -56,7 +59,7 @@ export function magicType(buf: Buffer): Magic {
   if (ascii(buf, 0, 2) === "MZ") return "exe";
   if (starts(buf, [0x7f, 0x45, 0x4c, 0x46])) return "elf";
   if ([[0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf], [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe]].some((m) => starts(buf, m))) return "macho";
-  if (buf.length > 0 && isUtf8Text(buf)) return "text";
+  if (buf.length > 0 && isText(buf)) return "text";
   return "unknown";
 }
 
