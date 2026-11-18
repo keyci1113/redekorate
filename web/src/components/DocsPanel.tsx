@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FilePlus2, Link2 } from "lucide-react";
+import { FilePlus2 } from "lucide-react";
 import { api } from "../lib/api";
-import { timeAgo } from "../lib/hooks";
 import { getLang, t, tr, type Lang } from "../lib/i18n";
 import { Button, Empty, ErrorNote, Field, Modal, cx } from "./ui";
 import { Segmented } from "./editing";
 import { DOC_CATEGORIES, DOC_TEMPLATES, docTemplate } from "../docs/templates";
 import type { DocRecord, DocTemplate } from "../docs/types";
+import { DocCard } from "../docs/DocCard";
 
 export function DocsPanel({ projectId, docs, onChange, preselect, canEdit = true }: { projectId: string; docs: DocRecord[]; onChange: () => void; preselect?: string | null; canEdit?: boolean }) {
   const [open, setOpen] = useState(!!preselect && canEdit);
@@ -27,17 +27,8 @@ export function DocsPanel({ projectId, docs, onChange, preselect, canEdit = true
           {docs.map((d) => {
             const tpl = docTemplate(d.kind);
             return (
-              <button key={d.id} onClick={() => nav(`/docs/${d.id}`)} className="focus-ring flex flex-col rounded-xl border border-line bg-surface p-4 text-left transition hover:-translate-y-0.5 hover:border-accent hover:shadow-lg hover:shadow-accent/10">
-                <div className="flex items-start justify-between gap-2">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-accent">{tpl?.icon}</span>
-                  <span className="flex items-center gap-1.5">
-                    {d.share_token && <span title={t("Compartido")} className="text-good"><Link2 size={14} /></span>}
-                    <span className="rounded bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 uppercase">{d.language}</span>
-                  </span>
-                </div>
-                <p className="mt-3 font-semibold leading-snug">{d.title}</p>
-                <p className="mt-0.5 text-xs text-ink-3">{tpl ? tpl.name && t(tpl.name) : d.kind} · {t("editado {a}", { a: timeAgo(d.updated_at) })}</p>
-              </button>
+              <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} icon={tpl?.icon} kind={tpl ? t(tpl.name) : d.kind}
+                badge={<span className="rounded bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 uppercase">{d.language}</span>} />
             );
           })}
         </div>

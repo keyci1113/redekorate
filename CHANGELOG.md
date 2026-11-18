@@ -4,6 +4,9 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Outside assistants: document fields.** New `document_reference` MCP tool: every document kind, and for one kind its sections in order, the key each uses in `data`, its title and prompt, and the shape its value takes. The connection's instructions point to it. `create_document` now only takes kinds the app opens (its hint used to name `research_plan`, which is a study method, not a document kind; a research plan document is `ux_blueprint`). The list mirrors `web/src/docs/templates.tsx`; `documentReference.test.ts` fails if they drift apart.
+- **Card menus on documents and diagrams.** Each card in UX documents and Architecture has a ⋯ menu for editors: open in a new tab, rename, share, duplicate, save as… and delete. The card itself still opens the document. Cards no longer lift on hover, because a moving card carried its fixed-position menu away.
+- **Project description layout.** A long description shows three lines with *See more* / *See less*, up to 48rem wide, and on phones sits below the title instead of beside the buttons.
 - **Mood boards (v1).** A new *Mood board* starter in Architecture → New diagram, stored as its own document kind (`moodboard`) on the diagram canvas, so sharing, comments, duplicates, export and the API work as for diagrams.
   - **Board items.** Images (upload several at once, drop files on the board or paste them with ⌘V), color swatches (system picker plus a hex field) and links (title, site name, opens in a new tab; a pasted or dropped web address becomes a link). Notes, cards, text and sections work as on any diagram. Stored items keep only safe values: pictures from `/uploads/` or https, `#rrggbb` colors and http(s) links.
   - **Pull colors.** On a selected image, *Pull colors* adds its main colors as a row of swatches under it (`dominantColors` in `architecture/model.ts`).

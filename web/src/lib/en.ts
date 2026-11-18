@@ -2545,4 +2545,9 @@ export const EN: Record<string, string> = {
 "Mood board": "Mood board",
 "Imágenes, colores, notas y enlaces de una dirección visual. Compara direcciones con participantes en una prueba de preferencia.": "Images, colors, notes and links for a visual direction. Compare directions with participants in a preference test.",
 "Diagramas, flujos, mapas del sitio y mood boards: dibuja con figuras y flechas, escribe un esquema y el mapa se arma solo, o junta imágenes y colores.": "Diagrams, flows, sitemaps and mood boards: draw with shapes and arrows, write an outline and the map builds itself, or gather images and colors.",
+"Abrir en otra pestaña": "Open in a new tab",
+"Opciones de {a}": "Options for {a}",
+"¿Eliminar \"{a}\"? Esta acción no se puede deshacer.": "Delete \"{a}\"? This can't be undone.",
+"Ver más": "See more",
+"Cambiar nombre": "Rename",
 };

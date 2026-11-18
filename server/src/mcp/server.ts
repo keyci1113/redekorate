@@ -13,7 +13,10 @@ export const MCP_INSTRUCTIONS = `redekorate is a UX research platform: projects 
 their responses, research documents and insights. Start with list_projects, then get_project.
 You act as the signed-in user with their project roles. You can read, create and edit, never delete.
 Before building or editing a study, read study_block_reference. Editing a live study changes a draft;
-publish_study_changes makes it what participants see.`;
+publish_study_changes makes it what participants see. Before creating or filling a research document, read
+document_reference: it lists every document kind and, for one kind, the key and value shape of each section in data
+(a research plan document is ux_blueprint; research_plan is a study method). Diagrams, sitemaps and mood boards:
+diagram_reference.`;
 
 class ApiCallError extends Error {}
 

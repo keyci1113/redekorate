@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { BLOCK_REFERENCE, BLOCK_TYPES, DIAGRAM_REFERENCE, DIAGRAM_SHAPES, METHODS } from "./reference.js";
 import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
+import { DOC_KINDS, DOCUMENT_KINDS, documentReference } from "./documentReference.js";
 
 /** The REST API as the token's user. No delete on purpose. */
 export interface Api {
@@ -148,6 +149,13 @@ export const TOOLS: ToolDef[] = [
     description: "How diagrams, sitemaps and mood boards (the Architecture section) are shaped. Read this before creating or editing one.",
     run: async () => ({ kinds: ["diagram", "sitemap", "moodboard"], shapes: DIAGRAM_SHAPES, reference: DIAGRAM_REFERENCE }),
   }),
+  tool({
+    name: "document_reference", title: "Document reference", writes: false,
+    input: { kind: z.enum(Object.keys(DOC_KINDS) as [string, ...string[]]).optional().describe("Leave out to list every kind") },
+    description: "How research documents are shaped. Without kind: every document kind with its name and purpose. With kind: its sections in order, each with the key it uses in data, its title, its prompt and the shape its value takes. Read this before create_document or update_document.",
+    run: async ({ kind }) => kind ? documentReference(kind)
+      : { kinds: Object.entries(DOC_KINDS).map(([k, v]) => ({ kind: k, name: v.name, description: v.description })), canvas_kinds: "diagram, sitemap and moodboard: see diagram_reference" },
+  }),
 
   // ---------- write (never delete) ----------
   tool({
@@ -233,10 +241,10 @@ export const TOOLS: ToolDef[] = [
   tool({
     name: "create_document", title: "Create document", writes: true,
     input: {
-      project_id: id("project"), kind: z.string().min(1).max(60).describe("Template kind, e.g. proto_persona, journey_map, interview_guide, research_plan; read a document of the same kind with get_document to copy its data shape. \"diagram\", \"sitemap\" and \"moodboard\" are the Architecture section: read diagram_reference first"),
+      project_id: id("project"), kind: z.enum(DOCUMENT_KINDS).describe("A document kind from document_reference (a research plan document is ux_blueprint), or diagram, sitemap or moodboard (see diagram_reference)"),
       title: z.string().trim().min(1).max(200), language: Lang, data: z.record(z.string(), z.unknown()).optional(),
     },
-    description: "Create a research document in a project.",
+    description: "Create a research document in a project. data is keyed by section id: call document_reference with the kind first, it lists each section's key and value shape. Leaving data out creates an empty document.",
     run: async (a, { api, baseUrl }) => {
       const { document: d } = await api.post("/documents", a);
       return { id: d.id, kind: d.kind, title: d.title, open_in_app: `${baseUrl}/docs/${d.id}` };
