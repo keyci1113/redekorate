@@ -111,7 +111,7 @@ export function ProjectPage() {
         {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} onChange={members.reload} />)}
         {tab === "comments" && <CommentsPanel projectId={p.id} role={role} />}
         {tab === "report" && (
-          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
+          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} documents={uxDocs} diagrams={diagrams} hasDescription={!!p.description?.trim()} insightCount={insights.data?.insights.length ?? 0} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
         )}
       </div>
 
