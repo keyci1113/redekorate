@@ -2501,4 +2501,6 @@ export const EN: Record<string, string> = {
 "Aún no hay suficientes respuestas para medir el completado.": "Not enough responses yet to measure completion.",
 "Aún no hay insights.": "No insights yet.",
 "Primero los más graves.": "Most severe first.",
+"Volver a {a}": "Back to {a}",
+"Secciones del proyecto": "Project sections",
 };

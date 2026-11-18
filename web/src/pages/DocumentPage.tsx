@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import { copy, timeAgo, uid, useLoad } from "../lib/hooks";
 import { t, type Lang } from "../lib/i18n";
 import type { Project } from "../lib/types";
-import { Button, ErrorNote, Field, Modal, Spinner, cx } from "../components/ui";
+import { BackLink, Button, ErrorNote, Field, Modal, Spinner, cx } from "../components/ui";
 import { ExportMenu } from "../components/ExportMenu";
 import { DocumentView } from "../docs/DocumentView";
 import { docTemplate } from "../docs/templates";
@@ -71,12 +71,10 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   }
 
   return (
-    <div className="min-h-full bg-paper-2">
+    <div className="rk-page-in min-h-full bg-paper-2">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface/95 px-(--page-gutter) backdrop-blur print:hidden">
-        <Link to={`/projects/${project.id}?tab=docs`} className="focus-ring flex items-center gap-2 rounded-md px-1.5 py-1 text-sm text-ink-3 hover:text-ink">
-          <span className="h-2.5 w-2.5 rounded-sm" style={{ background: project.color }} /><span className="hidden max-w-40 truncate sm:inline">{project.name}</span>
-        </Link>
-        <span className="text-line-2">/</span>
+        <BackLink compact to={`/projects/${project.id}?tab=docs`} color={project.color} label={project.name} section={t("Documentos")} />
+        <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
         <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t("Título del documento")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
@@ -86,11 +84,11 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
             <button key={l} type="button" onClick={() => setLangDoc(l)} className={cx("rounded-md px-2 py-1 uppercase", lang === l ? "bg-surface shadow-sm" : "text-ink-3")}>{l}</button>
           ))}
         </div>
-        {doc.kind === "usability_script" && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript}>{t("Crear matriz de resultados")}</Button>}
-        <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)}>{t("Guardar como…")}</Button>
+        {doc.kind === "usability_script" && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript} className="max-lg:hidden">{t("Crear matriz de resultados")}</Button>}
+        <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>
         <ExportMenu tpl={tpl} title={title} data={content} lang={lang} projectName={project.name} />
-        <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)}>{t("Comentarios")}</Button>
-        {!readOnly && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>}
+        <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)} aria-label={t("Comentarios")}><span className="max-sm:hidden">{t("Comentarios")}</span></Button>
+        {!readOnly && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
       </header>
 
       <main className="page print:p-0">

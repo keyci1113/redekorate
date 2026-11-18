@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { CheckCircle2, TriangleAlert, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, TriangleAlert, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { StudyStatus, Severity } from "../lib/types";
 
 import { t } from "../lib/i18n";
@@ -171,22 +172,56 @@ export function Stat({ label, value, sub, tone, note }: { label: string; value: 
   );
 }
 
-export function Tabs<T extends string>({ value, onChange, items }: { value: T; onChange: (v: T) => void; items: { id: T; label: string; count?: number }[] }) {
+export interface TabItem<T extends string> { id: T; label: string; count?: number; group?: string }
+
+/** Underline tabs. A count shows as a small badge when there is something to count; when `group` changes from one item to the
+ *  next, a thin divider separates them. The row scrolls sideways on its own when the tabs don't fit, so the page never does. */
+export function Tabs<T extends string>({ value, onChange, items, label }: { value: T; onChange: (v: T) => void; items: TabItem<T>[]; label?: string }) {
   return (
-    <div className="flex gap-1 border-b border-line">
-      {items.map((t) => (
-        <button
-          key={t.id}
-          onClick={() => onChange(t.id)}
-          className={cx(
-            "focus-ring -mb-px flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition",
-            value === t.id ? "border-ink text-ink" : "border-transparent text-ink-3 hover:text-ink-2",
-          )}
-        >
-          {t.label}
-          {t.count !== undefined && <span className="rounded-full bg-ink/5 px-1.5 text-[11px] tabular-nums text-ink-2">{t.count}</span>}
-        </button>
-      ))}
+    // On a phone the row runs to the screen edges, so a tab is never cut off at the page margin.
+    <div role={label ? "navigation" : undefined} aria-label={label} className="rk-tabs overflow-x-auto [scrollbar-width:thin] max-sm:-mx-(--page-gutter) max-sm:px-(--page-gutter)">
+      <div className="flex min-w-max items-stretch border-b border-line">
+        {items.map((it, i) => {
+          const on = value === it.id;
+          const divider = i > 0 && it.group !== items[i - 1].group;
+          return (
+            <div key={it.id} className="flex items-stretch">
+              {divider && <span aria-hidden className="mx-1.5 my-3 w-px bg-line-2/60" />}
+              <button
+                type="button"
+                ref={on ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
+                onClick={() => onChange(it.id)}
+                aria-current={on ? "page" : undefined}
+                className={cx(
+                  "group relative flex items-center gap-1.5 rounded-t-md px-2.5 pt-2.5 pb-3 text-sm font-medium whitespace-nowrap transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
+                  on ? "text-ink" : "text-ink-3 hover:text-ink",
+                )}
+              >
+                {it.label}
+                {!!it.count && <span className={cx("min-w-5 rounded-full px-1.5 text-center text-[11px] leading-[18px] font-semibold tabular-nums transition", on ? "bg-accent-soft text-accent-ink" : "bg-ink/5 text-ink-3")}>{it.count}</span>}
+                {/* The underline sits on the row's border, so the bar reads as one line. */}
+                <span aria-hidden className={cx("absolute inset-x-2 -bottom-px h-0.5 rounded-full transition", on ? "bg-accent" : "bg-transparent group-hover:bg-line-2")} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
+  );
+}
+
+/** The way back to the page this one was opened from: "← Project · Documents". `color` adds the project's swatch.
+ *  `compact` is for the top bar of full-screen pages: on a phone only the arrow shows, and the text stays for screen readers. */
+export function BackLink({ to, label, section, color, compact, className }: { to: string; label: string; section?: string; color?: string; compact?: boolean; className?: string }) {
+  return (
+    <Link to={to} title={t("Volver a {a}", { a: section ? `${label} · ${section}` : label })}
+      className={cx("focus-ring group inline-flex min-w-0 items-center gap-1.5 rounded-lg text-sm text-ink-3 transition hover:text-ink",
+        compact ? "h-9 shrink-0 px-2 hover:bg-ink/5" : "-ml-1 max-w-full px-1 py-0.5", className)}>
+      <ArrowLeft size={16} aria-hidden className="shrink-0 transition-transform group-hover:-translate-x-0.5 motion-reduce:transform-none" />
+      {color && <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color }} />}
+      <span className={cx("truncate", compact && "max-w-40 max-sm:sr-only lg:max-w-64")}>
+        <span className="font-medium text-ink-2 group-hover:text-ink">{label}</span>{section && <><span aria-hidden> · </span><span className="sr-only">, </span>{section}</>}
+      </span>
+    </Link>
   );
 }

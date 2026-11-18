@@ -49,6 +49,7 @@ This is what the application already does, so you know what is intended behavior
 - Helmet headers: strict CSP (`script-src 'self'`, `frame-ancestors 'none'`), HSTS, `nosniff`, Referrer-Policy.
 - All input is validated with zod and all SQL is parameterized. Every resource route checks ownership.
 - Image uploads are validated by magic bytes (PNG, JPG, GIF, WEBP; SVG is rejected because it can carry scripts), capped at 10 MB, stored under random names and served with `CSP default-src 'none'`.
+- Every upload (images and HTML prototypes) goes through one scan step before it is written (`server/src/lib/fileScan.ts`): the magic bytes must match the type, and text that is really an HTML/SVG page with scripts is refused (prototypes excepted: they run sandboxed); the same step refuses PDFs with active content (`/JavaScript`, `/JS`, `/Launch`, `/EmbeddedFile`, `/AA`, `/RichMedia`, `/XFA`, including hex-escaped names and compressed object streams) and Office files with macros, with a `422`. With `CLAMAV_HOST` set, files are also scanned by ClamAV (`clamd` INSTREAM); if clamd cannot answer, uploads are refused (`503`) unless `CLAMAV_FAIL_OPEN=true`.
 - HTML prototypes are served with a `sandbox` CSP (opaque origin), so they cannot read the session or call the API, and can only be framed by the app itself.
 - Rate limits on public routes, session creation and uploads.
 - The server refuses to start in production without a `JWT_SECRET` of at least 32 characters. The container runs as a non-root user and the database is not exposed outside the Docker network.

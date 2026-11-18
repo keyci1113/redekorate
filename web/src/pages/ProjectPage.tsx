@@ -7,7 +7,7 @@ import { OrgChip } from "./OrgsPage";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Insight, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
-import { Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag } from "../components/ui";
+import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, type TabItem } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
@@ -58,7 +58,7 @@ export function ProjectPage() {
 
   return (
     <div className="page">
-      <Link to="/projects" className="text-sm text-ink-3 hover:text-ink">{t("← Proyectos")}</Link>
+      <BackLink to="/projects" label={t("Proyectos")} />
       <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           <div className="flex items-center gap-3">
@@ -77,16 +77,17 @@ export function ProjectPage() {
       <AccessNotice role={role} owner={p.owner_name} className="mt-4 max-w-2xl" />
 
       <div className="mt-8">
-        <Tabs value={tab} onChange={setTab} items={[
-          { id: "studies", label: t("Estudios"), count: list.length },
-          { id: "docs", label: t("Documentos"), count: uxDocs.length },
-          { id: "architecture", label: t("Arquitectura"), count: diagrams.length },
-          { id: "insights", label: t("Repositorio de insights"), count: insights.data?.insights.length ?? 0 },
-          { id: "participants", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
-          { id: "report", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
-          { id: "members", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
-          { id: "comments", label: t("Comentarios") },
-        ]} />
+        {/* Two groups: the research itself, then the team's shared space. */}
+        <Tabs value={tab} onChange={setTab} label={t("Secciones del proyecto")} items={[
+          { id: "studies", group: "research", label: t("Estudios"), count: list.length },
+          { id: "docs", group: "research", label: t("Documentos"), count: uxDocs.length },
+          { id: "architecture", group: "research", label: t("Arquitectura"), count: diagrams.length },
+          { id: "insights", group: "research", label: t("Insights"), count: insights.data?.insights.length ?? 0 },
+          { id: "participants", group: "research", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
+          { id: "report", group: "research", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
+          { id: "members", group: "team", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
+          { id: "comments", group: "team", label: t("Comentarios") },
+        ] satisfies TabItem<typeof tab>[]} />
       </div>
 
       <div className="mt-6">
