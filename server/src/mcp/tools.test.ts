@@ -41,3 +41,23 @@ test("results never carry the participant record and are grouped and capped per 
   assert.ok(out.blocks[0].note);
   assert.deepEqual([out.blocks[1].answer_count, out.blocks[1].answers.length], [0, 0]);
 });
+
+test("project tools read, filter and set the project's category", async () => {
+  const calls: [string, string, unknown?][] = [];
+  const api: Api = {
+    get: async (path: string) => { calls.push(["get", path]); return { projects: [{ id: "p1", name: "Bot", category: "ai" }] } as any; },
+    post: async (path: string, body?: unknown) => { calls.push(["post", path, body]); return { project: body } as any; },
+    patch: async (path: string, body?: unknown) => { calls.push(["patch", path, body]); return { project: body } as any; },
+  };
+  const run = (name: string, args: object) => TOOLS.find((t) => t.name === name)!.run(args as any, { api, baseUrl: "https://x" });
+  const listed: any = await run("list_projects", { category: "ai" });
+  assert.deepEqual(calls.at(-1), ["get", "/projects?category=ai"]);
+  assert.equal(listed[0].category, "ai");
+  await run("list_projects", {});
+  assert.deepEqual(calls.at(-1), ["get", "/projects"]);
+  await run("update_project", { project_id: "p1", category: "automation" });
+  assert.deepEqual(calls.at(-1), ["patch", "/projects/p1", { category: "automation" }]);
+  const create = TOOLS.find((t) => t.name === "create_project")!;
+  assert.ok(create.input.category.safeParse("software").success);
+  assert.ok(!create.input.category.safeParse("marketing").success);
+});

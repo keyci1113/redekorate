@@ -4,6 +4,12 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Project types, home figures you can click into, and what a study is.**
+  - **Category.** A project now has a type: UX research, software development, artificial intelligence, automation, IT in general, design or other (migration `017_project_category.sql`; existing projects are UX research). It is chosen when creating or editing a project, shown on each project card, and the Projects page can filter by it (`?category=`). Selecting a project card no longer clears the workspace or type filter in the address.
+  - **Server and MCP.** `GET /api/projects` takes `?category=`, and creating or editing a project accepts `category`. The MCP tools `list_projects` (optionally one category), `get_project`, `create_project` and `update_project` read and set it.
+  - **Home.** The four figure cards on Home (responses this week, live studies, completion rate, insights) are now buttons that open a window with the studies or insights behind the number, each a link. It uses what Home already loaded, so the insights window shows the most severe ones and says when there are more.
+  - **Accessibility.** Windows now say they are dialogs, move focus in when they open and give it back when they close.
+  - **What a study is.** The *Live studies* page explains it: a test or survey you send to participants, such as a prototype test, a survey or a card sort.
 - **No more blank pages when moving around the app.**
   - **What happened.** After a deploy, a tab opened before it still asked for the old build's page files. The server answered those with the app's HTML page instead of a 404, the browser refused it, and with nothing to catch the error React removed the whole app: a blank white page until a manual reload. Any other error while showing a page did the same.
   - **Now.** A page file that fails to load reloads the tab once, onto the new build. Any other error shows a short message with *Reload* and *Go to home*, inside the app frame so the menu still works, and clears when you move to another page.

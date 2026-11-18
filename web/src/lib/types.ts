@@ -1,4 +1,5 @@
 import type { Block } from "../blocks/types";
+import type { ProjectCategory } from "./projectCategories";
 
 export type Role = "admin" | "member";
 export interface User { id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null }
@@ -26,6 +27,8 @@ export interface Comment { id: string; body: string; created_at: string; user_id
 
 export interface Project extends OrgRef {
   id: string; name: string; description: string; color: string; archived: boolean;
+  /** What kind of work the project holds; older answers may lack it (then it is UX research). */
+  category?: ProjectCategory;
   role?: ProjectRole; owner_name?: string;   // rol de quien consulta; owner_name para proyectos compartidos
   created_at: string; updated_at: string;
   study_count?: number; live_count?: number; response_count?: number; insight_count?: number;

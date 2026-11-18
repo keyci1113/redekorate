@@ -22,6 +22,7 @@ import { CATEGORY_ICON, FallbackIcon } from "../templates/icons";
 
 import { t } from "../lib/i18n";
 import { AccessNotice } from "../components/AccessNotice";
+import { categoryOf } from "../lib/projectCategories";
 export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -114,7 +115,7 @@ export function ProjectPage() {
       </div>
 
       <Modal open={editOpen} onClose={() => setEditOpen(false)} title={t("Editar proyecto")}>
-        <ProjectForm initial={{ name: p.name, description: p.description, color: p.color, organization_id: p.organization_id ?? null }} orgs={isOwner ? orgs.data?.organizations : undefined} submitLabel={t("Guardar cambios")} onSubmit={async (v) => {
+        <ProjectForm initial={{ name: p.name, description: p.description, color: p.color, organization_id: p.organization_id ?? null, category: categoryOf(p) }} orgs={isOwner ? orgs.data?.organizations : undefined} submitLabel={t("Guardar cambios")} onSubmit={async (v) => {
           // Only the owner may move the project; collaborators never send organization_id.
           const { organization_id, ...rest } = v;
           await api.patch(`/projects/${p.id}`, isOwner ? { ...rest, organization_id } : rest);

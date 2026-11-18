@@ -11,6 +11,7 @@ import { ProjectForm } from "../components/ProjectForm";
 import { sharedLabel } from "../components/MembersPanel";
 import { templateByKey } from "../templates/catalog";
 import { useAuth } from "../lib/auth";
+import { categoryCounts, categoryLabel, categoryOf, filterByCategory, readCategory } from "../lib/projectCategories";
 
 import { t } from "../lib/i18n";
 
@@ -26,12 +27,11 @@ function ProjectCard({ project: p, on, onSelect }: { project: Project; on: boole
       {/* El botón cubre toda la tarjeta; el enlace de acción queda encima. */}
       <button type="button" aria-current={on || undefined} onClick={onSelect} title={p.name}
         className="focus-ring mt-4 min-w-0 truncate rounded text-left font-display text-[19px] font-bold tracking-[-0.02em] after:absolute after:inset-0 after:rounded-xl">{p.name}</button>
-      {(p.organization_id || (p.role && p.role !== "owner")) && (
-        <span className="relative mt-1.5 flex flex-wrap items-center gap-1.5">
-          {p.organization_id && <OrgChip id={p.organization_id} name={p.org_name ?? ""} logo={p.org_logo} color={p.org_color} />}
-          {p.role && p.role !== "owner" && <Tag>{sharedLabel(p.role, p.owner_name)}</Tag>}
-        </span>
-      )}
+      <span className="relative mt-1.5 flex flex-wrap items-center gap-1.5">
+        <Tag>{categoryLabel(categoryOf(p))}</Tag>
+        {p.organization_id && <OrgChip id={p.organization_id} name={p.org_name ?? ""} logo={p.org_logo} color={p.org_color} />}
+        {p.role && p.role !== "owner" && <Tag>{sharedLabel(p.role, p.owner_name)}</Tag>}
+      </span>
       <p className="mt-1 line-clamp-2 min-h-10 text-[13px] leading-5 text-ink-2">{p.description || t("Sin descripción")}</p>
       <div className="mt-4 flex items-baseline justify-between gap-3 text-[13px]">
         <span className="font-medium text-ink-2">{t("Participantes que terminaron")}</span>
@@ -138,8 +138,13 @@ export function ProjectsPage() {
   // Workspace filter: "all", "personal" or an organization id. Preselects the organization for a new project too.
   const space = params.get("org") ?? "all";
   const all = data?.projects ?? [];
-  const projects = all.filter((p) => space === "all" || (space === "personal" ? !p.organization_id : p.organization_id === space));
-  const setSpace = (v: string) => setParams((prev) => { const next = new URLSearchParams(prev); if (v === "all") next.delete("org"); else next.set("org", v); next.delete("project"); return next; }, { replace: true });
+  const inSpace = all.filter((p) => space === "all" || (space === "personal" ? !p.organization_id : p.organization_id === space));
+  // Category filter (?category=software): what kind of work, on top of the workspace.
+  const category = readCategory(params.get("category"));
+  const categories = categoryCounts(inSpace);
+  const projects = filterByCategory(inSpace, category);
+  const setParam = (key: string, v: string | null) => setParams((prev) => { const next = new URLSearchParams(prev); if (v === null) next.delete(key); else next.set(key, v); next.delete("project"); return next; }, { replace: true });
+  const setSpace = (v: string) => setParam("org", v === "all" ? null : v);
   const totals = projects.reduce((a, p) => ({ studies: a.studies + (p.study_count ?? 0), responses: a.responses + (p.response_count ?? 0), live: a.live + (p.live_count ?? 0) }), { studies: 0, responses: 0, live: 0 });
   const selected = projects.find((p) => p.id === params.get("project")) ?? projects[0];
 
@@ -168,9 +173,19 @@ export function ProjectsPage() {
           <Link to="/orgs" className="focus-ring ml-1 flex items-center gap-1 rounded-full px-2 py-1 text-[13px] text-ink-3 hover:text-ink"><Building2 size={14} /> {t("Organizaciones")}</Link>
         </div>
       )}
+      {(categories.length > 1 || category) && (
+        <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label={t("Tipo de proyecto")}>
+          {[{ id: null, label: t("Todos los tipos"), n: inSpace.length }, ...categories.map((c) => ({ id: c.category, label: categoryLabel(c.category), n: c.n }))].map((c) => (
+            <button key={c.id ?? "all"} type="button" onClick={() => setParam("category", c.id)} aria-pressed={category === c.id}
+              className={cx("focus-ring flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-medium transition", category === c.id ? "border-ink bg-ink text-paper" : "border-line bg-surface text-ink-2 hover:border-line-2")}>
+              {c.label}<span className="tabular-nums opacity-70">{c.n}</span>
+            </button>
+          ))}
+        </div>
+      )}
       <div className="mt-7">
-        {loading ? <Spinner /> : error ? <ErrorNote>{error}</ErrorNote> : projects.length === 0 && space !== "all" ? (
-          <Empty icon={<FolderPlus size={20} />} title={t("No hay proyectos en este espacio")} text={t("Crea uno aquí o cambia el filtro de espacio.")}
+        {loading ? <Spinner /> : error ? <ErrorNote>{error}</ErrorNote> : projects.length === 0 && (space !== "all" || category) ? (
+          <Empty icon={<FolderPlus size={20} />} title={category ? t("No hay proyectos de este tipo") : t("No hay proyectos en este espacio")} text={category ? t("Crea uno o cambia el filtro de tipo.") : t("Crea uno aquí o cambia el filtro de espacio.")}
             action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo proyecto")}</Button>} />
         ) : projects.length === 0 ? (
           <Empty icon={<FolderPlus size={20} />} title={t("Crea tu primer proyecto")}
@@ -179,7 +194,7 @@ export function ProjectsPage() {
         ) : (
           <>
             <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {projects.map((p) => <ProjectCard key={p.id} project={p} on={p.id === selected?.id} onSelect={() => setParams({ project: p.id }, { replace: true })} />)}
+              {projects.map((p) => <ProjectCard key={p.id} project={p} on={p.id === selected?.id} onSelect={() => setParams((prev) => { const next = new URLSearchParams(prev); next.set("project", p.id); return next; }, { replace: true })} />)}
               <li className="min-h-44">
                 <button type="button" onClick={() => setOpen(true)} className="focus-ring flex h-full min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-line-2 p-5 text-center text-sm font-semibold text-ink-2 transition hover:border-accent hover:text-accent">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5" aria-hidden><Plus size={18} /></span>
@@ -198,7 +213,7 @@ export function ProjectsPage() {
       </div>
 
       <Modal open={open} onClose={() => setOpen(false)} title={t("Nuevo proyecto")}>
-        <ProjectForm key={space} orgs={orgList} initial={{ organization_id: space !== "all" && space !== "personal" ? space : null }} submitLabel={t("Crear proyecto")} onSubmit={async (v) => {
+        <ProjectForm key={`${space}-${category}`} orgs={orgList} initial={{ organization_id: space !== "all" && space !== "personal" ? space : null, ...(category ? { category } : {}) }} submitLabel={t("Crear proyecto")} onSubmit={async (v) => {
           const { project } = await api.post<{ project: Project }>("/projects", v);
           nav(`/projects/${project.id}/new?nuevo=1`);
         }} />

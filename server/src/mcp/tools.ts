@@ -5,6 +5,7 @@
  */
 import { z } from "zod";
 import { BLOCK_REFERENCE, BLOCK_TYPES, DIAGRAM_REFERENCE, DIAGRAM_SHAPES, METHODS } from "./reference.js";
+import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
 
 /** The REST API as the token's user. No delete on purpose. */
 export interface Api {
@@ -26,6 +27,7 @@ export interface ToolDef<S extends z.ZodRawShape = z.ZodRawShape> {
 const tool = <S extends z.ZodRawShape>(t: ToolDef<S>) => t as unknown as ToolDef;
 
 const id = (what: string) => z.string().uuid().describe(`The ${what} id`);
+const Category = z.enum(PROJECT_CATEGORIES).describe("What kind of work the project holds: UX research, software development, AI, automation, IT in general, design or other");
 const Block = z.object({ id: z.string().min(1), type: z.enum(BLOCK_TYPES), title: z.string() }).passthrough();
 const Severity = z.enum(["low", "medium", "high", "critical"]);
 const Confidence = z.enum(["low", "medium", "high"]);
@@ -78,12 +80,12 @@ export const TOOLS: ToolDef[] = [
     run: async (_a, { api }) => (await api.get("/auth/me")).user,
   }),
   tool({
-    name: "list_projects", title: "List projects", writes: false, input: {},
-    description: "Projects the user can open (own, shared with them, or in their organizations), with their role and counts of studies, responses, insights and documents.",
-    run: async (_a, { api }) => {
-      const { projects } = await api.get<{ projects: any[] }>("/projects");
+    name: "list_projects", title: "List projects", writes: false, input: { category: Category.optional().describe("Only projects of this category") },
+    description: "Projects the user can open (own, shared with them, or in their organizations), with their category, role and counts of studies, responses, insights and documents.",
+    run: async ({ category }, { api }) => {
+      const { projects } = await api.get<{ projects: any[] }>(category ? `/projects?category=${category}` : "/projects");
       return projects.map((p) => ({
-        id: p.id, name: p.name, description: p.description, role: p.role, archived: p.archived,
+        id: p.id, name: p.name, description: p.description, category: p.category, role: p.role, archived: p.archived,
         organization: p.org_name ?? null, studies: p.study_count, live_studies: p.live_count,
         responses: p.response_count, insights: p.insight_count, documents: p.document_count, updated_at: p.updated_at,
       }));
@@ -99,7 +101,7 @@ export const TOOLS: ToolDef[] = [
         api.get(`/projects/${project_id}`), part(api.get(`/projects/${project_id}/studies`)), part(api.get(`/documents?project_id=${project_id}`)),
       ]);
       return {
-        project: { id: project.id, name: project.name, description: project.description, color: project.color, archived: project.archived, role: project.role },
+        project: { id: project.id, name: project.name, description: project.description, category: project.category, color: project.color, archived: project.archived, role: project.role },
         studies: "unavailable" in studies ? studies : studies.studies.map((s: any) => ({ id: s.id, title: s.title, method: s.method, status: s.status, blocks: s.block_count, responses: s.response_count, started: s.started_count, updated_at: s.updated_at, ...studyLinks(baseUrl, s) })),
         documents: "unavailable" in documents ? documents : documents.documents.map((d: any) => ({ id: d.id, kind: d.kind, title: d.title, language: d.language, updated_at: d.updated_at })),
         open_in_app: `${baseUrl}/projects/${project.id}`,
@@ -152,7 +154,7 @@ export const TOOLS: ToolDef[] = [
     name: "create_project", title: "Create project", writes: true,
     input: {
       name: z.string().trim().min(1).max(160), description: z.string().max(4000).optional(),
-      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+      color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), category: Category.optional().describe("Defaults to ux_research"),
       organization_id: z.string().uuid().optional().describe("Put it in an organization the user belongs to; omit for a personal project"),
     },
     description: "Create a project owned by the user.",
@@ -160,8 +162,8 @@ export const TOOLS: ToolDef[] = [
   }),
   tool({
     name: "update_project", title: "Update project", writes: true,
-    input: { project_id: id("project"), name: z.string().trim().min(1).max(160).optional(), description: z.string().max(4000).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() },
-    description: "Rename a project or change its description or color (editor role or higher).",
+    input: { project_id: id("project"), name: z.string().trim().min(1).max(160).optional(), description: z.string().max(4000).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(), category: Category.optional() },
+    description: "Rename a project or change its description, color or category (editor role or higher).",
     run: async ({ project_id, ...b }, { api }) => (await api.patch(`/projects/${project_id}`, b)).project,
   }),
   tool({
