@@ -47,7 +47,7 @@ const TOOL_GROUPS: { label: string; shapes: Shape[] }[] = [
 /** A mood board's toolbar: its own items first, then the whiteboard pieces and a few plain shapes. */
 const BOARD_GROUPS: { label: string; shapes: Shape[] }[] = [
   { label: "Tablero", shapes: ["image", "swatch", "link"] },
-  { label: "Pizarra", shapes: ["note", "card", "text", "frame"] },
+  { label: "Pizarra", shapes: ["note", "text", "frame"] },
   { label: "Figuras", shapes: ["rect", "rounded", "ellipse"] },
 ];
 const MEDIA_ICON: Partial<Record<Shape, ReactNode>> = { image: <ImageIcon size={16} />, swatch: <Palette size={16} />, link: <Link2 size={16} /> };
