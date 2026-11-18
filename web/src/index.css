@@ -152,8 +152,8 @@
   background: #171920; color: var(--color-ink);
 }
 
-/* Post-its clásicos: papel de color con tinta oscura en ambos temas; en oscuro el papel se atenúa para no deslumbrar. */
-.note-paper { --color-ink: #FCFCFD; --color-ink-3: var(--color-note-muted); --color-accent: #BF7DF5; --color-bad: #A3302A; color: var(--color-ink); border: 1px solid rgb(22 25 31 / 0.08); }
+/* Classic sticky notes: colored paper with dark ink in both themes (the paper stays light, so light ink would vanish); in dark mode the paper is dimmed so it does not glare. noteContrast.test.ts checks every pairing. */
+.note-paper { --color-ink: #16191F; --color-ink-3: var(--color-note-muted); --color-accent: #5902A1; --color-bad: #8A2420; color: var(--color-ink); border: 1px solid rgb(22 25 31 / 0.08); }
 
 /* Al imprimir siempre se usa el tema claro y se conservan los fondos, aunque la app esté en oscuro. */
 @media print {
