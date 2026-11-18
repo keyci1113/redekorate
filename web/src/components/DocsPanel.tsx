@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FilePlus2 } from "lucide-react";
+import { FilePlus2, FileQuestion, LayoutGrid, Search, Table2 } from "lucide-react";
 import { api } from "../lib/api";
 import { getLang, t, tr, type Lang } from "../lib/i18n";
 import { Button, Empty, ErrorNote, Field, Modal, cx } from "./ui";
@@ -8,30 +8,73 @@ import { Segmented } from "./editing";
 import { DOC_CATEGORIES, DOC_TEMPLATES, docTemplate } from "../docs/templates";
 import type { DocRecord, DocTemplate } from "../docs/types";
 import { DocCard } from "../docs/DocCard";
+import { DocFilterBar, DocsTable, type RowInfo } from "../docs/DocsTable";
+import { DEFAULT_SORT, NO_FILTERS, filterAndSort, toggleSort, type DocFilters, type DocSort } from "../docs/docList";
+
+type DocsView = "cards" | "table";
+const VIEW_KEY = "pref:docs-view";
+const savedView = (): DocsView => { try { return localStorage.getItem(VIEW_KEY) === "table" ? "table" : "cards"; } catch { return "cards"; } };
+
+/** What the list shows for a document's template; a kind the app no longer has keeps its raw name. */
+function rowInfo(d: DocRecord): RowInfo {
+  const tpl = docTemplate(d.kind);
+  return tpl ? { icon: tpl.icon, type: t(tpl.name), category: t(tpl.category), categoryId: tpl.category }
+    : { icon: <FileQuestion size={18} />, type: d.kind, category: "", categoryId: "" };
+}
 
 export function DocsPanel({ projectId, docs, onChange, preselect, canEdit = true }: { projectId: string; docs: DocRecord[]; onChange: () => void; preselect?: string | null; canEdit?: boolean }) {
   const [open, setOpen] = useState(!!preselect && canEdit);
+  const [view, setViewState] = useState<DocsView>(savedView);
+  const [filters, setFilters] = useState<DocFilters>(NO_FILTERS);
+  const [sort, setSort] = useState<DocSort>(DEFAULT_SORT);
   const nav = useNavigate();
+  const setView = (v: DocsView) => { setViewState(v); try { localStorage.setItem(VIEW_KEY, v); } catch { /* no storage */ } };
+  const rows = useMemo(() => filterAndSort(docs, filters, sort, rowInfo), [docs, filters, sort]);
+  const viewBtn = (v: DocsView, icon: ReactNode, label: string) => (
+    <button type="button" aria-pressed={view === v} title={label} onClick={() => setView(v)}
+      className={cx("focus-ring flex h-9 w-9 items-center justify-center rounded-md transition", view === v ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}>
+      {icon}<span className="sr-only">{label}</span>
+    </button>
+  );
+  // min-w-0: the table is wider than a phone, and must scroll inside its frame instead of widening the page.
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <p className="text-sm text-ink-2">{t("Plantillas para planear, sintetizar y evaluar: se llenan aquí mismo, guiadas por instrucciones y ejemplos en cada campo.")}</p>
-        {canEdit && <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Nuevo documento")}</Button>}
+    <div className="min-w-0">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-[min(100%,18rem)] flex-1 text-sm text-ink-2">{t("Plantillas para planear, sintetizar y evaluar: se llenan aquí mismo, guiadas por instrucciones y ejemplos en cada campo.")}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          {docs.length > 0 && (
+            <div role="group" aria-label={t("Vista")} className="flex rounded-lg bg-ink/5 p-0.5">
+              {viewBtn("cards", <LayoutGrid size={16} />, t("Tarjetas"))}
+              {viewBtn("table", <Table2 size={16} />, t("Tabla"))}
+            </div>
+          )}
+          {canEdit && <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Nuevo documento")}</Button>}
+        </div>
       </div>
       {docs.length === 0 ? (
         <Empty icon={<FilePlus2 size={20} />} title={t("Aún no hay documentos")}
           text={t("User personas, journey maps, diagramas de afinidad, guiones de prueba, evaluaciones heurísticas y más.")}
           action={canEdit ? <Button variant="primary" icon={<FilePlus2 size={16} />} onClick={() => setOpen(true)}>{t("Crear el primero")}</Button> : undefined} />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {docs.map((d) => {
-            const tpl = docTemplate(d.kind);
-            return (
-              <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} icon={tpl?.icon} kind={tpl ? t(tpl.name) : d.kind}
-                badge={<span className="rounded bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 uppercase">{d.language}</span>} />
-            );
-          })}
-        </div>
+        <>
+          <DocFilterBar docs={docs} filters={filters} onChange={setFilters} info={rowInfo} shown={rows.length} />
+          {rows.length === 0 ? (
+            <Empty icon={<Search size={20} />} title={t("Ningún documento coincide con los filtros")} text={t("Prueba con menos filtros o con otra búsqueda.")}
+              action={<Button onClick={() => setFilters(NO_FILTERS)}>{t("Quitar filtros")}</Button>} />
+          ) : view === "table" ? (
+            <DocsTable rows={rows} sort={sort} onSort={(k) => setSort(toggleSort(sort, k))} info={rowInfo} canEdit={canEdit} onChange={onChange} />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {rows.map((d) => {
+                const m = rowInfo(d);
+                return (
+                  <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} icon={m.icon} kind={m.type}
+                    badge={<span className="rounded bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 uppercase">{d.language}</span>} />
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
       <NewDocModal open={open} onClose={() => setOpen(false)} projectId={projectId} preselect={preselect} onCreated={(id) => { onChange(); nav(`/docs/${id}`); }} />
     </div>
