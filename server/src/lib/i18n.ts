@@ -80,6 +80,13 @@ const EN: Record<string, string> = {
   "La app envió una dirección de regreso que no registró.": "The app sent a return address it did not register.",
   "Token no encontrado": "Token not found",
   "Conexión no encontrada": "Connection not found",
+  // Upload security scan (lib/fileScan.ts)
+  "El contenido del archivo no coincide con su tipo. Sube el archivo original, sin cambiarle la extensión.": "The file's content does not match its type. Upload the original file without changing its extension.",
+  "Este PDF contiene contenido activo (JavaScript, acciones automáticas o archivos incrustados) y no se puede subir. Guárdalo de nuevo sin ese contenido, por ejemplo con «Imprimir como PDF».": "This PDF contains active content (JavaScript, automatic actions or embedded files) and can't be uploaded. Save it again without that content, for example with \"Print to PDF\".",
+  "Este documento de Office contiene macros y no se puede subir. Guárdalo sin macros (.docx, .xlsx o .pptx) e inténtalo de nuevo.": "This Office document contains macros and can't be uploaded. Save it without macros (.docx, .xlsx or .pptx) and try again.",
+  "Este archivo contiene una página HTML o SVG con scripts y no se puede subir.": "This file contains an HTML or SVG page with scripts and can't be uploaded.",
+  "El análisis antivirus detectó una amenaza en este archivo. No se guardó.": "The antivirus scan found a threat in this file. It was not saved.",
+  "No se pudo revisar el archivo en este momento. Inténtalo de nuevo en unos minutos.": "The file could not be checked right now. Try again in a few minutes.",
 };
 export function translate(msg: string, lang: string | undefined): string {
   if (lang !== "en") return msg;

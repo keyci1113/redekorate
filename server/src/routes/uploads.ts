@@ -10,6 +10,7 @@ import { uploadLimiter } from "../lib/security.js";
 import { injectTracker, looksLikeHtml } from "../lib/protoTracker.js";
 import { z } from "zod";
 import { checkLink } from "../lib/linkCheck.js";
+import { scanUpload } from "../lib/fileScan.js";
 
 export const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? "uploads");
 const MAX_MB = Number(process.env.UPLOAD_MAX_MB ?? 10);
@@ -42,6 +43,7 @@ uploads.post("/", requireAuth, uploadLimiter, receive("La imagen"), async (req, 
   if (!f) throw new HttpError(400, "No se recibió ningún archivo");
   const kind = sniff(f.buffer);
   if (!kind) throw new HttpError(415, "Formato no permitido. Usa PNG, JPG, GIF o WEBP.");
+  await scanUpload(f.buffer, kind.ext, "image");
   await mkdir(UPLOAD_DIR, { recursive: true });
   const filename = `${fileId()}.${kind.ext}`;
   await writeFile(path.join(UPLOAD_DIR, filename), f.buffer, { mode: 0o640 });
@@ -55,6 +57,8 @@ uploads.post("/prototype", requireAuth, uploadLimiter, receive("El archivo"), as
   const f = req.file;
   if (!f) throw new HttpError(400, "No se recibió ningún archivo");
   if (!looksLikeHtml(f.buffer)) throw new HttpError(415, "El archivo no parece HTML. Descarga el prototipo como .html.");
+  // A prototype is meant to run its scripts (sandboxed), so only the type and the antivirus are checked.
+  await scanUpload(f.buffer, "html", "prototype", { allowScripts: true });
   await mkdir(UPLOAD_DIR, { recursive: true });
   const filename = `${fileId()}.html`;
   const html = injectTracker(f.buffer.toString("utf8").replace(/^﻿/, ""));
