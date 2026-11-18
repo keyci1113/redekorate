@@ -4,6 +4,11 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Mood boards (v1).** A new *Mood board* starter in Architecture → New diagram, stored as its own document kind (`moodboard`) on the diagram canvas, so sharing, comments, duplicates, export and the API work as for diagrams.
+  - **Board items.** Images (upload several at once, drop files on the board or paste them with ⌘V), color swatches (system picker plus a hex field) and links (title, site name, opens in a new tab; a pasted or dropped web address becomes a link). Notes, cards, text and sections work as on any diagram. Stored items keep only safe values: pictures from `/uploads/` or https, `#rrggbb` colors and http(s) links.
+  - **Pull colors.** On a selected image, *Pull colors* adds its main colors as a row of swatches under it (`dominantColors` in `architecture/model.ts`).
+  - **Test with participants.** Each section that holds items is one design direction. The dialog turns the chosen ones into a draft preference test: a picture of each section as it looks on the board, neutral names (Option A, B…), random order, in the board's language. It opens in the builder for review before publishing.
+  - **Outside assistants.** `diagram_reference` (MCP) describes the `moodboard` kind and the `image`, `swatch` and `link` items.
 - **Project types, home figures you can click into, and what a study is.**
   - **Category.** A project now has a type: UX research, software development, artificial intelligence, automation, IT in general, design or other (migration `017_project_category.sql`; existing projects are UX research). It is chosen when creating or editing a project, shown on each project card, and the Projects page can filter by it (`?category=`). Selecting a project card no longer clears the workspace or type filter in the address.
   - **Server and MCP.** `GET /api/projects` takes `?category=`, and creating or editing a project accepts `category`. The MCP tools `list_projects` (optionally one category), `get_project`, `create_project` and `update_project` read and set it.

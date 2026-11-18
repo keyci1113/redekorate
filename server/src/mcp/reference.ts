@@ -60,10 +60,10 @@ Tip: read an existing study with get_study to copy its exact shape.`;
 /** The shapes the Architecture canvas draws (web/src/architecture/model.ts SHAPES); reference.test.ts keeps the two lists equal. */
 export const DIAGRAM_SHAPES = [
   "rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder",
-  "page", "pages", "note", "text", "frame",
+  "page", "pages", "note", "text", "frame", "image", "swatch", "link",
 ] as const;
 
-export const DIAGRAM_REFERENCE = `The Architecture section holds two document kinds; create them with create_document and edit them with update_document.
+export const DIAGRAM_REFERENCE = `The Architecture section holds three document kinds; create them with create_document and edit them with update_document.
 
 kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, system architecture, IA diagrams).
   data: { nodes: Node[], edges: Edge[] }
@@ -72,7 +72,8 @@ kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, sys
   shape ${DIAGRAM_SHAPES.join(" | ")}
         rounded = process step, diamond = decision, parallelogram = input/output, cylinder = database,
         page / pages = a page / a group of pages (information architecture), note = sticky note,
-        text = free text with no outline, frame = a labelled area drawn behind the shapes inside it.
+        text = free text with no outline, frame = a labelled area drawn behind the shapes inside it,
+        image = a picture (src), swatch = a color sample (hex), link = a web page (url); they belong on mood boards.
   color none | gray | yellow | orange | pink | purple | blue | green
   Text settings (all optional): size "s"|"m"|"l"|"xl", align "left"|"center"|"right", valign "top"|"middle"|"bottom",
         textColor "ink"|"gray"|"red"|"orange"|"green"|"blue"|"purple"|"white" (leave it out to follow the fill).
@@ -80,6 +81,12 @@ kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, sys
         "1. " a numbered item (indent two spaces per level); a backslash keeps the next character literal.
   Edge  { id: string, from: nodeId, to: nodeId, fromSide?: "top"|"right"|"bottom"|"left", toSide?: same,
           label?: string, line?: "solid"|"dashed", arrow?: "end"|"both"|"none", path?: "elbow"|"curved"|"straight" }
+
+kind "moodboard": a visual direction board on the same canvas, with the same data as "diagram" (usually no edges).
+  Extra node fields: image { src: "/uploads/..." or an https address, text = caption },
+        swatch { hex: "#rrggbb", text = color name }, link { url: http(s) address, text = title }.
+  Put each design direction in its own frame: the app turns each frame that holds items into one option
+        of a preference test when the team tests the board with participants.
 
 kind "sitemap": information architecture written as an outline; the app draws the tree.
   data: { outline: string }   one page per line, two spaces of indent per level, e.g. "Home\n  Products\n    Detail\n  Contact"
