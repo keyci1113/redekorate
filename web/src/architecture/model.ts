@@ -5,16 +5,19 @@
  */
 import { tr, type Lang } from "../lib/i18n";
 
-export const DIAGRAM_KINDS = ["diagram", "sitemap"] as const;
+export const DIAGRAM_KINDS = ["diagram", "sitemap", "moodboard"] as const;
 export type DiagramKind = (typeof DIAGRAM_KINDS)[number];
 export const isDiagramKind = (kind: string): kind is DiagramKind => (DIAGRAM_KINDS as readonly string[]).includes(kind);
 
 /** Every shape the canvas can draw. server/src/mcp/reference.ts describes the same list for outside assistants. */
 export const SHAPES = [
   "rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder",
-  "page", "pages", "note", "text", "frame",
+  "page", "pages", "note", "text", "frame", "image", "swatch", "link",
 ] as const;
 export type Shape = (typeof SHAPES)[number];
+/** Mood board items: they hold a picture, a color or a web address instead of a drawn outline. */
+export const MEDIA_SHAPES = ["image", "swatch", "link"] as const satisfies readonly Shape[];
+export const isMedia = (s: Shape) => (MEDIA_SHAPES as readonly Shape[]).includes(s);
 
 export const COLORS = ["none", "gray", "yellow", "orange", "pink", "purple", "blue", "green"] as const;
 export type ColorId = (typeof COLORS)[number];
@@ -36,6 +39,8 @@ export type PathStyle = "elbow" | "curved" | "straight";
 export interface DNode { id: string; shape: Shape; x: number; y: number; w: number; h: number; text: string; color: ColorId; size?: TextSize;
   /** Formatting of the text as a whole; bold, italic, lists and the like live in the text itself (see richText.ts). */
   align?: TextAlign; valign?: TextVAlign; textColor?: TextColor;
+  /** image: the picture's address. swatch: its color as #rrggbb. link: the web page it points to. */
+  src?: string; hex?: string; url?: string;
 }
 export interface DEdge {
   id: string; from: string; to: string; fromSide?: Side; toSide?: Side;
@@ -49,6 +54,7 @@ export const DEFAULT_SIZE: Record<Shape, [number, number]> = {
   rect: [160, 80], rounded: [160, 80], ellipse: [140, 90], diamond: [150, 110], triangle: [130, 110],
   parallelogram: [170, 80], hexagon: [160, 90], cylinder: [120, 110], page: [150, 110], pages: [150, 110],
   note: [180, 180], text: [180, 40], frame: [480, 320],
+  image: [240, 180], swatch: [120, 150], link: [240, 76],
 };
 export const DEFAULT_COLOR: Partial<Record<Shape, ColorId>> = { note: "yellow", frame: "gray" };
 
@@ -77,6 +83,9 @@ export function normalizeDiagram(raw: unknown): DiagramData {
     if (TEXT_ALIGNS.includes(o.align as TextAlign)) node.align = o.align as TextAlign;
     if (TEXT_VALIGNS.includes(o.valign as TextVAlign)) node.valign = o.valign as TextVAlign;
     if (TEXT_COLORS.includes(o.textColor as TextColor) && o.textColor !== "auto") node.textColor = o.textColor as TextColor;
+    if (shape === "image" && safeImageSrc(o.src)) node.src = o.src as string;
+    if (shape === "swatch") node.hex = normalizeHex(o.hex) ?? "#9ca3af";
+    if (shape === "link" && safeUrl(o.url)) node.url = o.url as string;
     nodes.push(node);
   }
   const edges: DEdge[] = [];
@@ -96,6 +105,80 @@ export function normalizeDiagram(raw: unknown): DiagramData {
     edges.push(edge);
   }
   return { nodes, edges };
+}
+
+// ---------- mood boards: pictures, colors and links ----------
+
+/** A picture uploaded to this app, or any https address. Anything else (javascript:, data:, http:) is dropped. */
+export function safeImageSrc(v: unknown): v is string {
+  return typeof v === "string" && (/^\/uploads\/[A-Za-z0-9._-]+$/.test(v) || /^https:\/\/[^\s"'<>]+$/i.test(v));
+}
+/** A link a person can open: http or https only. */
+export function safeUrl(v: unknown): v is string {
+  if (typeof v !== "string" || v.length > 2000) return false;
+  try { const u = new URL(v); return u.protocol === "https:" || u.protocol === "http:"; } catch { return false; }
+}
+/** Accepts "#abc", "abc", "#AABBCC" or "aabbcc" and returns "#aabbcc"; null when it is not a color. */
+export function normalizeHex(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(v.trim());
+  if (!m) return null;
+  const h = m[1].length === 3 ? [...m[1]].map((c) => c + c).join("") : m[1];
+  return `#${h.toLowerCase()}`;
+}
+/** Adds https:// to an address typed without it ("example.com"), so the link opens. */
+export function withScheme(v: string): string {
+  const s = v.trim();
+  return !s || /^[a-z][a-z0-9+.-]*:/i.test(s) ? s : `https://${s}`;
+}
+export const hostOf = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return url; } };
+
+const toHex = (r: number, g: number, b: number) => `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, "0")).join("")}`;
+
+/**
+ * The main colors of a picture, from its RGBA pixels: colors are grouped into buckets, the fullest buckets win,
+ * and a color too close to one already picked is skipped so the palette is not five shades of the same thing.
+ */
+export function dominantColors(px: Uint8ClampedArray | number[], count = 5): string[] {
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let i = 0; i + 3 < px.length; i += 4) {
+    if (px[i + 3] < 128) continue;
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    const key = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4);
+    const k = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    k.n++; k.r += r; k.g += g; k.b += b;
+    buckets.set(key, k);
+  }
+  const ranked = [...buckets.values()].sort((a, b) => b.n - a.n).map((k) => [k.r / k.n, k.g / k.n, k.b / k.n] as const);
+  const picked: (readonly [number, number, number])[] = [];
+  for (const minDist of [48, 24, 0]) {
+    for (const c of ranked) {
+      if (picked.length >= count) break;
+      if (picked.some((p) => Math.hypot(p[0] - c[0], p[1] - c[1], p[2] - c[2]) <= minDist)) continue;
+      picked.push(c);
+    }
+  }
+  return picked.map((c) => toHex(c[0], c[1], c[2]));
+}
+
+/** A row of swatches under an image, one per color, as the "Pull colors" button lays them out. */
+export function swatchRow(colors: string[], below: { x: number; y: number; w: number; h: number }, makeId: () => string): DNode[] {
+  const [w, h] = DEFAULT_SIZE.swatch, gap = 12, count = Math.max(1, colors.length);
+  // As wide as fits under the image, never wider than a normal swatch nor too thin to read its code.
+  const sw = Math.max(48, Math.min(w, Math.floor((below.w - gap * (count - 1)) / count)));
+  const sh = Math.max(96, Math.round((h * sw) / w));
+  return colors.map((hex, i) => ({ id: makeId(), shape: "swatch", x: below.x + i * (sw + gap), y: below.y + below.h + 24, w: sw, h: sh, text: "", color: "none", hex }));
+}
+
+/**
+ * The design directions on a board, for a preference test: every section (frame) that holds at least one picture,
+ * swatch or link, left to right and then top to bottom, as a person reads the board.
+ */
+export function boardDirections(d: DiagramData): DNode[] {
+  const inside = (f: DNode, n: DNode) => n.x >= f.x && n.y >= f.y && n.x + n.w <= f.x + f.w && n.y + n.h <= f.y + f.h;
+  return d.nodes
+    .filter((f) => f.shape === "frame" && d.nodes.some((n) => n.id !== f.id && n.shape !== "frame" && inside(f, n)))
+    .sort((a, b) => (Math.abs(a.y - b.y) > Math.min(a.h, b.h) / 2 ? a.y - b.y : a.x - b.x));
 }
 
 // ---------- sitemap: an indented outline, drawn as a tree ----------
@@ -177,7 +260,7 @@ export function outlineStats(roots: OutlineNode[]) {
 
 // ---------- starters for a new diagram, written in the document's language ----------
 
-export type StarterId = "blank" | "flowchart" | "user_flow" | "system" | "sitemap";
+export type StarterId = "blank" | "moodboard" | "flowchart" | "user_flow" | "system" | "sitemap";
 
 const n = (id: string, shape: Shape, x: number, y: number, text: string, color: ColorId = "none", w?: number, h?: number): DNode => {
   const [dw, dh] = DEFAULT_SIZE[shape];
@@ -189,6 +272,18 @@ const e = (from: string, to: string, label?: string, extra: Partial<DEdge> = {})
 export function starter(id: StarterId, lang: Lang): { kind: DiagramKind; data: DiagramData | SitemapData } {
   const T = (k: string) => tr(k, lang);
   switch (id) {
+    case "moodboard":
+      // Two empty directions side by side: each section becomes one option when the board is tested with participants.
+      return { kind: "moodboard", data: {
+        nodes: [
+          { ...n("intro", "text", 0, -70, T("Pon cada dirección visual en su propia sección: imágenes, colores, notas y enlaces. Luego usa «Probar con participantes» para que elijan una."), "none", 1000, 44), size: "s" },
+          n("dir-a", "frame", 0, 0, T("Dirección A"), "gray", 480, 420),
+          n("dir-b", "frame", 540, 0, T("Dirección B"), "gray", 480, 420),
+          n("note-a", "note", 30, 50, T("¿Qué debe sentir la persona?"), "yellow", 180, 140),
+          n("note-b", "note", 570, 50, T("¿Qué debe sentir la persona?"), "yellow", 180, 140),
+        ],
+        edges: [],
+      } };
     case "sitemap":
       return { kind: "sitemap", data: { outline: [
         T("Inicio"),

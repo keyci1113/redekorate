@@ -25,13 +25,17 @@ export function textBox(shape: Shape, w: number, h: number): { top: number; righ
     case "note": return { top: 14, right: 14, bottom: 14, left: 14 };
     case "frame": return { top: 8, right: 12, bottom: h - 34, left: 12 };
     case "text": return { top: 2, right: 2, bottom: 2, left: 2 };
+    // Mood board items: the caption or name sits in a strip at the bottom, the link title fills the card.
+    case "image": return { top: Math.max(0, h - 30), right: 8, bottom: 4, left: 8 };
+    case "swatch": return { top: Math.max(0, h - 46), right: 10, bottom: 22, left: 10 };
+    case "link": return { top: 10, right: 14, bottom: 26, left: 42 };
     default: return { top: 6, right: 10, bottom: 6, left: 10 };
   }
 }
 
 /** The outline of a shape at its real size (not stretched, so corners and folds keep their proportions). */
 export function ShapeSvg({ shape, w, h, color, selected = false, strokeWidth = 1.5 }: { shape: Shape; w: number; h: number; color: ColorId; selected?: boolean; strokeWidth?: number }) {
-  if (shape === "text") return null;
+  if (shape === "text" || shape === "image" || shape === "swatch" || shape === "link") return null;
   const fill = shape === "frame" ? frameFill(color) : FILL[color];
   const stroke = selected ? "var(--color-accent)" : strokeOf(color);
   const s = strokeWidth / 2 + 0.5, W = w - s, H = h - s;

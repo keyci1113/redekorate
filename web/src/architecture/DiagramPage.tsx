@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, Copy, Link2, MessageSquare, Save, Shapes, Trash2 } from "lucide-react";
+import { Check, Copy, FlaskConical, Link2, MessageSquare, Save, Shapes, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import { t } from "../lib/i18n";
@@ -10,7 +10,8 @@ import { BackLink, Button, Modal } from "../components/ui";
 import { CommentsPanel } from "../components/CommentsPanel";
 import { SaveAsModal, ShareModal } from "../docs/DocModals";
 import type { DocData, DocRecord } from "../docs/types";
-import { DiagramCanvas } from "./DiagramCanvas";
+import { DiagramCanvas, type CanvasHandle } from "./DiagramCanvas";
+import { BoardTestModal } from "./BoardTestModal";
 import { layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, type DiagramData } from "./model";
 import { AccessNotice } from "../components/AccessNotice";
 
@@ -23,6 +24,9 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
   const [shareOpen, setShareOpen] = useState(false);
   const [saveAsOpen, setSaveAsOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [testOpen, setTestOpen] = useState(false);
+  const canvas = useRef<CanvasHandle>(null);
+  const board = doc.kind === "moodboard";
   const first = useRef(true);
   const readOnly = !canEdit(project.role);
   const back = `/projects/${project.id}?tab=architecture`;
@@ -32,7 +36,7 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
     if (readOnly) return;
     setSaving("saving");
     const timer = setTimeout(async () => {
-      try { const { document } = await api.patch<{ document: DocRecord }>(`/documents/${doc.id}`, { title: title.trim() || t("Diagrama sin título"), data: content }); onDoc(document); setSaving("saved"); }
+      try { const { document } = await api.patch<{ document: DocRecord }>(`/documents/${doc.id}`, { title: title.trim() || (board ? t("Tablero sin título") : t("Diagrama sin título")), data: content }); onDoc(document); setSaving("saved"); }
       catch { setSaving("error"); }
     }, 800);
     return () => clearTimeout(timer);
@@ -52,10 +56,11 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-(--page-gutter)">
         <BackLink compact to={back} color={project.color} label={project.name} section={t("Arquitectura")} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={t("Título del diagrama")} className="focus-ring min-w-24 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={board ? t("Título del tablero") : t("Título del diagrama")} className="focus-ring min-w-24 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
         </span>
+        {board && !readOnly && <Button size="sm" variant="ghost" icon={<FlaskConical size={15} />} onClick={() => setTestOpen(true)}><span className="max-md:hidden">{t("Probar con participantes")}</span></Button>}
         {doc.kind === "sitemap" && !readOnly && <Button size="sm" variant="ghost" icon={<Shapes size={15} />} onClick={openAsDiagram} className="max-lg:hidden">{t("Abrir como diagrama")}</Button>}
         {!readOnly && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
         <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)}><span className="hidden sm:inline">{t("Comentarios")}</span></Button>
@@ -64,7 +69,7 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
           <button type="button" title={t("Duplicar")} aria-label={t("Duplicar")} className="focus-ring hidden h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-ink/5 hover:text-ink sm:flex"
             onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}><Copy size={15} /></button>
           <button type="button" title={t("Eliminar")} aria-label={t("Eliminar")} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"
-            onClick={async () => { if (!confirm(t("¿Eliminar este diagrama?"))) return; await api.del(`/documents/${doc.id}`); nav(back); }}><Trash2 size={15} /></button>
+            onClick={async () => { if (!confirm(board ? t("¿Eliminar este tablero?") : t("¿Eliminar este diagrama?"))) return; await api.del(`/documents/${doc.id}`); nav(back); }}><Trash2 size={15} /></button>
         </>}
       </header>
 
@@ -72,9 +77,11 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
       <div className="min-h-0 flex-1">
         {doc.kind === "sitemap"
           ? <SitemapEditor outline={String(content.outline ?? "")} lang={doc.language} title={title} readOnly={readOnly} onChange={(outline) => setContent({ ...content, outline })} />
-          : <DiagramCanvas data={normalizeDiagram(doc.data)} title={title} readOnly={readOnly} onChange={(d) => setContent(d as unknown as DocData)} />}
+          : <DiagramCanvas data={normalizeDiagram(doc.data)} title={title} readOnly={readOnly} board={board} handle={canvas} onChange={(d) => setContent(d as unknown as DocData)} />}
       </div>
 
+      {board && <BoardTestModal open={testOpen} onClose={() => setTestOpen(false)} board={normalizeDiagram(content)} canvas={canvas}
+        projectId={project.id} title={title} lang={doc.language} />}
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} doc={doc} onDoc={onDoc} />
       <Modal open={commentsOpen} onClose={() => setCommentsOpen(false)} title={t("Comentarios")} wide>
         <CommentsPanel projectId={project.id} documentId={doc.id} role={project.role} />

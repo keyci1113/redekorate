@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { boardDirections, dominantColors, hostOf, normalizeHex, safeImageSrc, safeUrl, swatchRow, withScheme, type DiagramData, type DNode } from "./model";
 import { SITEMAP, isDiagramKind, layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, starter, alignedLine, onOutline, HANDLE_HALF, ALIGN_SNAP } from "./model";
 
 describe("parseOutline", () => {
@@ -79,11 +80,12 @@ describe("starters", () => {
       for (const lang of ["es", "en"] as const) {
         const s = starter(id, lang);
         expect(isDiagramKind(s.kind)).toBe(true);
-        if (s.kind === "diagram") expect(normalizeDiagram(s.data)).toEqual(s.data);
+        if (s.kind !== "sitemap") expect(normalizeDiagram(s.data)).toEqual(s.data);
         else expect(outlineStats(parseOutline((s.data as { outline: string }).outline)).pages).toBeGreaterThan(5);
       }
     }
   });
+
 
   test("a sitemap opened as a diagram keeps every page and line", () => {
     const outline = (starter("sitemap", "en").data as { outline: string }).outline;
@@ -108,5 +110,88 @@ describe("arrow geometry", () => {
     expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140 + ALIGN_SNAP + 1, y: 160, side: "top" })).toBeNull();
     expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140, y: 40, side: "top" })).toBeNull();
     expect(alignedLine({ x: 140, y: 100, side: "bottom" }, { x: 140, y: 160, side: "left" })).toBeNull();
+  });
+});
+
+describe("mood boards", () => {
+  test("moodboard is a canvas kind and its starter puts two directions in sections", () => {
+    expect(isDiagramKind("moodboard")).toBe(true);
+    const s = starter("moodboard", "en");
+    expect(s.kind).toBe("moodboard");
+    const dirs = boardDirections(s.data as DiagramData);
+    expect(dirs.map((d) => d.text)).toEqual(["Direction A", "Direction B"]);
+  });
+
+  test("stored items keep only a safe picture, a real color and an http(s) link", () => {
+    const d = normalizeDiagram({ nodes: [
+      { id: "a", shape: "image", src: "/uploads/abc123.png" },
+      { id: "b", shape: "image", src: "javascript:alert(1)" },
+      { id: "c", shape: "image", src: "data:image/png;base64,AAAA" },
+      { id: "d", shape: "swatch", hex: "ABC" },
+      { id: "e", shape: "swatch", hex: "not a color" },
+      { id: "f", shape: "link", url: "https://example.com/x" },
+      { id: "g", shape: "link", url: "javascript:alert(1)" },
+      { id: "h", shape: "rect", src: "/uploads/x.png", hex: "#fff", url: "https://x.y" },
+    ], edges: [] });
+    const by = (id: string) => d.nodes.find((n) => n.id === id)!;
+    expect(by("a").src).toBe("/uploads/abc123.png");
+    expect(by("b").src).toBeUndefined();
+    expect(by("c").src).toBeUndefined();
+    expect(by("d").hex).toBe("#aabbcc");
+    expect(by("e").hex).toBe("#9ca3af");
+    expect(by("f").url).toBe("https://example.com/x");
+    expect(by("g").url).toBeUndefined();
+    expect(by("h")).not.toHaveProperty("src");
+    expect(by("h")).not.toHaveProperty("hex");
+    expect(by("h")).not.toHaveProperty("url");
+  });
+
+  test("addresses and color codes are cleaned the way people type them", () => {
+    expect(normalizeHex("#FfF")).toBe("#ffffff");
+    expect(normalizeHex(" 7c3aed ")).toBe("#7c3aed");
+    expect(normalizeHex("#12345")).toBeNull();
+    expect(withScheme("example.com/a")).toBe("https://example.com/a");
+    expect(withScheme("http://x.org")).toBe("http://x.org");
+    expect(safeUrl("ftp://x.org")).toBe(false);
+    expect(safeImageSrc("https://cdn.example.com/a.jpg")).toBe(true);
+    expect(safeImageSrc("http://cdn.example.com/a.jpg")).toBe(false);
+    expect(safeImageSrc("/uploads/../secret")).toBe(false);
+    expect(hostOf("https://www.dribbble.com/shots/1")).toBe("dribbble.com");
+  });
+
+  test("dominant colors: the biggest areas first, near-duplicates skipped, transparent pixels ignored", () => {
+    const px = (rgb: [number, number, number], n: number, a = 255) => Array.from({ length: n }, () => [...rgb, a]).flat();
+    const pixels = [
+      ...px([250, 250, 250], 60), ...px([235, 236, 238], 30), // two near-identical whites, in different buckets
+      ...px([20, 40, 200], 40), ...px([230, 60, 30], 20), ...px([0, 255, 0], 500, 0),
+    ];
+    expect(dominantColors(pixels, 3)).toEqual(["#fafafa", "#1428c8", "#e63c1e"]);
+  });
+
+  test("dominant colors still fills the palette from a picture with few distinct colors", () => {
+    const pixels = [...Array.from({ length: 10 }, () => [10, 10, 10, 255]).flat(), ...Array.from({ length: 5 }, () => [20, 20, 20, 255]).flat()];
+    expect(dominantColors(pixels, 5)).toHaveLength(2);
+  });
+
+  test("pulled swatches sit in a row under the image, no wider than it once they need to shrink", () => {
+    let i = 0;
+    const row = swatchRow(["#000000", "#111111", "#222222", "#333333", "#444444"], { x: 100, y: 50, w: 300, h: 200 }, () => `s${++i}`);
+    expect(row).toHaveLength(5);
+    expect(row.every((s) => s.shape === "swatch" && s.y === 274)).toBe(true);
+    expect(row[0].x).toBe(100);
+    const last = row[4];
+    expect(last.x + last.w).toBeLessThanOrEqual(100 + 300 + 12);
+    expect(row.map((s) => s.hex)).toEqual(["#000000", "#111111", "#222222", "#333333", "#444444"]);
+  });
+
+  test("directions are sections with something inside, read left to right then top to bottom", () => {
+    const n = (id: string, shape: DNode["shape"], x: number, y: number, w: number, h: number): DNode => ({ id, shape, x, y, w, h, text: id, color: "none" });
+    const d: DiagramData = { nodes: [
+      n("B", "frame", 600, 0, 400, 300), n("A", "frame", 0, 10, 400, 300), n("C", "frame", 0, 400, 400, 300),
+      n("empty", "frame", 600, 400, 400, 300),
+      n("img-a", "image", 20, 40, 100, 100), n("img-b", "swatch", 620, 40, 100, 100), n("img-c", "note", 20, 440, 100, 100),
+      n("outside", "image", 2000, 2000, 100, 100),
+    ], edges: [] };
+    expect(boardDirections(d).map((f) => f.id)).toEqual(["A", "B", "C"]);
   });
 });

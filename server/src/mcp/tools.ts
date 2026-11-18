@@ -145,8 +145,8 @@ export const TOOLS: ToolDef[] = [
   }),
   tool({
     name: "diagram_reference", title: "Diagram reference", writes: false, input: {},
-    description: "How diagrams and sitemaps (the Architecture section) are shaped. Read this before creating or editing one.",
-    run: async () => ({ kinds: ["diagram", "sitemap"], shapes: DIAGRAM_SHAPES, reference: DIAGRAM_REFERENCE }),
+    description: "How diagrams, sitemaps and mood boards (the Architecture section) are shaped. Read this before creating or editing one.",
+    run: async () => ({ kinds: ["diagram", "sitemap", "moodboard"], shapes: DIAGRAM_SHAPES, reference: DIAGRAM_REFERENCE }),
   }),
 
   // ---------- write (never delete) ----------
@@ -233,7 +233,7 @@ export const TOOLS: ToolDef[] = [
   tool({
     name: "create_document", title: "Create document", writes: true,
     input: {
-      project_id: id("project"), kind: z.string().min(1).max(60).describe("Template kind, e.g. proto_persona, journey_map, interview_guide, research_plan; read a document of the same kind with get_document to copy its data shape. \"diagram\" and \"sitemap\" are the Architecture section: read diagram_reference first"),
+      project_id: id("project"), kind: z.string().min(1).max(60).describe("Template kind, e.g. proto_persona, journey_map, interview_guide, research_plan; read a document of the same kind with get_document to copy its data shape. \"diagram\", \"sitemap\" and \"moodboard\" are the Architecture section: read diagram_reference first"),
       title: z.string().trim().min(1).max(200), language: Lang, data: z.record(z.string(), z.unknown()).optional(),
     },
     description: "Create a research document in a project.",

@@ -1,4 +1,4 @@
-import { createContext, memo, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type RefObject } from "react";
+import { createContext, memo, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type Ref, type RefObject } from "react";
 import {
   Background, BackgroundVariant, BaseEdge, ConnectionMode, Controls, EdgeLabelRenderer, Handle, MarkerType, MiniMap, NodeResizer, Panel, Position,
   ReactFlow, ReactFlowProvider, SelectionMode, applyEdgeChanges, applyNodeChanges, getBezierPath, getNodesBounds, getSmoothStepPath, getStraightPath,
@@ -7,21 +7,23 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowLeftRight, ArrowRight, Bold, Copy,
-  Download, Hand, Italic, List, ListOrdered, Minus, MousePointer2, Redo2, Spline, Strikethrough, Trash2, Type, Underline, Undo2,
+  Download, ExternalLink, Hand, Image as ImageIcon, Italic, Link2, List, ListOrdered, Minus, MousePointer2, Palette, Pipette, Redo2, Spline, Strikethrough, Trash2, Type, Underline, Undo2,
 } from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 import { uid } from "../lib/hooks";
+import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
 import { cx } from "../components/ui";
 import {
   COLORS, DEFAULT_COLOR, DEFAULT_SIZE, SHAPES, alignedLine, onOutline, type ArrowStyle, type ColorId, type DEdge, type DNode, type DiagramData, type LineStyle, type PathStyle,
   TEXT_COLORS, type Shape, type Side, type TextAlign, type TextColor, type TextSize, type TextVAlign,
+  dominantColors, hostOf, isMedia, normalizeHex, safeImageSrc, safeUrl, swatchRow, withScheme,
 } from "./model";
 import { domToRich, parseRich, toEditorHtml, type Seg } from "./richText";
 import { ShapeIcon, ShapeSvg, fillOf, strokeOf, textBox, textOf } from "./shapes";
 
-type ShapeData = { shape: Shape; text: string; color: ColorId; size?: TextSize; align?: TextAlign; valign?: TextVAlign; textColor?: TextColor };
+type ShapeData = { shape: Shape; text: string; color: ColorId; size?: TextSize; align?: TextAlign; valign?: TextVAlign; textColor?: TextColor; src?: string; hex?: string; url?: string };
 type FNode = Node<ShapeData, "shape">;
 type LineData = { label?: string; line: LineStyle; arrow: ArrowStyle; path: PathStyle };
 type FEdge = Edge<LineData, "line">;
@@ -34,6 +36,7 @@ const SIDE_POS: Record<Side, Position> = { top: Position.Top, right: Position.Ri
 export const SHAPE_NAMES: Record<Shape, string> = {
   rect: "Rectángulo", rounded: "Proceso", ellipse: "Elipse", diamond: "Decisión", triangle: "Triángulo", parallelogram: "Entrada / salida",
   hexagon: "Hexágono", cylinder: "Base de datos", page: "Página", pages: "Grupo de páginas", note: "Nota adhesiva", text: "Texto", frame: "Sección",
+  image: "Imagen", swatch: "Muestra de color", link: "Enlace",
 };
 const SHORTCUT: Partial<Record<Shape, string>> = { rect: "r", ellipse: "o", diamond: "d", page: "p", note: "s", text: "t", frame: "f" };
 const TOOL_GROUPS: { label: string; shapes: Shape[] }[] = [
@@ -41,6 +44,13 @@ const TOOL_GROUPS: { label: string; shapes: Shape[] }[] = [
   { label: "Arquitectura de información", shapes: ["page", "pages"] },
   { label: "Pizarra", shapes: ["note", "text", "frame"] },
 ];
+/** A mood board's toolbar: its own items first, then the whiteboard pieces and a few plain shapes. */
+const BOARD_GROUPS: { label: string; shapes: Shape[] }[] = [
+  { label: "Tablero", shapes: ["image", "swatch", "link"] },
+  { label: "Pizarra", shapes: ["note", "card", "text", "frame"] },
+  { label: "Figuras", shapes: ["rect", "rounded", "ellipse"] },
+];
+const MEDIA_ICON: Partial<Record<Shape, ReactNode>> = { image: <ImageIcon size={16} />, swatch: <Palette size={16} />, link: <Link2 size={16} /> };
 const SIZE_PX: Record<TextSize, number> = { s: 12, m: 14, l: 19, xl: 26 };
 /** Fixed text colors, picked to read on the light pastel fills; "auto" follows the fill and the theme. */
 const TEXT_COLOR_CSS: Record<Exclude<TextColor, "auto">, string> = {
@@ -55,6 +65,12 @@ const textOpts = (d: { size?: TextSize; align?: TextAlign; valign?: TextVAlign; 
   ...(d.size ? { size: d.size } : {}), ...(d.align ? { align: d.align } : {}), ...(d.valign ? { valign: d.valign } : {}),
   ...(d.textColor && d.textColor !== "auto" ? { textColor: d.textColor } : {}),
 });
+/** A mood board item's picture, color or address, copied only when the item has one. */
+const mediaOpts = (d: { src?: string; hex?: string; url?: string }) => ({
+  ...(d.src ? { src: d.src } : {}), ...(d.hex ? { hex: d.hex } : {}), ...(d.url ? { url: d.url } : {}),
+});
+/** Text with its formatting marks taken out, for an image's alt text. */
+const plainText = (s: string) => s.replace(/\\(.)/g, "$1").replace(/[*_~]/g, "").replace(/^\s*(?:[-*]|\d+\.)\s+/gm, "").trim();
 
 // ---------- stored diagram <-> React Flow ----------
 
@@ -68,7 +84,7 @@ function toFlow(d: DiagramData): Snap {
   return {
     nodes: d.nodes.map((n) => ({
       id: n.id, type: "shape", position: { x: n.x, y: n.y }, width: n.w, height: n.h, zIndex: n.shape === "frame" ? -1 : 0,
-      data: { shape: n.shape, text: n.text, color: n.color, ...textOpts(n) },
+      data: { shape: n.shape, text: n.text, color: n.color, ...textOpts(n), ...mediaOpts(n) },
     })),
     edges: d.edges.map((e) => withMarkers({
       id: e.id, type: "line", source: e.from, target: e.to, sourceHandle: e.fromSide ?? null, targetHandle: e.toSide ?? null,
@@ -82,7 +98,7 @@ function fromFlow(nodes: FNode[], edges: FEdge[]): DiagramData {
     nodes: nodes.map((n): DNode => ({
       id: n.id, shape: n.data.shape, x: Math.round(n.position.x), y: Math.round(n.position.y),
       w: Math.round(n.width ?? n.measured?.width ?? DEFAULT_SIZE[n.data.shape][0]), h: Math.round(n.height ?? n.measured?.height ?? DEFAULT_SIZE[n.data.shape][1]),
-      text: n.data.text, color: n.data.color, ...textOpts(n.data),
+      text: n.data.text, color: n.data.color, ...textOpts(n.data), ...mediaOpts(n.data),
     })),
     edges: edges.map((e): DEdge => ({
       id: e.id, from: e.source, to: e.target,
@@ -179,13 +195,14 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
   const box = textBox(data.shape, w, h);
   const editing = ctx.editing === id;
   const frame = data.shape === "frame", note = data.shape === "note", text = data.shape === "text";
-  const left = note || text || frame;
+  const image = data.shape === "image", swatch = data.shape === "swatch", link = data.shape === "link";
+  const left = note || text || frame || link || swatch;
   const align = data.align ?? (left ? "left" : "center"), valign = data.valign ?? (left ? "top" : "middle");
-  const color = data.textColor && data.textColor !== "auto" ? TEXT_COLOR_CSS[data.textColor] : frame || text ? "var(--color-ink)" : textOf(data.color);
+  const color = data.textColor && data.textColor !== "auto" ? TEXT_COLOR_CSS[data.textColor] : image ? "#FFFFFF" : frame || text || swatch || link ? "var(--color-ink)" : textOf(data.color);
   const style: CSSProperties = { fontSize: SIZE_PX[data.size ?? (frame ? "s" : "m")], color, lineHeight: 1.3, textAlign: align, justifyContent: JUSTIFY[valign] };
   // While typing, the shape gets taller until the text fits (never shorter, never wider).
   const grow = (el: HTMLElement) => {
-    if (frame) return;
+    if (frame || image || swatch) return;
     const need = el.scrollHeight;
     let H = h;
     for (let k = 0; k < 60; k++) { const b = textBox(data.shape, w, H); if (H - b.top - b.bottom >= need) break; H += 8; }
@@ -197,12 +214,15 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
         handleClassName="!h-2.5 !w-2.5 !rounded-sm !border-2 !border-[var(--color-accent)] !bg-[var(--color-surface)]" />}
       <ShapeSvg shape={data.shape} w={w} h={h} color={data.color} selected={selected && !ctx.readOnly && text} />
       {text && selected && !ctx.readOnly && <span className="pointer-events-none absolute inset-0 rounded border border-dashed border-[var(--color-accent)]" />}
-      <div className={cx("absolute flex flex-col break-words whitespace-pre-wrap", editing ? "overflow-visible" : "overflow-hidden", frame && "font-semibold")}
-        style={{ top: box.top, right: box.right, bottom: box.bottom, left: box.left, ...style }}>
+      {isMedia(data.shape) && <MediaBody data={data} selected={selected && !ctx.readOnly} />}
+      <div className={cx("absolute flex flex-col break-words whitespace-pre-wrap", editing ? "overflow-visible" : "overflow-hidden", frame && "font-semibold",
+        image && (data.text || editing) && "rounded-md bg-[rgb(22_25_31/0.55)] px-1.5 py-0.5", swatch && "font-semibold", link && "font-semibold")}
+        style={{ top: box.top, right: box.right, bottom: box.bottom, left: box.left, ...style, ...(swatch || link ? { fontSize: SIZE_PX[data.size ?? "s"] } : {}) }}>
         {editing
           ? <RichEditor value={data.text} onChange={(v) => ctx.setText(id, v)} onDone={ctx.endEdit} onGrow={grow} />
           : data.text ? <RichText text={data.text} />
-          : !ctx.readOnly && (note || text) ? <span className="opacity-40">{t("Escribe algo")}</span> : null}
+          : !ctx.readOnly && (note || text) ? <span className="opacity-40">{t("Escribe algo")}</span>
+          : link && data.url ? <span>{hostOf(data.url)}</span> : null}
       </div>
       {(["top", "right", "bottom", "left"] as const).map((side) => (
         <Handle key={side} id={side} type="source" position={SIDE_POS[side]} isConnectable={!ctx.readOnly} className="rk-handle" />
@@ -210,6 +230,37 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
     </div>
   );
 });
+
+/** What a mood board item shows under its text: the picture, the color with its code, or the link's site and a way to open it. */
+function MediaBody({ data, selected }: { data: ShapeData; selected: boolean }) {
+  const ring = selected ? "ring-2 ring-[var(--color-accent)]" : "";
+  if (data.shape === "image") {
+    return data.src && safeImageSrc(data.src)
+      ? <img src={data.src} alt={plainText(data.text)} draggable={false} className={cx("pointer-events-none absolute inset-0 h-full w-full rounded-md object-cover shadow-sm", ring)} />
+      : <div className={cx("absolute inset-0 flex items-center justify-center rounded-md border border-dashed border-line-2 bg-paper text-ink-3", ring)}><ImageIcon size={22} aria-hidden /></div>;
+  }
+  if (data.shape === "swatch") {
+    const hex = data.hex ?? "#9ca3af";
+    return (
+      <div className={cx("absolute inset-0 flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-sm", ring)}>
+        <div className="min-h-0 flex-1" style={{ background: hex }} />
+        <div className="h-[46px] shrink-0" />
+        <span className="absolute right-2.5 bottom-1 left-2.5 truncate font-mono text-[11px] text-ink-3 uppercase">{hex}</span>
+      </div>
+    );
+  }
+  const ok = data.url && safeUrl(data.url);
+  return (
+    <div className={cx("absolute inset-0 rounded-lg border border-line bg-surface shadow-sm", ring)}>
+      <span className="absolute top-2.5 left-3 flex h-6 w-6 items-center justify-center rounded-md bg-accent-soft text-accent"><Link2 size={14} aria-hidden /></span>
+      {ok
+        ? <a href={data.url} target="_blank" rel="noopener noreferrer" title={t("Abrir el enlace")} aria-label={t("Abrir el enlace")}
+            className="nodrag nopan focus-ring absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-md text-ink-3 hover:bg-ink/5 hover:text-ink"
+            onDoubleClick={(e) => e.stopPropagation()}><ExternalLink size={13} /></a>
+        : <span className="absolute right-3 bottom-1.5 left-[42px] truncate text-[11px] text-ink-3">{t("Sin dirección todavía")}</span>}
+    </div>
+  );
+}
 
 function LineEdge({ id, sourceX: sx0, sourceY: sy0, targetX: tx0, targetY: ty0, sourcePosition, targetPosition, data, selected, markerEnd, markerStart }: EdgeProps<FEdge>) {
   const ctx = useContext(DiagramCtx);
@@ -259,13 +310,39 @@ export interface CanvasProps {
   actions?: ReactNode;
   /** Read-only canvases refit whenever this changes (a sitemap redrawn from its outline). */
   fitKey?: string;
+  /** A mood board: its toolbar puts images, color swatches and links first, and images can be dropped or pasted in. */
+  board?: boolean;
+  /** Lets the page take a picture of one section (a mood board direction for a preference test). */
+  handle?: Ref<CanvasHandle>;
 }
+
+export interface CanvasHandle {
+  /** A PNG of everything inside one section, cropped to it; null when the section is gone. */
+  exportFrame: (id: string) => Promise<Blob | null>;
+}
+
+/** A data: URL as a Blob, without fetch (the content security policy does not allow fetching data: URLs). */
+function dataUrlBlob(url: string): Blob {
+  const [head, body] = url.split(",", 2);
+  const mime = /data:([^;]+)/.exec(head)?.[1] ?? "application/octet-stream";
+  const bin = atob(body), bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+const nextFrame = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+/** The picture's own width and height, so an image lands on the board without being stretched. */
+const naturalSize = (src: string) => new Promise<[number, number]>((resolve) => {
+  const i = new Image();
+  i.onload = () => resolve([i.naturalWidth || DEFAULT_SIZE.image[0], i.naturalHeight || DEFAULT_SIZE.image[1]]);
+  i.onerror = () => resolve(DEFAULT_SIZE.image);
+  i.src = src;
+});
 
 export function DiagramCanvas(props: CanvasProps) {
   return <ReactFlowProvider><Canvas {...props} /></ReactFlowProvider>;
 }
 
-function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, fitKey }: CanvasProps) {
+function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, fitKey, board = false, handle }: CanvasProps) {
   const { theme } = useTheme();
   const rf = useReactFlow<FNode, FEdge>();
   const wrap = useRef<HTMLDivElement>(null);
@@ -339,12 +416,107 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
     };
   };
   const addShape = (shape: Shape, at = center()) => {
+    if (shape === "image") { imageAt.current = at; fileInput.current?.click(); return; }
     snapshot();
     const n = makeNode(shape, at);
+    if (shape === "swatch") n.data.hex = "#7c3aed";
     setNodes((ns) => [...ns.map((x) => ({ ...x, selected: false })), n]);
     setEdges((es) => es.map((x) => ({ ...x, selected: false })));
-    if (shape !== "frame") setEditing(n.id);
+    // A link starts with its address field open in the inspector; a swatch with its color picker.
+    if (shape !== "frame" && shape !== "link" && shape !== "swatch") setEditing(n.id);
   };
+
+  // ----- mood board: images, links and colors -----
+  const fileInput = useRef<HTMLInputElement>(null), imageAt = useRef<{ x: number; y: number } | null>(null);
+  const [notice, setNotice] = useState<{ text: string; error?: boolean } | null>(null);
+  const addNodes = (made: FNode[]) => {
+    if (!made.length) return;
+    snapshot();
+    setNodes((ns) => [...ns.map((x) => ({ ...x, selected: false })), ...made.map((n) => ({ ...n, selected: true }))]);
+    setEdges((es) => es.map((x) => ({ ...x, selected: false })));
+  };
+  async function addImages(files: File[], at = imageAt.current ?? center()) {
+    imageAt.current = null;
+    const pics = files.filter((f) => f.type.startsWith("image/"));
+    if (!pics.length) return;
+    setNotice({ text: plural(pics.length, { one: "Subiendo la imagen…", other: "Subiendo {n} imágenes…" }) });
+    const made: FNode[] = [];
+    let failed: string | null = null;
+    for (const f of pics) {
+      try {
+        const src = await api.upload(f);
+        const [nw, nh] = await naturalSize(src);
+        const w = Math.min(320, nw), h = Math.max(40, Math.round((w * nh) / nw));
+        made.push({ id: uid(), type: "shape", position: { x: 0, y: Math.round(at.y - h / 2) }, width: w, height: h, zIndex: 0, data: { shape: "image", text: "", color: "none", src } });
+      } catch (e) { failed = (e as Error).message; }
+    }
+    // The pictures sit side by side, the row centered where they were dropped (or in the middle of the screen).
+    const gap = 24, total = made.reduce((sum, n) => sum + (n.width ?? 0), 0) + gap * Math.max(0, made.length - 1);
+    let x = at.x - total / 2;
+    for (const n of made) { n.position.x = Math.round(x); x += (n.width ?? 0) + gap; }
+    addNodes(made);
+    setNotice(failed ? { text: failed, error: true } : null);
+  }
+  const addLink = (url: string, at = center()) => {
+    const n = makeNode("link", at);
+    n.data = { ...n.data, url, text: hostOf(url) };
+    addNodes([n]);
+  };
+  async function pullColors(n: FNode) {
+    if (!n.data.src) return;
+    try {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.src = n.data.src;
+      await img.decode();
+      const side = 96, k = side / Math.max(img.naturalWidth, img.naturalHeight);
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(img.naturalWidth * k)); c.height = Math.max(1, Math.round(img.naturalHeight * k));
+      const g = c.getContext("2d")!;
+      g.drawImage(img, 0, 0, c.width, c.height);
+      const colors = dominantColors(g.getImageData(0, 0, c.width, c.height).data, 5);
+      const w = n.width ?? DEFAULT_SIZE.image[0], h = n.height ?? DEFAULT_SIZE.image[1];
+      addNodes(swatchRow(colors, { x: n.position.x, y: n.position.y, w, h }, uid).map((s) => ({
+        id: s.id, type: "shape", position: { x: s.x, y: s.y }, width: s.w, height: s.h, zIndex: 0, data: { shape: "swatch", text: "", color: "none", hex: s.hex },
+      })));
+    } catch { setNotice({ text: t("No se pudieron leer los colores de esta imagen."), error: true }); }
+  }
+  // Pasting on a board: a copied picture becomes an image and a copied web address a link; otherwise the shapes copied here.
+  const pastePending = useRef(false);
+  useEffect(() => {
+    if (readOnly || !board) return;
+    const on = (e: ClipboardEvent) => {
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (el && el !== document.body && !wrap.current?.contains(el)) return;
+      const files = [...(e.clipboardData?.files ?? [])].filter((f) => f.type.startsWith("image/"));
+      const text = e.clipboardData?.getData("text/plain").trim() ?? "";
+      if (files.length) { e.preventDefault(); pastePending.current = false; void addImages(files); return; }
+      if (/^https?:\/\/\S+$/i.test(text) && safeUrl(text)) { e.preventDefault(); pastePending.current = false; addLink(text); }
+    };
+    window.addEventListener("paste", on);
+    return () => window.removeEventListener("paste", on);
+  });
+
+  // ----- a picture of one section, for testing a board's directions -----
+  useImperativeHandle(handle, () => ({
+    exportFrame: async (id: string) => {
+      const f = live.current.nodes.find((n) => n.id === id);
+      const el = wrap.current?.querySelector<HTMLElement>(".react-flow__viewport");
+      if (!f || !el) return null;
+      setNodes((ns) => ns.map((n) => ({ ...n, selected: false })));
+      setEdges((es) => es.map((e) => ({ ...e, selected: false })));
+      await nextFrame();
+      const width = Math.round(f.width ?? DEFAULT_SIZE.frame[0]), height = Math.round(f.height ?? DEFAULT_SIZE.frame[1]);
+      const bg = getComputedStyle(document.documentElement).getPropertyValue("--color-surface").trim() || "#ffffff";
+      const url = await toPng(el, {
+        backgroundColor: bg, width, height, pixelRatio: Math.min(2, 1600 / Math.max(width, height)),
+        style: { width: `${width}px`, height: `${height}px`, transform: `translate(${-f.position.x}px, ${-f.position.y}px) scale(1)` },
+        filter: (n: HTMLElement) => !(n instanceof HTMLElement && (n.classList.contains("react-flow__handle") || n.classList.contains("react-flow__resize-control"))),
+      } as Parameters<typeof toPng>[1]);
+      return dataUrlBlob(url);
+    },
+  }), []);
   const newEdge = (source: string, target: string, sourceHandle: string | null, targetHandle: string | null): FEdge =>
     withMarkers({ id: uid(), type: "line", source, target, sourceHandle, targetHandle, data: { line: "solid", arrow: "end", path: "elbow" } });
 
@@ -368,7 +540,7 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
       setEdges((es) => [...es, newEdge(from.id, target.id, s.fromHandle.id ?? null, facingSide(from, target))]);
       return;
     }
-    const shape: Shape = ["note", "text", "frame"].includes(from.data.shape) ? "rounded" : from.data.shape;
+    const shape: Shape = ["note", "text", "frame"].includes(from.data.shape) || isMedia(from.data.shape) ? "rounded" : from.data.shape;
     const side = (s.fromHandle.id ?? "right") as Side;
     const n = makeNode(shape, rf.screenToFlowPosition({ x: pt.clientX, y: pt.clientY }), from.data.color);
     const [w, h] = DEFAULT_SIZE[shape];
@@ -456,7 +628,13 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
     if (mod && k === "y") { e.preventDefault(); redo(); return; }
     if (mod && k === "c") { copySel(); return; }
     if (mod && k === "x") { copySel(); removeSelected(); return; }
-    if (mod && k === "v") { e.preventDefault(); paste(); return; }
+    if (mod && k === "v") {
+      // On a board the browser's paste event comes first, so a copied picture or address wins over copied shapes.
+      if (!board) { e.preventDefault(); paste(); return; }
+      pastePending.current = true;
+      setTimeout(() => { if (pastePending.current) { pastePending.current = false; paste(); } }, 60);
+      return;
+    }
     if (mod && k === "d") { e.preventDefault(); copySel(); paste(); return; }
     if (mod && k === "a") { e.preventDefault(); setNodes((ns) => ns.map((n) => ({ ...n, selected: true }))); return; }
     if (mod || e.altKey) return;
@@ -475,6 +653,13 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
 
   // ----- drag a shape from the toolbar onto the canvas -----
   const onDrop = (e: DragEvent) => {
+    if (board && !readOnly && e.dataTransfer.files.length) {
+      e.preventDefault();
+      void addImages([...e.dataTransfer.files], rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }));
+      return;
+    }
+    const url = board && !readOnly ? e.dataTransfer.getData("text/uri-list").split(/\r?\n/).find((l) => l && !l.startsWith("#")) : undefined;
+    if (url && safeUrl(url)) { e.preventDefault(); addLink(url, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })); return; }
     const shape = e.dataTransfer.getData("application/x-rk-shape") as Shape;
     if (!SHAPES.includes(shape)) return;
     e.preventDefault();
@@ -529,7 +714,7 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
 
           {!readOnly && (
             <Panel position="top-left" className="!m-3">
-              <Toolbar tool={tool} setTool={setTool} add={(s) => addShape(s)} />
+              <Toolbar tool={tool} setTool={setTool} add={(s) => addShape(s)} groups={board ? BOARD_GROUPS : TOOL_GROUPS} />
             </Panel>
           )}
           <Panel position="top-right" className="!m-3 flex items-center gap-1.5">
@@ -549,17 +734,32 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
           {!readOnly && (selNodes.length > 0 || selEdges.length > 0) && !editing && (
             <Panel position="top-center" className="!mt-3">
               <Inspector nodes={selNodes} edges={selEdges} patchNodes={patchNodes} patchEdges={patchEdges} remove={removeSelected}
-                duplicate={() => { copySel(); paste(); }} label={() => selEdges[0] && ctx.startEdit(`edge:${selEdges[0].id}`)} />
+                duplicate={() => { copySel(); paste(); }} label={() => selEdges[0] && ctx.startEdit(`edge:${selEdges[0].id}`)}
+                setQuiet={(p) => setNodes((ns) => ns.map((n) => (n.selected ? { ...n, data: { ...n.data, ...p } } : n)))} snapshot={snapshot}
+                pullColors={() => selNodes[0] && void pullColors(selNodes[0])} />
             </Panel>
           )}
         </ReactFlow>
         {empty && !readOnly && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
             <div className="max-w-sm rounded-2xl border border-dashed border-line-2 bg-surface/80 p-5 text-center text-sm text-ink-2 backdrop-blur">
-              <p className="font-semibold text-ink">{t("Lienzo vacío")}</p>
-              <p className="mt-1">{t("Elige una figura en la barra de la izquierda o arrástrala aquí. Para unir dos figuras, arrastra desde uno de sus puntos hasta la otra.")}</p>
+              <p className="font-semibold text-ink">{board ? t("Tablero vacío") : t("Lienzo vacío")}</p>
+              <p className="mt-1">{board
+                ? t("Arrastra imágenes aquí, pégalas con ⌘V o usa la barra de la izquierda para agregar imágenes, colores, enlaces y notas.")
+                : t("Elige una figura en la barra de la izquierda o arrástrala aquí. Para unir dos figuras, arrastra desde uno de sus puntos hasta la otra.")}</p>
             </div>
           </div>
+        )}
+        {notice && (
+          <div role={notice.error ? "alert" : "status"} className={cx("absolute bottom-4 left-1/2 z-10 flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-3 rounded-xl border px-3.5 py-2 text-sm shadow-[var(--shadow-lift)]",
+            notice.error ? "border-bad/30 bg-bad-soft text-bad" : "border-line bg-surface text-ink-2")}>
+            <span>{notice.text}</span>
+            {notice.error && <button type="button" onClick={() => setNotice(null)} className="focus-ring rounded px-1 text-xs font-semibold underline">{t("Cerrar")}</button>}
+          </div>
+        )}
+        {board && !readOnly && (
+          <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden aria-hidden tabIndex={-1}
+            onChange={(e) => { const fs = [...(e.target.files ?? [])]; e.target.value = ""; void addImages(fs); }} />
         )}
       </div>
     </DiagramCtx.Provider>
@@ -578,18 +778,18 @@ function IconBtn({ label, keys, onClick, disabled, active, children }: { label: 
   );
 }
 
-function Toolbar({ tool, setTool, add }: { tool: "select" | "hand"; setTool: (t: "select" | "hand") => void; add: (s: Shape) => void }) {
+function Toolbar({ tool, setTool, add, groups }: { tool: "select" | "hand"; setTool: (t: "select" | "hand") => void; add: (s: Shape) => void; groups: { label: string; shapes: Shape[] }[] }) {
   return (
     <div className="flex max-h-[calc(100vh-9rem)] flex-col gap-0.5 overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-[var(--shadow-lift)]" role="toolbar" aria-label={t("Herramientas")}>
       <IconBtn label={t("Seleccionar")} keys="V" onClick={() => setTool("select")} active={tool === "select"}><MousePointer2 size={16} /></IconBtn>
       <IconBtn label={t("Mover el lienzo")} keys="H" onClick={() => setTool("hand")} active={tool === "hand"}><Hand size={16} /></IconBtn>
-      {TOOL_GROUPS.map((g) => (
+      {groups.map((g) => (
         <div key={g.label} className="mt-1 flex flex-col gap-0.5 border-t border-line pt-1" role="group" aria-label={t(g.label)}>
           {g.shapes.map((s) => (
-            <button key={s} type="button" draggable onDragStart={(e) => { e.dataTransfer.setData("application/x-rk-shape", s); e.dataTransfer.effectAllowed = "copy"; }}
-              onClick={() => add(s)} title={SHORTCUT[s] ? `${t(SHAPE_NAMES[s])} (${SHORTCUT[s].toUpperCase()})` : t(SHAPE_NAMES[s])} aria-label={t(SHAPE_NAMES[s])}
-              className="focus-ring flex h-8 w-8 cursor-grab items-center justify-center rounded-lg text-ink-2 transition hover:bg-ink/5 hover:text-ink">
-              <ShapeIcon shape={s} />
+            <button key={s} type="button" draggable={s !== "image"} onDragStart={(e) => { e.dataTransfer.setData("application/x-rk-shape", s); e.dataTransfer.effectAllowed = "copy"; }}
+              onClick={() => add(s)} title={SHORTCUT[s] ? `${t(SHAPE_NAMES[s])} (${SHORTCUT[s].toUpperCase()})` : s === "image" ? t("Subir imágenes") : t(SHAPE_NAMES[s])} aria-label={s === "image" ? t("Subir imágenes") : t(SHAPE_NAMES[s])}
+              className={cx("focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-2 transition hover:bg-ink/5 hover:text-ink", s === "image" ? "cursor-pointer" : "cursor-grab")}>
+              {MEDIA_ICON[s] ?? <ShapeIcon shape={s} />}
             </button>
           ))}
         </div>
@@ -632,15 +832,26 @@ function Seg<T extends string>({ value, options, onChange, label }: { value: T |
 
 const same = <T,>(xs: T[]): T | null => (xs.length && xs.every((x) => x === xs[0]) ? xs[0] : null);
 
-function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, label }: {
+function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, label, setQuiet, snapshot, pullColors }: {
   nodes: FNode[]; edges: FEdge[]; patchNodes: (f: (d: ShapeData) => Partial<ShapeData>) => void; patchEdges: (p: Partial<LineData>) => void;
   remove: () => void; duplicate: () => void; label: () => void;
+  /** Changes the selection without an undo step of its own (the step is taken when the field is first touched). */
+  setQuiet: (p: Partial<ShapeData>) => void; snapshot: () => void; pullColors: () => void;
 }) {
   const shapeNow = same(nodes.map((n) => n.data.shape)), colorNow = same(nodes.map((n) => n.data.color));
   const sep = <span className="mx-0.5 h-6 w-px bg-line" />;
+  const media = nodes.some((n) => isMedia(n.data.shape));
+  const one = nodes.length === 1 ? nodes[0] : null;
   return (
     <div className="flex max-w-[calc(100vw-2rem)] flex-wrap items-center gap-1.5 rounded-xl border border-line bg-surface p-1.5 shadow-[var(--shadow-lift)]">
-      {nodes.length > 0 && <>
+      {one?.data.shape === "swatch" && <><SwatchFields key={one.id} hex={one.data.hex ?? "#9ca3af"} set={(hex) => setQuiet({ hex })} snapshot={snapshot} />{sep}</>}
+      {one?.data.shape === "link" && <><LinkField key={one.id} data={one.data} set={setQuiet} snapshot={snapshot} />{sep}</>}
+      {one?.data.shape === "image" && one.data.src && <>
+        <button type="button" onClick={pullColors} title={t("Agrega los colores principales de la imagen como muestras debajo de ella.")}
+          className="focus-ring flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-ink-2 hover:bg-ink/5 hover:text-ink"><Pipette size={14} />{t("Extraer colores")}</button>
+        {sep}
+      </>}
+      {nodes.length > 0 && !media && <>
         <div className="flex gap-1 px-0.5" role="group" aria-label={t("Color")}>
           {COLORS.map((c) => (
             <button key={c} type="button" onClick={() => patchNodes(() => ({ color: c }))} title={t(COLOR_NAMES[c])} aria-label={t(COLOR_NAMES[c])} aria-pressed={colorNow === c}
@@ -649,13 +860,14 @@ function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, la
           ))}
         </div>
         {sep}
-        <select value={shapeNow ?? ""} onChange={(e) => patchNodes(() => ({ shape: e.target.value as Shape }))} aria-label={t("Figura")}
+      </>}
+      {nodes.length > 0 && <>
+        {!media && <select value={shapeNow ?? ""} onChange={(e) => patchNodes(() => ({ shape: e.target.value as Shape }))} aria-label={t("Figura")}
           className="focus-ring h-7 rounded-md border border-line bg-surface px-1.5 text-xs">
           {!shapeNow && <option value="">{t("Varias")}</option>}
-          {SHAPES.map((s) => <option key={s} value={s}>{t(SHAPE_NAMES[s])}</option>)}
-        </select>
-        <TextSettings datas={nodes.map((n) => n.data)} patch={(p) => patchNodes(() => p)} />
-        {sep}
+          {SHAPES.filter((s) => !isMedia(s)).map((s) => <option key={s} value={s}>{t(SHAPE_NAMES[s])}</option>)}
+        </select>}
+        {!media && <><TextSettings datas={nodes.map((n) => n.data)} patch={(p) => patchNodes(() => p)} />{sep}</>}
         <IconBtn label={t("Duplicar")} keys="⌘D" onClick={duplicate}><Copy size={15} /></IconBtn>
       </>}
       {nodes.length === 0 && edges.length > 0 && <>
@@ -681,7 +893,46 @@ function Inspector({ nodes, edges, patchNodes, patchEdges, remove, duplicate, la
   );
 }
 
-const LEFT_SHAPES = new Set<Shape>(["note", "text", "frame"]);
+/** A swatch's color: the system picker and the code, which takes #abc or #aabbcc. */
+function SwatchFields({ hex, set, snapshot }: { hex: string; set: (hex: string) => void; snapshot: () => void }) {
+  const [draft, setDraft] = useState(hex);
+  useEffect(() => setDraft(hex), [hex]);
+  const commit = () => { const h = normalizeHex(draft); if (h && h !== hex) { snapshot(); set(h); } else setDraft(hex); };
+  return (
+    <div className="flex items-center gap-1.5 px-0.5">
+      <input type="color" value={hex} aria-label={t("Color de la muestra")} onFocus={snapshot} onPointerDown={snapshot} onChange={(e) => set(e.target.value)}
+        className="h-7 w-9 cursor-pointer rounded-md border border-line bg-surface p-0.5" />
+      <input value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={commit} onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") e.currentTarget.blur(); }}
+        aria-label={t("Código del color")} spellCheck={false} className="focus-ring h-7 w-[5.5rem] rounded-md border border-line bg-surface px-1.5 font-mono text-xs uppercase" />
+    </div>
+  );
+}
+
+/** A link's address. Typed without https:// it gets one; the title fills in with the site's name if it is empty. */
+function LinkField({ data, set, snapshot }: { data: ShapeData; set: (p: Partial<ShapeData>) => void; snapshot: () => void }) {
+  const [draft, setDraft] = useState(data.url ?? "");
+  const [bad, setBad] = useState(false);
+  const commit = () => {
+    const url = withScheme(draft);
+    if (!url) { setBad(false); return; }
+    if (!safeUrl(url)) { setBad(true); return; }
+    setBad(false); setDraft(url);
+    if (url === data.url) return;
+    snapshot();
+    set({ url, ...(!data.text || (data.url && data.text === hostOf(data.url)) ? { text: hostOf(url) } : {}) });
+  };
+  return (
+    <label className="flex items-center gap-1.5 px-0.5 text-xs text-ink-3">
+      <Link2 size={14} aria-hidden />
+      <input autoFocus={!data.url} value={draft} placeholder="https://" onChange={(e) => setDraft(e.target.value)} onBlur={commit}
+        onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") e.currentTarget.blur(); }} aria-label={t("Dirección del enlace")} aria-invalid={bad}
+        className={cx("focus-ring h-7 w-56 rounded-md border bg-surface px-1.5 text-xs text-ink", bad ? "border-bad" : "border-line")} />
+      {bad && <span className="text-bad">{t("Usa una dirección http o https.")}</span>}
+    </label>
+  );
+}
+
+const LEFT_SHAPES = new Set<Shape>(["note", "text", "frame", "link", "swatch"]);
 
 /** Size, alignment and color of the text as a whole: in the inspector, and in the bar shown while typing. */
 function TextSettings({ datas, patch, keepFocus }: { datas: ShapeData[]; patch: (p: Partial<ShapeData>) => void; keepFocus?: boolean }) {
