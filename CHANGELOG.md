@@ -4,6 +4,7 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Sticky notes readable again.** Notes in documents (personas, empathy maps, affinity diagrams…) showed near-white text on their pastel paper (1.1:1 contrast) since the November redesign. They now use dark ink in both themes (9.8:1 or better), with a darker link and delete color. `noteContrast.test.ts` checks every note color against every text color on it.
 - **Outside assistants: document fields.** New `document_reference` MCP tool: every document kind, and for one kind its sections in order, the key each uses in `data`, its title and prompt, and the shape its value takes. The connection's instructions point to it. `create_document` now only takes kinds the app opens (its hint used to name `research_plan`, which is a study method, not a document kind; a research plan document is `ux_blueprint`). The list mirrors `web/src/docs/templates.tsx`; `documentReference.test.ts` fails if they drift apart.
 - **Card menus on documents and diagrams.** Each card in UX documents and Architecture has a ⋯ menu for editors: open in a new tab, rename, share, duplicate, save as… and delete. The card itself still opens the document. Cards no longer lift on hover, because a moving card carried its fixed-position menu away.
 - **Project description layout.** A long description shows three lines with *See more* / *See less*, up to 48rem wide, and on phones sits below the title instead of beside the buttons.
