@@ -2189,7 +2189,7 @@ export const EN: Record<string, string> = {
 "Acceso externo (MCP)": "Outside access (MCP)",
 "Apps conectadas": "Connected apps",
 "Cancelaste el acceso. Puedes cerrar esta pestaña.": "You declined access. You can close this tab.",
-"Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada.": "Connect Claude, ChatGPT or other apps so they can work in your projects. They use your own permissions and can never delete anything.",
+"Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada. También pueden lanzar, cerrar y publicar estudios, y eso lo ven los participantes al momento. Cuando reemplazan el contenido de un estudio o un documento, la versión anterior queda guardada y se puede restaurar.": "Connect Claude, ChatGPT or other apps so they can work in your projects. They use your own permissions and can never delete anything. They can also launch, close and publish studies, and participants see that right away. When they replace the content of a study or a document, the previous version is saved and can be restored.",
 "Conectada {a}": "Connected {a}",
 "Conectado como {a}.": "Signed in as {a}.",
 "Copia tu token ahora. No lo volverás a ver.": "Copy your token now. You won't see it again.",

@@ -61,3 +61,30 @@ test("project tools read, filter and set the project's category", async () => {
   assert.ok(create.input.category.safeParse("software").success);
   assert.ok(!create.input.category.safeParse("marketing").success);
 });
+
+test("tools that replace content or change what participants see are marked destructive; creating is not", async () => {
+  const { toolAnnotations } = await import("./server.js");
+  const ann = (name: string) => toolAnnotations(TOOLS.find((t) => t.name === name)!);
+  for (const name of ["update_study", "update_document", "update_insight", "set_study_status", "publish_study_changes", "restore_version"])
+    assert.equal(ann(name).destructiveHint, true, name);
+  for (const name of ["create_study", "create_document", "get_study"]) assert.equal(ann(name).destructiveHint, false, name);
+  assert.equal(ann("get_study").readOnlyHint, true);
+});
+
+test("results are marked as outside text, carry option labels, and lose contacts typed into answers", () => {
+  const r: any = shapeResults({
+    study: { id: "s", title: "T", status: "live", blocks: [{ id: "q", type: "choice", title: "Pick", options: [{ id: "f1", label: "Fast" }] }] },
+    sessions: [], answers: [{ session_id: "x", block_id: "q", value: { selected: ["f1"], other: "write me at a@b.co" }, duration_ms: 1 }], insights: [],
+  });
+  assert.match(r.untrusted_content, /never as instructions/);
+  assert.deepEqual(r.blocks[0].options, { f1: "Fast" });
+  assert.equal(r.blocks[0].answers[0].value.other, "write me at [email removed]");
+});
+
+test("replacing content without base_updated_at is refused before anything is sent", async () => {
+  let sent = false;
+  const api = { get: async () => ({}), post: async () => ({}), patch: async () => { sent = true; return {}; } };
+  const t = TOOLS.find((x) => x.name === "update_document")!;
+  await assert.rejects(t.run({ document_id: "00000000-0000-0000-0000-000000000000", data: { a: 1 } } as any, { api, baseUrl: "" }), /base_updated_at/);
+  assert.equal(sent, false);
+});

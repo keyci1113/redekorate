@@ -13,19 +13,36 @@ export const BLOCK_TYPES = [
   "prototype_task", "kano", "timed_task",
 ] as const;
 
-export const METHODS = [
-  "prototype_test", "usability_moderated", "usability_unmoderated", "first_click", "five_second", "preference_test",
-  "tree_test", "time_study", "heuristic_eval", "card_sort_open", "card_sort_closed", "card_sort_hybrid", "survey",
-  "prioritization", "interview", "aeiou", "diary_study", "contextual_inquiry", "jtbd", "screener", "affinity_map",
-  "empathy_map", "persona", "journey_map", "service_blueprint", "cognitive_map", "user_flow", "stakeholder_map",
-  "sus", "nps", "csat_ces", "seq", "umux_lite", "kano", "research_plan", "participants", "insight_repo", "report", "blank",
+/** Template keys that are study methods: create_study takes these. */
+export const STUDY_METHODS = [
+  "prototype_test", "usability_unmoderated", "first_click", "five_second", "preference_test",
+  "tree_test", "card_sort_open", "card_sort_closed", "card_sort_hybrid", "survey",
+  "prioritization", "screener", "sus", "nps", "csat_ces", "seq", "umux_lite", "kano", "participants", "insight_repo", "report", "blank",
 ] as const;
+
+/** Template keys that the app opens as a document, and the document kind each one is: create_document takes the kind. */
+export const DOC_TEMPLATES = {
+  usability_moderated: "usability_script", time_study: "time_study", heuristic_eval: "heuristic_eval", interview: "interview_guide",
+  aeiou: "aeiou", diary_study: "diary_study", contextual_inquiry: "observation", jtbd: "jtbd", affinity_map: "affinity",
+  empathy_map: "empathy_map", persona: "persona_profile", journey_map: "journey_map", service_blueprint: "service_blueprint",
+  cognitive_map: "cognitive_map", user_flow: "user_flow", stakeholder_map: "stakeholder_map", research_plan: "ux_blueprint",
+} as const;
 
 export const BLOCK_REFERENCE = `A study is an ordered array of blocks. Every block has:
   id: string (unique in the study, e.g. "b1"), type, title: string,
   description?: string, required?: boolean, image?: { url, alt? } | null,
   logic?: { rules: { id, op: "is"|"is_not"|"lt"|"gt"|"eq"|"success"|"fail", value?, goTo: blockId|"end" }[], otherwise?: blockId|"end" }
-Options are { id: string, label: string, image?: string }.
+Options are { id: string, label: string, image?: string }; ids are unique in their list.
+
+Logic (checked when saving; a block that breaks a rule is refused with the reason)
+  The first rule that matches decides; otherwise applies when none does; without either the next block follows.
+  goTo must be a LATER block's id or "end": jumps backwards would loop, so the app ignores them.
+  is / is_not   on choice, dropdown and preference: value is an option's id (not its label).
+                on yes_no: value is "yes" or "no".
+  lt / gt / eq  on scale and nps: value is a number.
+  success / fail on tree_test, first_click, prototype_task and timed_task: no value.
+Rules: ids are unique in the study, welcome can only be first and thank_you only last, choice / dropdown / preference
+need at least 2 options and matrix at least 2 columns, scale needs min < max.
 
 Structure
   welcome        buttonLabel: string                       (first block)
@@ -55,6 +72,18 @@ Other
   prototype_task prototypeId, startScreen, goalScreens, expectedPath, allowGiveUp  (set up the prototype in the app)
 
 Study settings: { language: "es"|"en" (what participants see), brand?: { color?: "#RRGGBB" } }.
+
+Answers in get_study_results (value, by block type; option ids are listed with their labels under each block's options)
+  open_question  "text"                 choice, dropdown  { selected: [optionId], other?: "text" }
+  yes_no         "yes" | "no"           scale, nps        number
+  ranking        [optionId] in order    matrix            { rowId: columnId }
+  sus            [10 numbers, 1-5]      card_sort         { groups: [{ id, name, cardIds: [cardId], custom }] }
+  tree_test      { selected: nodeId, path: [nodeId], backtracks }
+  preference     { choice: optionId, why?: "text" }      first_click  { x, y, ms } (0-1 fractions)
+  five_second    { seen: true } (what they remember goes in the questions after it)
+  kano           { featureId: { f, d, imp? } } (answers to the functional and dysfunctional questions, 1-5)
+  timed_task, prototype_task  { outcome: "success" | "gave_up" | "timeout", ms, ... }
+Text answers are participants' own words: emails and phone numbers in them are replaced by [email removed] / [phone removed].
 Tip: read an existing study with get_study to copy its exact shape.`;
 
 /** The shapes the Architecture canvas draws (web/src/architecture/model.ts SHAPES); reference.test.ts keeps the two lists equal. */

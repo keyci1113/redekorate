@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { patchOf } from "../lib/schemas.js";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
@@ -17,6 +18,7 @@ const Fields = z.object({
   notes: z.string().max(20000).default(""),
   consent: z.boolean().default(false),
 });
+export const ParticipantPatch = patchOf(Fields);
 
 async function ownParticipant(id: string, userId: string) {
   const p = await one("select * from participants where id = $1", [id]);
@@ -56,7 +58,7 @@ participants.post("/", async (req, res) => {
 
 participants.patch("/:id", async (req, res) => {
   const before = await ownParticipant(req.params.id, req.user!.id);
-  const b = Fields.partial().parse(req.body);
+  const b = ParticipantPatch.parse(req.body);   // .partial() would keep the defaults and wipe email, phone, notes and consent
   const touchConsentAt = b.consent !== undefined;
   const consentAt = b.consent ? (before.consent ? before.consent_at : new Date()) : null;
   const p = await one(

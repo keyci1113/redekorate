@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
-import rateLimit from "express-rate-limit";
+import { createHash } from "node:crypto";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import helmet from "helmet";
 import { HttpError } from "./http.js";
 import { translate } from "./i18n.js";
+import { verifyBearer } from "./apiAccess.js";
 
 const prod = process.env.NODE_ENV === "production";
 
@@ -57,7 +59,35 @@ export const uploadLimiter = limiter(10, 200, "Demasiadas subidas. Espera un mom
 // Outside access (OAuth for MCP clients and the MCP endpoint itself).
 export const registerLimiter = limiter(60, 30, "Demasiadas solicitudes. Espera un momento.");
 export const oauthLimiter = limiter(1, 60, "Demasiadas solicitudes. Espera un momento.");
-export const mcpLimiter = limiter(1, 240, "Demasiadas solicitudes. Espera un momento.");
+
+/** Who a bearer token belongs to (null when it is not valid). Cached briefly: it only picks the rate-limit bucket, the request itself is still checked. */
+const owners = new Map<string, { user: string | null; until: number }>();
+export async function tokenOwner(raw: string): Promise<string | null> {
+  const key = createHash("sha256").update(raw).digest("hex");
+  const hit = owners.get(key);
+  if (hit && hit.until > Date.now()) return hit.user;
+  const user = (await verifyBearer(raw))?.id ?? null;
+  if (owners.size > 5000) owners.clear();
+  owners.set(key, { user, until: Date.now() + 30_000 });
+  return user;
+}
+
+/**
+ * /mcp counts per account, not per address and not per token. Claude.ai and ChatGPT call from their own servers,
+ * so a limit per address would be one limit shared by everybody; a limit per token would let someone multiply it
+ * with more tokens. A valid token counts against its user, whichever of their tokens it is; no token or a token
+ * that isn't valid counts against the address, so made-up tokens don't each get a fresh allowance.
+ */
+export const perAccount = (limit: number, ownerOf: (raw: string) => Promise<string | null> = tokenOwner) => rateLimit({
+  windowMs: 60_000, limit, standardHeaders: "draft-7", legacyHeaders: false,
+  handler: (req, res) => res.status(429).json({ error: translate("Demasiadas solicitudes. Espera un momento.", req.get("x-lang")) }),
+  keyGenerator: async (req) => {
+    const token = /^Bearer\s+(\S+)$/i.exec(req.get("authorization") ?? "")?.[1];
+    const user = token ? await ownerOf(token) : null;
+    return user ? `user:${user}` : ipKeyGenerator(req.ip ?? "");
+  },
+});
+export const mcpLimiter = perAccount(240);
 
 /** Política de contraseñas: mínimo 10 caracteres, con letras y números. */
 export function passwordProblem(pw: string): string | null {

@@ -3,7 +3,8 @@ import { ZodError, type ZodType } from "zod";
 import { translate } from "./i18n.js";
 
 export class HttpError extends Error {
-  constructor(public status: number, message: string) {
+  /** `extra` goes into the JSON answer next to `error` (e.g. issues, the current updated_at). */
+  constructor(public status: number, message: string, public extra: Record<string, unknown> = {}) {
     super(message);
   }
 }
@@ -16,7 +17,7 @@ export function parse<T>(schema: ZodType<T>, data: unknown): T {
 
 export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction) {
   const L = (m: string) => translate(m, req.get("x-lang"));
-  if (err instanceof HttpError) return res.status(err.status).json({ error: L(err.message) });
+  if (err instanceof HttpError) return res.status(err.status).json({ error: L(err.message), ...err.extra });
   if (err instanceof ZodError) return res.status(400).json({ error: L("Datos inválidos"), issues: err.issues });
   const code = (err as { code?: string })?.code;
   if (code === "22P02") return res.status(404).json({ error: L("Recurso no encontrado") }); // id con formato inválido

@@ -124,7 +124,12 @@ Owners and admins act as owners of every organization project. When a project ha
 
 ## Connect AI apps (MCP)
 
-Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL>/mcp`, so Claude, ChatGPT, Cursor and other AI apps can work in your projects: list projects and studies, read results, draft or edit studies, launch or close them, and write insights and documents. They act as you, with your role in each project, and can never delete anything. Results reach them without the participant details a link may carry.
+Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL>/mcp`, so Claude, ChatGPT, Cursor and other AI apps can work in your projects: list projects and studies, read results, draft or edit studies, launch or close them, and write insights and documents. They act as you, with your role in each project, and can never delete anything. Results reach them without the participant details a link may carry, and without emails or phone numbers participants typed into their answers.
+
+- **Safe edits.** `update_study` and `update_document` replace content: they need the `updated_at` the assistant read (`base_updated_at`), so a newer edit is never overwritten (409); they refuse to empty existing content; and every version they replace is saved (migration 019, last 30 per item), so `list_versions` and `restore_version` undo a bad write. Study blocks, diagrams and document sections an assistant sends are checked before saving, and a misspelled argument is refused by name.
+- **Asking first.** Tools that replace content or change what participants see are marked `destructiveHint`, so Claude asks before running them. Launching a live study again or publishing an unchanged draft changes nothing.
+- **Outside text is data.** Study answers carry an `untrusted_content` notice, and the server's instructions tell assistants never to act on requests written in them.
+- **Rate limit.** 240 calls a minute per account (all of its tokens together); calls without a valid token count per address.
 
 - **Claude.ai or ChatGPT:** add a custom connector with the address shown under *My account → Outside access (MCP)* and sign in. You approve the app on a consent screen; *My account* lists connected apps and removes their access.
 - **Claude Code, Claude Desktop, Cursor or scripts:** create an access token in the same section (shown once, 30 days to no expiry) and send it as a bearer token, e.g. `claude mcp add --transport http redekorate https://research.yourdomain.com/mcp --header "Authorization: Bearer rdk_pat_…"`. Clients that support OAuth can skip the token and sign in instead.

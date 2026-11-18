@@ -6,6 +6,8 @@ import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
 import { ORG_COLS, projectRole, requireProject, type ProjectRole } from "../lib/access.js";
+import { checkStudy, fromAssistant, refuse } from "../lib/contentCheck.js";
+import { beforeReplace, filled, listVersions, restoreVersion } from "../lib/versions.js";
 
 export const studies = Router();
 studies.use(requireAuth);
@@ -27,6 +29,7 @@ const StudyUpdate = z.object({
   title: z.string().trim().min(1).max(200).optional(),
   blocks: z.array(Block).optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
+  base_updated_at: z.iso.datetime({ offset: true }).optional(),   // the updated_at the caller read: a newer edit is not overwritten (409)
 });
 
 /** Marca si el borrador difiere de lo publicado (solo tiene sentido en estudios live). */
@@ -52,6 +55,7 @@ async function ownStudy(id: string, userId: string, min: ProjectRole = "viewer")
 
 studies.post("/", async (req, res) => {
   const b = parse(StudyCreate, req.body);
+  if (fromAssistant(req)) refuse(checkStudy(b.blocks, b.settings));
   await ownProject(b.project_id, req.user!.id, "editor");
   const s = await one(
     `insert into studies(project_id, owner_id, title, method, blocks, settings, public_slug)
@@ -70,8 +74,15 @@ studies.get("/:id", async (req, res) => {
 });
 
 studies.patch("/:id", async (req, res) => {
-  await ownStudy(req.params.id, req.user!.id, "editor");
+  const cur = await ownStudy(req.params.id, req.user!.id, "editor");
   const b = parse(StudyUpdate, req.body);
+  // AI apps: content the app can't use is refused, emptying is refused, and what they replace is saved as a version.
+  const ai = fromAssistant(req);
+  if (ai) refuse(checkStudy(b.blocks, b.settings));
+  await beforeReplace("study", cur, req.user!.id, b, {
+    replaces: b.blocks !== undefined || b.settings !== undefined, saveVersion: ai,
+    emptied: ai && b.blocks?.length === 0 && filled(cur.blocks) ? "blocks" : null,
+  });
   await query(
     `update studies set title = coalesce($2, title), blocks = coalesce($3, blocks),
        settings = coalesce($4, settings), updated_at = now() where id = $1`,
@@ -84,6 +95,9 @@ studies.patch("/:id", async (req, res) => {
 studies.post("/:id/status", async (req, res) => {
   const cur = await ownStudy(req.params.id, req.user!.id, "editor");
   const { status } = parse(z.object({ status: z.enum(["draft", "live", "closed"]) }), req.body);
+  // Asking for the status it already has changes nothing: launching a live study again must not publish its draft.
+  if (status === cur.status) return void res.json({ study: await withDirty(req.params.id) });
+  if (status === "closed" && !cur.published_at) throw new HttpError(400, "Este estudio nunca se lanzó: no hay nada que cerrar");
   if (status === "live" && (cur.blocks as unknown[]).length === 0)
     throw new HttpError(400, "Agrega al menos un bloque antes de publicar");
   await query(
@@ -102,7 +116,21 @@ studies.post("/:id/publish", async (req, res) => {
   const cur = await ownStudy(req.params.id, req.user!.id, "editor");
   if (cur.status !== "live") throw new HttpError(400, "Solo se publican cambios en un estudio que está recibiendo respuestas");
   if ((cur.blocks as unknown[]).length === 0) throw new HttpError(400, "Agrega al menos un bloque antes de publicar");
+  // Nothing new in the draft: no new version (participants would see the same study under another number).
+  const now = await withDirty(req.params.id);
+  if (!now?.has_unpublished) return void res.json({ study: now });
   res.json({ study: await snapshot(req.params.id) });
+});
+
+/** Earlier versions of the draft that AI apps replaced, newest first. */
+studies.get("/:id/versions", async (req, res) => {
+  const s = await ownStudy(req.params.id, req.user!.id);
+  res.json({ versions: await listVersions("study", s.id) });
+});
+
+studies.post("/:id/versions/:vid/restore", async (req, res) => {
+  const s = await ownStudy(req.params.id, req.user!.id, "editor");
+  res.json(await restoreVersion("study", s, req.params.vid, req.user!.id));
 });
 
 studies.post("/:id/duplicate", async (req, res) => {

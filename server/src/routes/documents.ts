@@ -6,6 +6,8 @@ import { requireAuth } from "../lib/auth.js";
 import { notFound, parse } from "../lib/http.js";
 import { ownProject } from "./projects.js";
 import { projectRole, requireProject, type ProjectRole } from "../lib/access.js";
+import { checkDocument, fromAssistant, refuse } from "../lib/contentCheck.js";
+import { beforeReplace, filled, listVersions, restoreVersion } from "../lib/versions.js";
 
 export const documents = Router();
 documents.use(requireAuth);
@@ -32,6 +34,7 @@ documents.get("/", async (req, res) => {
 
 documents.post("/", async (req, res) => {
   const b = parse(z.object({ project_id: z.string().uuid(), kind: z.string().min(1).max(60), title: z.string().trim().min(1).max(200), language: Lang, data: Data.default({}) }), req.body);
+  if (fromAssistant(req)) refuse(checkDocument(b.kind, b.data));
   await ownProject(b.project_id, req.user!.id, "editor");
   const d = await one(
     "insert into documents(project_id, owner_id, kind, title, language, data) values ($1,$2,$3,$4,$5,$6) returning *",
@@ -47,13 +50,34 @@ documents.get("/:id", async (req, res) => {
 });
 
 documents.patch("/:id", async (req, res) => {
-  await ownDoc(req.params.id, req.user!.id, "editor");
-  const b = parse(z.object({ title: z.string().trim().min(1).max(200).optional(), language: Lang.optional(), data: Data.optional() }), req.body);
+  const cur = await ownDoc(req.params.id, req.user!.id, "editor");
+  const b = parse(z.object({
+    title: z.string().trim().min(1).max(200).optional(), language: Lang.optional(), data: Data.optional(),
+    base_updated_at: z.iso.datetime({ offset: true }).optional(),   // the updated_at the caller read: a newer edit is not overwritten (409)
+  }), req.body);
+  // AI apps: content the kind can't use is refused, emptying is refused, and what they replace is saved as a version.
+  const ai = fromAssistant(req);
+  if (ai) refuse(checkDocument(cur.kind, b.data));
+  await beforeReplace("document", cur, req.user!.id, b, {
+    replaces: b.data !== undefined, saveVersion: ai,
+    emptied: ai && b.data !== undefined && !filled(b.data) && filled(cur.data) ? "data" : null,
+  });
   const d = await one(
     `update documents set title = coalesce($2, title), language = coalesce($3, language), data = coalesce($4, data), updated_at = now()
      where id = $1 returning *`,
     [req.params.id, b.title ?? null, b.language ?? null, b.data ? JSON.stringify(b.data) : null]);
   res.json({ document: d });
+});
+
+/** Earlier versions of the content that AI apps replaced, newest first. */
+documents.get("/:id/versions", async (req, res) => {
+  const d = await ownDoc(req.params.id, req.user!.id);
+  res.json({ versions: await listVersions("document", d.id) });
+});
+
+documents.post("/:id/versions/:vid/restore", async (req, res) => {
+  const d = await ownDoc(req.params.id, req.user!.id, "editor");
+  res.json(await restoreVersion("document", d, req.params.vid, req.user!.id));
 });
 
 // Duplicar o "Guardar como": copia el documento (opcionalmente con otro nombre y en otro proyecto propio)
