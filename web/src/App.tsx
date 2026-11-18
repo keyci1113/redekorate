@@ -8,6 +8,7 @@ import { isSharedLink, pageTitle } from "./lib/pageTitle";
 // Every page is its own chunk: participants opening /s/:slug only download the runner,
 // not the builder, results or document templates.
 const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.RegisterPage })));
 const ForgotPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.ForgotPage })));
 const ResetPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.ResetPage })));
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
@@ -56,6 +57,7 @@ export function App() {
     <Routes>
       {/* Público */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot" element={<ForgotPage />} />
       <Route path="/reset" element={<ResetPage />} />
       <Route path="/invite" element={<InvitePage />} />

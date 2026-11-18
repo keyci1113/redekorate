@@ -4,12 +4,12 @@ import { ArrowRight, CheckCircle2, Clock, Plus, Search, Sparkles, Users } from "
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import type { Project, Study } from "../lib/types";
-import { BLANK, CATEGORIES, TEMPLATES, type Category, type Template } from "../templates/catalog";
+import { BLANK, CATEGORIES, TEMPLATES, catalogCounts, type Category, type Template } from "../templates/catalog";
 import { CATEGORY_ICON } from "../templates/icons";
 import { blockDef } from "../blocks/registry";
 import { BackLink, Button, ErrorNote, Field, Modal, cx } from "../components/ui";
 import { Segmented } from "../components/editing";
-import { getLang, setContentLang, type Lang } from "../lib/i18n";
+import { getLang, plural, setContentLang, type Lang } from "../lib/i18n";
 
 import { t } from "../lib/i18n";
 // "¿Qué quieres averiguar?" → métodos recomendados
@@ -34,7 +34,7 @@ export function NewStudyPage() {
   const [goal, setGoal] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [pick, setPick] = useState<Template | null>(null);
-  const ready = TEMPLATES.filter((tpl) => tpl.build || tpl.doc || tpl.tab).length;
+  const counts = catalogCounts();
   const firstTime = params.get("nuevo") === "1";
 
   const filtered = useMemo(() => TEMPLATES.filter((tpl) =>
@@ -61,7 +61,11 @@ export function NewStudyPage() {
         <span className="flex items-center gap-1.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-line text-[11px]">3</span>{t("Publica y comparte")}</span>
       </div>
       <h1 className="page-title mt-3">{t("¿Qué vas a investigar?")}</h1>
-      <p className="mt-2 text-[15px] text-ink-2">{TEMPLATES.length} {t("métodos ·")} {ready} {t("listos para usar. Cada uno trae su template, su guía y su análisis automático.")}</p>
+      {/* Counts that match the cards below: studies, documents and project features. */}
+      <p className="mt-2 text-[15px] text-ink-2">
+        {[plural(counts.studies, { one: "{n} estudio", other: "{n} estudios" }), plural(counts.documents, { one: "{n} documento", other: "{n} documentos" }), plural(counts.features, { one: "{n} función del proyecto", other: "{n} funciones del proyecto" })].join(" · ")}.{" "}
+        {t("Cada estudio trae su template, su guía y su análisis automático.")}
+      </p>
 
       {/* Ayuda para elegir */}
       <div className="mt-8 rounded-2xl border border-line bg-surface p-5">

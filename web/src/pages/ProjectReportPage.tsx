@@ -95,7 +95,7 @@ export function ProjectReportPage() {
               <h2 className="display mt-1 text-4xl leading-tight">{r.study.title}</h2>
               {r.study.published_at && <p className="mt-2 text-sm text-ink-3">{t("Publicado el")} {new Date(r.study.published_at).toLocaleDateString(locale(), { dateStyle: "long" })}</p>}
 
-              <div className="mt-8"><Overview sessions={r.sessions} /></div>
+              <div className="mt-8"><Overview sessions={r.sessions} answers={r.answers} /></div>
 
               {r.insights.length > 0 && (
                 <div className="mt-12">

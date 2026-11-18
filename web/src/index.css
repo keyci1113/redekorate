@@ -264,18 +264,6 @@ article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb,
 @keyframes rk-page-in { from { opacity: 0; } }
 .rk-page-in { animation: rk-page-in 180ms var(--ease-out); }
 
-/* A tab row wider than the screen fades out on the side that has more tabs past it, so it is clear the row scrolls.
-   Driven by the row's own scroll position; browsers without scroll timelines just show the row without the fade. */
-@property --rk-fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
-@property --rk-fade-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
-@keyframes rk-tabs-edges { from { --rk-fade-l: 0px; --rk-fade-r: 40px; } to { --rk-fade-l: 40px; --rk-fade-r: 0px; } }
-@supports (animation-timeline: scroll()) {
-  .rk-tabs {
-    animation: rk-tabs-edges linear both; animation-timeline: scroll(self inline);
-    mask-image: linear-gradient(to right, transparent, #000 var(--rk-fade-l), #000 calc(100% - var(--rk-fade-r)), transparent);
-  }
-}
-
 /* Architecture canvas (React Flow). Its own colors are mapped onto the app's tokens, so light and dark mode need nothing else. */
 .rk-diagram .react-flow {
   --xy-background-color: var(--color-paper);

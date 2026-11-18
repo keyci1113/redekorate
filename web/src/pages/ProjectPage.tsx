@@ -22,6 +22,7 @@ import { CATEGORY_ICON, FallbackIcon } from "../templates/icons";
 
 import { t } from "../lib/i18n";
 import { AccessNotice } from "../components/AccessNotice";
+import { Menu, MenuItem } from "../components/Menu";
 import { categoryOf } from "../lib/projectCategories";
 export function ProjectPage() {
   const { id } = useParams();
@@ -132,10 +133,9 @@ export function ProjectPage() {
 
 function StudyRow({ s, first, canEdit, onChange }: { s: Study; first: boolean; canEdit: boolean; onChange: () => void }) {
   const nav = useNavigate();
-  const [menu, setMenu] = useState(false);
   const tpl = templateByKey(s.method);
   return (
-    <div className={`group relative flex items-center gap-4 px-5 py-4 transition hover:bg-paper/50 ${first ? "" : "border-tpl border-line"}`}>
+    <div className={`group relative flex items-center gap-4 px-5 py-4 transition hover:bg-paper/50 ${first ? "" : "border-t border-line"}`}>
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-paper text-ink-2 ring-1 ring-line">
         {tpl ? CATEGORY_ICON[tpl.category] : FallbackIcon}
       </span>
@@ -151,20 +151,24 @@ function StudyRow({ s, first, canEdit, onChange }: { s: Study; first: boolean; c
       <div className="flex gap-1">
         {canEdit && <Link to={`/studies/${s.id}/edit`} title={t("Editar")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><PenLine size={16} /></Link>}
         <Link to={`/studies/${s.id}/results`} title={t("Resultados")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><BarChart3 size={16} /></Link>
-        {canEdit && <button onClick={() => setMenu(!menu)} onBlur={() => setTimeout(() => setMenu(false), 150)} title={t("Más")} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><MoreHorizontal size={16} /></button>}
+        {/* The shared Menu: arrow keys move, Escape closes and gives focus back to ⋯. */}
+        {canEdit && <Menu label={t("Acciones de «{a}»", { a: s.title })} width={200} button={(props) => (
+          <button {...props} title={t("Más")} aria-label={t("Más acciones de «{a}»", { a: s.title })} className="focus-ring rounded-md p-2 text-ink-3 hover:bg-ink/5 hover:text-ink"><MoreHorizontal size={16} /></button>
+        )}>
+          {(close) => <>
+            <MenuItem onSelect={async () => {
+              close(false);
+              const { study } = await api.post<{ study: Study }>(`/studies/${s.id}/duplicate`);
+              nav(`/studies/${study.id}/edit`);
+            }}><Copy size={14} aria-hidden /> {t("Duplicar")}</MenuItem>
+            <MenuItem danger onSelect={async () => {
+              close();
+              if (!confirm(t("¿Eliminar \"{a}\" y todas sus respuestas?", { a: s.title }))) return;
+              await api.del(`/studies/${s.id}`); onChange();
+            }}><Trash2 size={14} aria-hidden /> {t("Eliminar")}</MenuItem>
+          </>}
+        </Menu>}
       </div>
-      {menu && (
-        <div className="absolute top-12 right-4 z-20 w-44 rounded-lg border border-line bg-surface p-1 shadow-lg">
-          <button className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm hover:bg-paper" onClick={async () => {
-            const { study } = await api.post<{ study: Study }>(`/studies/${s.id}/duplicate`);
-            nav(`/studies/${study.id}/edit`);
-          }}><Copy size={14} /> {t("Duplicar")}</button>
-          <button className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm text-bad hover:bg-bad-soft" onClick={async () => {
-            if (!confirm(t("¿Eliminar \"{a}\" y todas sus respuestas?", { a: s.title }))) return;
-            await api.del(`/studies/${s.id}`); onChange();
-          }}><Trash2 size={14} /> {t("Eliminar")}</button>
-        </div>
-      )}
     </div>
   );
 }

@@ -29,6 +29,16 @@ export interface Template {
 // Helpers para construir bloques a partir del registro
 const b = <T extends Block["type"]>(type: T, patch: Partial<Extract<Block, { type: T }>> = {}) =>
   ({ ...blockDef(type)!.create(), ...patch }) as Block;
+/** A card sort's welcome: a greeting and what to do, never the same words as the thank-you screen. */
+const cardSortWelcome = (mode: "open" | "closed" | "hybrid") => b("welcome", {
+  title: tc("¡Hola! Gracias por ayudarnos"),
+  description: {
+    open: tc("Verás una lista de tarjetas. Agrúpalas como tenga sentido para ti y ponle un nombre a cada grupo. Toma unos 10–15 minutos y no hay respuestas correctas o incorrectas: queremos entender cómo lo piensas tú."),
+    closed: tc("Verás una lista de tarjetas y algunas categorías. Coloca cada tarjeta en la categoría donde esperarías encontrarla. Toma unos 10–15 minutos y no hay respuestas correctas o incorrectas: queremos entender cómo lo piensas tú."),
+    hybrid: tc("Verás una lista de tarjetas y algunas categorías. Coloca cada tarjeta donde esperarías encontrarla, o crea un grupo nuevo si ninguna categoría encaja. Toma unos 10–15 minutos y no hay respuestas correctas o incorrectas."),
+  }[mode],
+  buttonLabel: tc("Empezar"),
+});
 const opts = (...labels: string[]) => labels.map((label) => ({ id: uid(), label }));
 
 export const CATEGORIES: { id: Category; blurb: string }[] = [
@@ -103,7 +113,7 @@ export const TEMPLATES: Template[] = [
       b("preference"),
       b("thank_you"),
     ] },
-  { key: "tree_test", get name() { return t("Tree Testing"); }, category: "Usabilidad", phase: 2,
+  { key: "tree_test", get name() { return t("Tree Testing"); }, category: "Arquitectura de información", phase: 2,
     get description() { return t("Valida la arquitectura de información sin interfaz visual: ¿encuentran dónde está cada cosa?"); },
     get when() { return t("Después de un card sorting o antes de rediseñar un menú."); }, get duration() { return t("5–10 min"); }, get participants() { return t("30–50"); },
     get guide() { return ["Escribe tu menú con sangría (2 espacios por nivel).", "En cada tarea marca el/los destinos correctos.", "Redacta tareas sin usar las mismas palabras del menú.", "Usa entre 5 y 10 tareas; duplica el bloque para crear más."].map((x) => t(x)); },
@@ -133,7 +143,7 @@ export const TEMPLATES: Template[] = [
     get when() { return t("Descubrir modelos mentales al crear navegación."); }, get duration() { return t("10–15 min"); }, get participants() { return t("15–30"); },
     get guide() { return ["Escribe o pega tus tarjetas (una por línea con \"Pegar lista\").", "Usa entre 30 y 50 tarjetas con nombres claros y sin jerga.", "Revisa la vista previa como participante.", "En resultados, revisa la matriz de similitud para detectar grupos naturales."].map((x) => t(x)); },
     build: () => [
-      b("welcome", { description: tc("Verás una lista de tarjetas. Organízalas en grupos que tengan sentido para ti. No hay respuestas correctas o incorrectas.") }),
+      cardSortWelcome("open"),
       b("card_sort", { mode: "open" }),
       b("open_question", { title: tc("¿Hubo alguna tarjeta difícil de ubicar? ¿Por qué?"), required: false }),
       b("thank_you"),
@@ -143,7 +153,7 @@ export const TEMPLATES: Template[] = [
     get when() { return t("Validar una estructura existente."); }, get duration() { return t("10–15 min"); }, get participants() { return t("15–30"); },
     get guide() { return ["Escribe o pega tus tarjetas (una por línea con \"Pegar lista\").", "Define tus categorías actuales.", "Usa entre 30 y 50 tarjetas con nombres claros y sin jerga.", "Revisa la vista previa como participante.", "En resultados, revisa la matriz de similitud para detectar grupos naturales."].map((x) => t(x)); },
     build: () => [
-      b("welcome", { description: tc("Verás una lista de tarjetas. Organízalas en grupos que tengan sentido para ti. No hay respuestas correctas o incorrectas.") }),
+      cardSortWelcome("closed"),
       b("card_sort", { mode: "closed" }),
       b("open_question", { title: tc("¿Hubo alguna tarjeta difícil de ubicar? ¿Por qué?"), required: false }),
       b("thank_you"),
@@ -153,7 +163,7 @@ export const TEMPLATES: Template[] = [
     get when() { return t("Refinar una estructura con apertura."); }, get duration() { return t("10–15 min"); }, get participants() { return t("15–30"); },
     get guide() { return ["Escribe o pega tus tarjetas (una por línea con \"Pegar lista\").", "Define tus categorías actuales.", "Usa entre 30 y 50 tarjetas con nombres claros y sin jerga.", "Revisa la vista previa como participante.", "En resultados, revisa la matriz de similitud para detectar grupos naturales."].map((x) => t(x)); },
     build: () => [
-      b("welcome", { description: tc("Verás una lista de tarjetas. Organízalas en grupos que tengan sentido para ti. No hay respuestas correctas o incorrectas.") }),
+      cardSortWelcome("hybrid"),
       b("card_sort", { mode: "hybrid" }),
       b("open_question", { title: tc("¿Hubo alguna tarjeta difícil de ubicar? ¿Por qué?"), required: false }),
       b("thank_you"),
@@ -293,8 +303,8 @@ export const TEMPLATES: Template[] = [
     get when() { return t("Al iniciar cualquier investigación."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
   { key: "participants", tab: "participants", get name() { return t("Panel de participantes"); }, category: "Organización", phase: 6,
     get description() { return t("Base de participantes, consentimiento informado e historial de estudios."); }, get when() { return t("Reclutamiento continuo."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
-  { key: "insight_repo", get name() { return t("Repositorio de insights"); }, category: "Organización", phase: 1,
-    get description() { return t("Hallazgos con etiquetas, severidad y confianza, ligados a cada estudio. Disponible en cada proyecto."); },
+  { key: "insight_repo", tab: "insights", get name() { return t("Repositorio de insights"); }, category: "Organización", phase: 1,
+    get description() { return t("Hallazgos con etiquetas, severidad y confianza, ligados a cada estudio. Abre la pestaña Insights del proyecto."); },
     get when() { return t("Siempre."); }, get duration() { return t("—"); }, get participants() { return t("—"); } },
   { key: "report", tab: "report", get name() { return t("Reporte compartible"); }, category: "Organización", phase: 1,
     get description() { return t("Link público de solo lectura con resultados, gráficas e insights de un estudio."); },
@@ -307,5 +317,15 @@ export const BLANK: Template = {
   get when() { return t(""); }, get duration() { return t("—"); }, get participants() { return t("—"); },
   build: () => [b("welcome"), b("thank_you")],
 };
+
+/** What the catalog offers, counted the way its cards show it: studies to build, documents to fill, project features to open. */
+export function catalogCounts(list: Template[] = TEMPLATES) {
+  return {
+    studies: list.filter((x) => !x.doc && !x.tab && x.build).length,
+    documents: list.filter((x) => x.doc).length,
+    features: list.filter((x) => !x.doc && x.tab).length,
+    unavailable: list.filter((x) => !x.build && !x.doc && !x.tab).length,
+  };
+}
 
 export const templateByKey = (key: string) => (key === "blank" ? BLANK : TEMPLATES.find((t) => t.key === key));

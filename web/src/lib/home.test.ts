@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   COMPLETION_THRESHOLD, DEFAULT_VIEW, aggregateCompletion, completion, groupActivity, isLowCompletion,
-  LIVE_SORT_PRESETS, loadView, peakDay, presetOf, saveView, sortInsights, sortLive, splitWeeks, toggleSort,
+  LIVE_SORT_PRESETS, filterStudies, latestActivity, loadView, peakDay, presetOf, saveView, sortInsights, sortLive, splitWeeks, toggleSort,
 } from "./home";
 
 describe("completado y umbral", () => {
@@ -125,5 +125,27 @@ describe("persistencia de la vista", () => {
     expect(saveView("u1", "inline", broken)).toBe(false);
     expect(loadView("u1", broken)).toBe("snapshot");
     expect(loadView("u1", null)).toBe("snapshot");
+  });
+});
+
+describe("Studies page", () => {
+  it("«Más reciente» uses the latest of edited, published and last response", () => {
+    const list = [
+      { id: "old-response", responses: 1, started: 1, last_response_at: "2026-11-01T00:00:00Z", updated_at: "2026-10-01T00:00:00Z" },
+      { id: "fresh-draft", responses: 0, started: 0, last_response_at: null, updated_at: "2026-11-10T00:00:00Z" },
+      { id: "just-published", responses: 0, started: 0, last_response_at: null, updated_at: "2026-11-01T00:00:00Z", published_at: "2026-11-05T00:00:00Z" },
+    ];
+    expect(sortLive(list, LIVE_SORT_PRESETS.recent).map((s) => s.id)).toEqual(["fresh-draft", "just-published", "old-response"]);
+    expect(latestActivity({ last_response_at: null })).toBe(-Infinity);
+  });
+  it("filters by status, with Todos keeping everything", () => {
+    const list = [{ status: "live" }, { status: "draft" }, { status: "closed" }, { status: "live" }];
+    expect(filterStudies(list, "all")).toHaveLength(4);
+    expect(filterStudies(list, "live")).toHaveLength(2);
+    expect(filterStudies(list, "draft")).toHaveLength(1);
+  });
+  it("the 7-day window is rolling: the last seven days against the seven before", () => {
+    const days = Array.from({ length: 14 }, (_, i) => ({ day: `2026-11-${String(i + 1).padStart(2, "0")}`, n: i < 7 ? 1 : 2 }));
+    expect(splitWeeks(days)).toMatchObject({ thisWeek: 14, lastWeek: 7 });
   });
 });

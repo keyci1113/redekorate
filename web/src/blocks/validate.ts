@@ -4,6 +4,7 @@ import { parseTree } from "./types";
 import { blockDef, isStructural } from "./registry";
 import type { StudySettings } from "../lib/settings";
 import { resolveTask } from "./prototype";
+import { noopLogic } from "./review";
 
 export interface Issue { level: "error" | "warning"; blockId?: string; message: string }
 
@@ -31,6 +32,7 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
       case "card_sort":
         if (b.cards.length < 3) err(b, t("{a}: agrega al menos 3 tarjetas.", { a: name }));
         if (b.mode !== "open" && !b.categories.length) err(b, t("{a}: un card sorting {b} necesita categorías.", { a: name, b: b.mode === "closed" ? "cerrado" : t("híbrido") }));
+        if (b.cards.length >= 3 && b.cards.length < 30) warn(b, t("{a}: solo {n} tarjetas; la guía recomienda 30–50 para que salgan grupos claros.", { a: name, n: b.cards.length }));
         if (b.cards.length > 60) warn(b, t("{a}: más de 60 tarjetas puede cansar a los participantes (ideal 30–50).", { a: name }));
         if (new Set(b.cards.map((c) => c.label.trim().toLowerCase())).size !== b.cards.length) warn(b, t("{a}: hay tarjetas repetidas.", { a: name }));
         break;
@@ -79,6 +81,9 @@ export function validateStudy(blocks: Block[], settings: StudySettings = {}): Is
     }
     const targets = [...(b.logic?.rules.map((r) => r.goTo) ?? []), b.logic?.otherwise].filter(Boolean) as string[];
     if (targets.some((t) => t !== "end" && !ids.has(t))) err(b, t("{a}: la lógica apunta a un bloque que ya no existe.", { a: name }));
+    const noop = noopLogic(blocks, i);
+    for (const r of noop.rules) warn(b, t("{a}: la regla {n} no cambia nada: lleva al mismo lugar que el flujo normal.", { a: name, n: (b.logic?.rules.indexOf(r) ?? 0) + 1 }));
+    if (noop.otherwise) warn(b, t("{a}: \"En cualquier otro caso\" apunta al bloque siguiente, que ya es el flujo normal.", { a: name }));
   });
   // Revisión de cada prototipo usado
   const used = new Set(blocks.flatMap((b) => (b.type === "prototype_task" ? [b.prototypeId] : [])));

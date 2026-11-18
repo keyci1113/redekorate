@@ -109,7 +109,7 @@ export function Ring({ rate, size = 96 }: { rate: number | null; size?: number }
 
 const fmtDay = (d: string) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { day: "numeric", month: "short" });
 
-/** Barras de 14 días: los 7 primeros son la semana pasada y los 7 últimos esta semana. */
+/** Barras de 14 días: los 7 últimos días (hoy incluido) y los 7 anteriores. Es una ventana móvil, no la semana del calendario. */
 export function TrendBars({ days, height = 64, legend = true, summary }: { days: Day[]; height?: number; legend?: boolean; summary: string }) {
   const max = Math.max(1, ...days.map((d) => d.n));
   return (
@@ -125,8 +125,8 @@ export function TrendBars({ days, height = 64, legend = true, summary }: { days:
       {legend && (
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-2" aria-hidden>
           <span className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-ink-3" />{t("Semana pasada")}</span>
-            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-accent" />{t("Esta semana")}</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-ink-3" />{t("7 días anteriores")}</span>
+            <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-accent" />{t("Últimos 7 días")}</span>
           </span>
           <span className="tabular-nums">{fmtDay(days[0].day)} – {fmtDay(days[days.length - 1].day)}</span>
         </div>

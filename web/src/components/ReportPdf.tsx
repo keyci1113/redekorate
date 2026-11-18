@@ -69,7 +69,7 @@ function StudyBody({ r, startAt = 1 }: { r: ReportStudy; startAt?: number }) {
   let n = startAt;
   return (
     <>
-      <section className="mt-10"><SectionTitle n={n++}>{t("Resumen")}</SectionTitle><Overview sessions={r.sessions} /></section>
+      <section className="mt-10"><SectionTitle n={n++}>{t("Resumen")}</SectionTitle><Overview sessions={r.sessions} answers={r.answers} /></section>
       {sorted.length > 0 && <section className="mt-10"><SectionTitle n={n++}>{t("Hallazgos clave")}</SectionTitle><KeyFindings insights={sorted} /></section>}
       <section className="mt-10"><SectionTitle n={n++}>{t("Resultados por pregunta")}</SectionTitle>
         <BlockResults blocks={r.study.blocks} sessions={r.sessions} answers={r.answers} settings={r.study.settings as StudySettings} />
@@ -81,7 +81,7 @@ function StudyBody({ r, startAt = 1 }: { r: ReportStudy; startAt?: number }) {
 const Closing = () => <p className="mt-12 border-t border-line pt-4 text-center text-xs text-ink-3">{t("Reporte generado con Redekorate · datos de participantes anonimizados")}</p>;
 
 export function StudyReportPdf({ r, projectName, projectColor }: { r: ReportStudy; projectName?: string; projectColor?: string }) {
-  const o = overview(r.sessions);
+  const o = overview(r.sessions, r.answers);
   const dates = fieldDates(r.sessions);
   return (
     <PrintMode.Provider value>
@@ -100,7 +100,7 @@ export function StudyReportPdf({ r, projectName, projectColor }: { r: ReportStud
 }
 
 export function ProjectReportPdf({ projectName, projectColor, reports }: { projectName: string; projectColor?: string; reports: ReportStudy[] }) {
-  const totals = reports.reduce((a, r) => { const o = overview(r.sessions); return { done: a.done + o.completed, insights: a.insights + r.insights.length }; }, { done: 0, insights: 0 });
+  const totals = reports.reduce((a, r) => { const o = overview(r.sessions, r.answers); return { done: a.done + o.completed, insights: a.insights + r.insights.length }; }, { done: 0, insights: 0 });
   return (
     <PrintMode.Provider value>
       <div className="bg-white text-ink">
@@ -114,7 +114,7 @@ export function ProjectReportPdf({ projectName, projectColor, reports }: { proje
           <h2 className="display mb-3 text-[20px]">{t("Contenido")}</h2>
           <ol className="divide-y divide-line border-y border-line">
             {reports.map((r, i) => {
-              const o = overview(r.sessions);
+              const o = overview(r.sessions, r.answers);
               return (
                 <li key={r.study.id ?? i} className="flex items-baseline gap-4 py-2.5 text-sm">
                   <span className="display w-6 text-accent tabular-nums">{i + 1}</span>

@@ -8,8 +8,8 @@ import { Inbox } from "lucide-react";
 import type { StudySettings } from "../lib/settings";
 
 import { t } from "../lib/i18n";
-export function Overview({ sessions }: { sessions: Session[] }) {
-  const o = overview(sessions);
+export function Overview({ sessions, answers }: { sessions: Session[]; answers?: Answer[] }) {
+  const o = overview(sessions, answers);
   const drops = o.started - o.completed;
   // Finalización: ≥85% bien, 70–84% atención, <70% mal (con al menos 5 personas para no alarmar por una sola)
   const rate = o.completionRate;

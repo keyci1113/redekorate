@@ -1,3 +1,4 @@
+import { translate } from "../lib/i18n.js";
 import { Router } from "express";
 import { z } from "zod";
 import { customAlphabet } from "nanoid";
@@ -138,7 +139,7 @@ studies.post("/:id/duplicate", async (req, res) => {
   const copy = await one(
     `insert into studies(project_id, owner_id, title, method, blocks, settings, public_slug)
      values ($1,$2,$3,$4,$5,$6,$7) returning *`,
-    [s.project_id, req.user!.id, `${s.title} (copia)`, s.method, JSON.stringify(s.blocks), JSON.stringify(s.settings), slugId()],
+    [s.project_id, req.user!.id, `${s.title} (${translate("copia", req.get("x-lang"))})`, s.method, JSON.stringify(s.blocks), JSON.stringify(s.settings), slugId()],
   );
   res.status(201).json({ study: copy });
 });

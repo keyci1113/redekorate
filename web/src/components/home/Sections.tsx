@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, ArrowUpRight, BarChart3, Check, PenLine } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BarChart3, Check, Circle, PenLine } from "lucide-react";
 import type { RecentStudy } from "../../lib/recent";
 import { fmtNum, fmtPct, locale, plural, relTime, t } from "../../lib/i18n";
 import { aggregateCompletion, completion, groupActivity, isLowCompletion, peakDay, sortInsights, splitWeeks, type Day } from "../../lib/home";
@@ -75,8 +75,8 @@ export function DaySummary({ data, load }: { data: Dash | null; load: Load }) {
   const top = [...data.live].filter((s) => s.responses > 0).sort((a, b) => b.responses - a.responses)[0];
   const parts: string[] = [];
   parts.push(thisWeek === 0
-    ? t("Esta semana no han llegado respuestas.")
-    : plural(thisWeek, { one: "Esta semana llegó {n} respuesta", other: "Esta semana llegaron {n} respuestas" })
+    ? t("En los últimos 7 días no han llegado respuestas.")
+    : plural(thisWeek, { one: "En los últimos 7 días llegó {n} respuesta", other: "En los últimos 7 días llegaron {n} respuestas" })
       + (peak ? t(", con el pico el {a} ({b}).", { a: longDay(peak.day), b: fmtNum(peak.n) }) : "."));
   if (top) {
     const rate = completion(top.responses, top.started);
@@ -118,7 +118,7 @@ function kpiDrills(data: Dash): Record<"responses" | "live" | "completion" | "in
   });
   const rated = data.live.map((s) => ({ s, rate: completion(s.responses, s.started) })).filter((x): x is { s: Dash["live"][number]; rate: number } => x.rate !== null).sort((a, b) => a.rate - b.rate);
   return {
-    responses: { title: t("Respuestas esta semana"), rows: responses, empty: t("Esta semana no han llegado respuestas."), note: t("Por estudio activo.") },
+    responses: { title: t("Respuestas · últimos 7 días"), rows: responses, empty: t("En los últimos 7 días no han llegado respuestas."), note: t("Por estudio activo.") },
     live: { title: t("Estudios activos"), empty: t("No hay estudios activos."),
       rows: data.live.map((s) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: s.last_response_at ? relTime(s.last_response_at) : undefined })) },
     completion: { title: t("Tasa de completado por estudio"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto."),
@@ -140,8 +140,9 @@ export function KpiRow({ data, load, onOpen }: { data: Dash | null; load: Load; 
   const open = (k: keyof ReturnType<typeof kpiDrills>) => () => onOpen(kpiDrills(data)[k]);
   return (
     <section aria-label={t("Indicadores")} className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi label={t("Respuestas esta semana")} value={fmtNum(thisWeek)} onOpen={open("responses")}>
-        <TrendBars days={trend as Day[]} height={40} summary={t("Esta semana {a} respuestas; la semana pasada {b}.", { a: fmtNum(thisWeek), b: fmtNum(lastWeek) })} />
+      {/* A rolling window (today and the 6 days before), so it is labeled as such rather than "this week". */}
+      <Kpi label={t("Respuestas · últimos 7 días")} value={fmtNum(thisWeek)} onOpen={open("responses")}>
+        <TrendBars days={trend as Day[]} height={40} summary={t("Últimos 7 días: {a} respuestas; los 7 días anteriores: {b}.", { a: fmtNum(thisWeek), b: fmtNum(lastWeek) })} />
         <p className="mt-2 tabular-nums">
           {t("{a} en total", { a: fmtNum(totals.responses) })}
           {peak && <> · {t("Pico: {a} el {b}", { a: fmtNum(peak.n), b: fmtDay(peak.day) })}</>}
@@ -192,7 +193,8 @@ export function RecentInsights({ insights, load, firstLive, onReview }: { insigh
                 <button type="button" aria-pressed={reviewed} disabled={busy === i.id} onClick={() => toggle(i)}
                   title={reviewed ? t("Marcar como pendiente") : t("Marcar como revisado")}
                   className={cx("focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border", reviewed ? "border-good/40 bg-good-soft text-good" : "border-line text-ink-2 hover:border-line-2 hover:text-ink")}>
-                  <Check size={18} aria-hidden />
+                  {/* ✓ only once reviewed; a pending insight shows an empty circle. */}
+                  {reviewed ? <Check size={18} aria-hidden /> : <Circle size={18} aria-hidden />}
                   <span className="sr-only">{reviewed ? t("Revisado. Marcar como pendiente") : t("Marcar como revisado")}: {i.title}</span>
                 </button>
               </li>

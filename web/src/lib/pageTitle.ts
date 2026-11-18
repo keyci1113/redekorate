@@ -7,6 +7,7 @@ export const HOME_TITLE = `${SITE_NAME} · UX Research Platform`;
 // First match wins. Keys are Spanish like every UI string; en.ts translates them.
 const ROUTES: [RegExp, string][] = [
   [/^\/login$/, "Iniciar sesión"],
+  [/^\/register$/, "Crear cuenta"],
   [/^\/forgot$/, "Recuperar contraseña"],
   [/^\/reset$/, "Nueva contraseña"],
   [/^\/invite$/, "Invitación"],
@@ -16,7 +17,7 @@ const ROUTES: [RegExp, string][] = [
   [/^\/projects$/, "Proyectos"],
   [/^\/projects\/[^/]+\/new$/, "Nuevo estudio"],
   [/^\/projects\/[^/]+$/, "Proyecto"],
-  [/^\/studies$/, "Estudios activos"],
+  [/^\/studies$/, "Estudios"],
   [/^\/studies\/[^/]+\/results$/, "Resultados"],
   [/^\/studies\/[^/]+\/edit$/, "Estudio"],
   [/^\/account$/, "Mi cuenta"],

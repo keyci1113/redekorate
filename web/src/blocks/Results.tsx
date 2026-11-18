@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Block, CardSortBlock, CardSortValue, ChoiceValue, FirstClickBlock, FirstClickValue, MatrixBlock, PreferenceBlock, PreferenceValue, TreeTestBlock, TreeTestValue } from "./types";
 import { parseTree } from "./types";
+import { scaleRange } from "./scale";
 import { isSuccess } from "./logic";
 import { PrototypeResult } from "./PrototypeResults";
 import { KanoResults } from "./KanoViews";
@@ -87,7 +88,7 @@ function Body({ block, answers, settings }: { block: Block; answers: Answer[]; s
     }
     case "scale": {
       const vals = answers.map((a) => a.value as number);
-      const lo = block.style === "emoji" ? 1 : block.min, hi = block.style === "emoji" ? 5 : block.max;
+      const { min: lo, max: hi } = scaleRange(block);
       return (
         <div className="grid items-start gap-6 sm:grid-cols-[220px_1fr]">
           {/* Posición del promedio en la escala: arriba del 70% bien, 50–70% atención, abajo mal */}

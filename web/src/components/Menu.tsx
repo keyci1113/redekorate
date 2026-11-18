@@ -1,14 +1,18 @@
 // A popup menu anchored to its button, and its items (same primitive as the ticket screens on the GitLab edition).
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
 import { Check } from "lucide-react";
-import { cx } from "./ui";
+// Its own cx: ui.tsx imports this file (the Tabs overflow menu), so importing ui here would be a cycle.
+const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
+
+const visible = (el: HTMLElement) => el.getClientRects().length > 0;
 
 interface MenuProps {
   /** Accessible name of the popup. */
   label: string;
   /** Renders the trigger; spread `props` on the button. */
   button: (props: { ref: (el: HTMLButtonElement | null) => void; onClick: () => void; "aria-haspopup": "menu"; "aria-expanded": boolean; type: "button" }, open: boolean) => ReactNode;
-  children: (close: () => void) => ReactNode;
+  /** `close()` returns focus to the button; `close(false)` leaves it where the chosen action put it. */
+  children: (close: (refocus?: boolean) => void) => ReactNode;
   /** Popup width in px, or "trigger" to match the button (for field-like pickers). */
   width?: number | "trigger";
 }
@@ -37,7 +41,8 @@ export function Menu({ label, button, children, width = 240 }: MenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    const first = panel.current?.querySelector<HTMLElement>("input, [role^='menuitem']");
+    // Items can be hidden at some widths (a responsive toolbar's overflow), so only visible ones take focus.
+    const first = [...(panel.current?.querySelectorAll<HTMLElement>("input, [role^='menuitem']") ?? [])].find(visible);
     first?.focus();
     const outside = (e: MouseEvent) => { if (!panel.current?.contains(e.target as Node) && !trigger.current?.contains(e.target as Node)) close(false); };
     const away = () => close(false);
@@ -50,7 +55,7 @@ export function Menu({ label, button, children, width = 240 }: MenuProps) {
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key === "Escape") { e.stopPropagation(); close(); return; }
     if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && e.key !== "Home" && e.key !== "End") return;
-    const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role^='menuitem']") ?? [])];
+    const items = [...(panel.current?.querySelectorAll<HTMLElement>("[role^='menuitem']") ?? [])].filter(visible);
     if (!items.length) return;
     e.preventDefault();
     const i = items.indexOf(document.activeElement as HTMLElement);

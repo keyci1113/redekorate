@@ -1,5 +1,7 @@
 // Mensajes del servidor en inglés (el cliente envía x-lang: en|es)
 const EN: Record<string, string> = {
+  // Suffix of a duplicated study's title.
+  "copia": "copy",
   "Elige al menos una parte del proyecto": "Choose at least one part of the project",
   "Alguno de los estudios no pertenece a este proyecto": "One of the studies does not belong to this project",
   "Alguno de los documentos no pertenece a este proyecto": "One of the documents does not belong to this project",

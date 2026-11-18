@@ -7,6 +7,8 @@ describe("pageTitle", () => {
   it("names each page in the interface language", () => {
     expect(pageTitle("/login", "es")).toBe("Iniciar sesión · redekorate");
     expect(pageTitle("/login", "en")).toBe("Sign in · redekorate");
+    expect(pageTitle("/register", "es")).toBe("Crear cuenta · redekorate");
+    expect(pageTitle("/register", "en")).toBe("Create account · redekorate");
     expect(pageTitle("/projects/abc/new", "en")).toBe("New study · redekorate");
     expect(pageTitle("/projects/abc", "en")).toBe("Project · redekorate");
     expect(pageTitle("/studies/42/results", "es")).toBe("Resultados · redekorate");

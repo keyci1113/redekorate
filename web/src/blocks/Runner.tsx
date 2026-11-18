@@ -6,6 +6,7 @@ import type {
 } from "./types";
 import { TimedTaskView } from "./TimedTaskRunner";
 import { parseTree } from "./types";
+import { scaleRange } from "./scale";
 import { imageSize, imageStyle } from "./image";
 import { SUS_ITEMS } from "./registry";
 import { cx } from "../components/ui";
@@ -16,6 +17,7 @@ import type { KanoValue } from "./kano";
 import type { PrototypeTaskValue } from "./prototype";
 import { voiceOn, type StudySettings } from "../lib/settings";
 import { DictationField } from "../components/Dictation";
+import { Menu, MenuItem } from "../components/Menu";
 
 import { t } from "../lib/i18n";
 export interface BlockViewProps {
@@ -109,7 +111,7 @@ export function BlockView({ block, value, onChange, onAdvance, preview, settings
           ))}
         </div>
       )}
-      {block.type === "scale" && <ScaleView min={block.style === "emoji" ? 1 : block.min} max={block.style === "emoji" ? 5 : block.max} minLabel={block.minLabel} maxLabel={block.maxLabel} style={block.style} value={value as number | undefined} onChange={onChange} />}
+      {block.type === "scale" && <ScaleView {...scaleRange(block)} minLabel={block.minLabel} maxLabel={block.maxLabel} style={block.style} value={value as number | undefined} onChange={onChange} />}
       {block.type === "nps" && <ScaleView min={0} max={10} minLabel={t("Nada probable")} maxLabel={t("Muy probable")} style="numbers" value={value as number | undefined} onChange={onChange} />}
       {block.type === "sus" && <SusView product={block.product} value={(value as (number | null)[]) ?? []} onChange={onChange} />}
       {block.type === "ranking" && <RankingView block={block} value={value as string[] | undefined} onChange={onChange} />}
@@ -310,53 +312,87 @@ function CardSortView({ block, value, onChange }: { block: CardSortBlock; value?
   const drop = (groupId: string | null) => (e: React.DragEvent) => { e.preventDefault(); setOverGroup(null); const id = e.dataTransfer.getData("text/card"); if (id) place(id, groupId); };
   const over = (gid: string) => (e: React.DragEvent) => { e.preventDefault(); setOverGroup(gid); };
 
-  const Card = ({ o, inGroup }: { o: Option; inGroup?: boolean }) => (
-    <div draggable onDragStart={(e) => { e.dataTransfer.setData("text/card", o.id); e.dataTransfer.effectAllowed = "move"; }}
-      onClick={() => setPicked(picked === o.id ? null : o.id)}
-      className={cx("group flex cursor-grab items-center gap-2 rounded-lg border bg-surface px-3 py-2 text-[14px] shadow-sm transition select-none active:cursor-grabbing",
+  // Moves a card from the keyboard menu, then puts focus back on that card where it landed (a new group's name field takes it instead).
+  const refocus = useRef<string | null>(null);
+  useEffect(() => {
+    if (!refocus.current) return;
+    document.querySelector<HTMLElement>(`[data-card="${refocus.current}"]`)?.focus();
+    refocus.current = null;
+  });
+  const moveFromMenu = (cardId: string, groupId: string | null) => {
+    if (groupId !== "__new") refocus.current = cardId;   // focused after the move is drawn (effect above)
+    place(cardId, groupId);
+  };
+  const groupName = (g: (typeof groups)[number]) => g.name.trim() || t("Grupo sin nombre");
+
+  // A function, not a component: the card keeps its identity across renders, so its menu stays open.
+  const renderCard = (o: Option, inGroup?: boolean) => (
+    <div key={o.id} draggable onDragStart={(e) => { e.dataTransfer.setData("text/card", o.id); e.dataTransfer.effectAllowed = "move"; }}
+      className={cx("group flex items-center gap-1 rounded-lg border bg-surface shadow-sm transition select-none",
         picked === o.id ? "border-accent ring-2 ring-accent/30" : "border-line hover:border-line-2 hover:shadow")}>
-      <GripVertical size={13} className="shrink-0 text-ink-3/60" />
-      <span className="flex-1">{o.label}</span>
-      {inGroup && <button type="button" onClick={(e) => { e.stopPropagation(); place(o.id, null); }} className="rounded p-0.5 text-ink-3 opacity-0 group-hover:opacity-100 hover:text-bad" aria-label={t("Quitar")}><X size={13} /></button>}
+      <Menu label={t("Mover «{a}»", { a: o.label })} width={240} button={(props) => (
+        <button {...props} data-card={o.id}
+          // A pointer click picks the card (then tap a group); Enter or Space (detail 0) opens the move menu.
+          onClick={(e) => { e.stopPropagation(); if (e.detail === 0) props.onClick(); else setPicked(picked === o.id ? null : o.id); }}
+          aria-label={inGroup ? t("{a}, en un grupo. Pulsa Enter para moverla.", { a: o.label }) : t("{a}. Pulsa Enter para elegir su grupo.", { a: o.label })}
+          className="focus-ring flex min-w-0 flex-1 cursor-grab items-center gap-2 rounded-lg px-3 py-2 text-left text-[14px] active:cursor-grabbing">
+          <GripVertical size={13} aria-hidden className="shrink-0 text-ink-3/60" />
+          <span className="flex-1 [overflow-wrap:anywhere]">{o.label}</span>
+        </button>
+      )}>
+        {(close) => <>
+          {groups.filter((g) => !g.cardIds.includes(o.id)).map((g) => (
+            <MenuItem key={g.id} onSelect={() => { close(false); moveFromMenu(o.id, g.id); }}>{t("A «{a}»", { a: groupName(g) })}</MenuItem>
+          ))}
+          {canCreate && <MenuItem onSelect={() => { close(false); moveFromMenu(o.id, "__new"); }}><Plus size={14} aria-hidden /> {t("Crear grupo nuevo")}</MenuItem>}
+          {inGroup && <MenuItem onSelect={() => { close(false); moveFromMenu(o.id, null); }}>{t("Devolver a las tarjetas")}</MenuItem>}
+        </>}
+      </Menu>
+      {inGroup && <button type="button" onClick={(e) => { e.stopPropagation(); place(o.id, null); }} className="mr-1.5 rounded p-0.5 text-ink-3 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-bad" aria-label={t("Quitar")}><X size={13} /></button>}
     </div>
   );
 
   return (
-    <div className="grid gap-5 md:grid-cols-[minmax(200px,260px)_1fr]">
+    // Laid out by the space it gets (container queries), not the window: the editor preview is narrower than the screen.
+    <div className="@container">
+    <div className="grid gap-5 @2xl:grid-cols-[minmax(200px,260px)_1fr]">
       <div onDragOver={over("__pool")} onDrop={drop(null)}
-        className={cx("rounded-2xl border border-dashed p-3 transition md:sticky md:top-4 md:self-start", overGroup === "__pool" ? "border-accent bg-accent-soft/40" : "border-line-2 bg-paper/60")}>
-        <p className="mb-2 text-xs text-ink-3">{t("Arrastra una tarjeta a un grupo, o tócala y luego toca el grupo.")}</p>
+        className={cx("rounded-2xl border border-dashed p-3 transition @2xl:sticky @2xl:top-4 @2xl:self-start", overGroup === "__pool" ? "border-accent bg-accent-soft/40" : "border-line-2 bg-paper/60")}>
+        <p className="mb-2 text-xs text-ink-3">{t("Arrastra una tarjeta a un grupo, o tócala y luego toca el grupo. Con teclado: Enter sobre una tarjeta.")}</p>
         <p className="label mb-2 flex justify-between"><span>{t("Tarjetas")}</span><span className="tabular-nums">{pool.length} / {block.cards.length}</span></p>
         <div className="space-y-1.5">
-          {pool.map((o) => <Card key={o.id} o={o} />)}
+          {pool.map((o) => renderCard(o))}
           {pool.length === 0 && <p className="py-6 text-center text-sm text-good">{t("¡Ordenaste todas las tarjetas! ✓")}</p>}
         </div>
         {picked && <p className="mt-3 text-xs text-accent-ink">{t("Ahora toca un grupo para colocar la tarjeta.")}</p>}
       </div>
 
-      <div className="grid content-start gap-3 sm:grid-cols-2">
+      <div className="@container min-w-0">
+      <div className="grid content-start gap-3 @md:grid-cols-2">
         {groups.map((g) => (
           <div key={g.id} onDragOver={over(g.id)} onDragLeave={() => setOverGroup(null)} onDrop={drop(g.id)} onClick={() => picked && place(picked, g.id)}
-            className={cx("min-h-32 rounded-2xl border p-3 transition", overGroup === g.id ? "border-accent bg-accent-soft/50" : "border-line bg-surface", picked && "cursor-pointer hover:border-accent")}>
+            className={cx("min-h-32 min-w-0 rounded-2xl border p-3 transition", overGroup === g.id ? "border-accent bg-accent-soft/50" : "border-line bg-surface", picked && "cursor-pointer hover:border-accent")}>
             {g.custom ? (
-              <input autoFocus={!g.name} className="mb-2 w-full rounded-md border border-transparent bg-paper px-2 py-1 text-[13px] font-semibold outline-none focus:border-accent"
+              <input autoFocus={!g.name} aria-label={t("Nombre del grupo")} className="mb-2 w-full rounded-md border border-transparent bg-paper px-2 py-1 text-[13px] font-semibold outline-none focus:border-accent"
                 placeholder={t("Nombra este grupo…")} value={g.name} maxLength={80} onClick={(e) => e.stopPropagation()}
                 onChange={(e) => commit(groups.map((x) => (x.id === g.id ? { ...x, name: e.target.value } : x)))} />
             ) : <p className="mb-2 px-1 text-[13px] font-semibold">{g.name}</p>}
-            <div className="space-y-1.5">{g.cardIds.map((id) => card(id) && <Card key={id} o={card(id)!} inGroup />)}</div>
+            <div className="space-y-1.5">{g.cardIds.map((id) => card(id) && renderCard(card(id)!, true))}</div>
             {g.cardIds.length === 0 && <p className="py-4 text-center text-xs text-ink-3">{picked ? t("Toca para colocar aquí") : t("Suelta tarjetas aquí")}</p>}
           </div>
         ))}
         {canCreate && (
           <div onDragOver={over("__new")} onDragLeave={() => setOverGroup(null)} onDrop={drop("__new")} onClick={() => picked && place(picked, "__new")}
-            className={cx("flex min-h-32 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed p-3 text-center transition",
+            className={cx("flex min-h-32 min-w-0 flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed p-3 text-center transition",
               overGroup === "__new" ? "border-accent bg-accent-soft/50" : "border-line-2", picked && "cursor-pointer hover:border-accent")}>
-            <Plus size={18} className="text-accent" />
-            <p className="text-[13px] font-medium text-ink-2">{t("Crear grupo nuevo")}</p>
-            <p className="text-xs text-ink-3">{picked ? t("Toca para crear un grupo") : t("Suelta una tarjeta aquí")}</p>
+            <Plus size={18} aria-hidden className="text-accent" />
+            <p className="text-[13px] font-medium text-balance text-ink-2">{t("Crear grupo nuevo")}</p>
+            <p className="text-xs text-balance text-ink-3">{picked ? t("Toca para crear un grupo") : t("Suelta una tarjeta aquí")}</p>
           </div>
         )}
       </div>
+      </div>
+    </div>
     </div>
   );
 }

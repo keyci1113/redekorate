@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import type { Block, FirstClickBlock, TreeNode, TreeTestBlock } from "./types";
+import { styleLimitsRange } from "./scale";
 import { parseTree } from "./types";
 import { IMAGE_SIZE, imageSize } from "./image";
 import { isStructural } from "./registry";
@@ -81,9 +82,13 @@ export function BlockEditor({ block, onChange, ctx }: { block: Block; onChange: 
 
       {block.type === "scale" && <>
         <Field group label={t("Estilo")}>
-          <Segmented value={block.style} onChange={(style) => set(style === "emoji" ? { style, min: 1, max: 5 } : { style })}
+          {/* Only the style changes: min/max stay stored, so switching back restores them. */}
+          <Segmented value={block.style} onChange={(style) => set({ style })}
             options={[{ id: "numbers", label: t("Números") }, { id: "stars", label: t("Estrellas") }, { id: "emoji", label: t("Emojis") }]} />
         </Field>
+        {block.style === "emoji" && styleLimitsRange(block) && (
+          <p className="rounded-lg bg-paper px-3 py-2 text-xs text-ink-2">{t("Los emojis van de 1 a 5. Tu rango de {a} a {b} queda guardado y vuelve si eliges Números o Estrellas.", { a: block.min, b: block.max })}</p>
+        )}
         {block.style !== "emoji" && (
           <div className="grid grid-cols-2 gap-3">
             <Field label={t("Desde")}>

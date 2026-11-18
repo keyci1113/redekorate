@@ -14,6 +14,7 @@ import { ThemeSwitch } from "../lib/theme";
 
 import { t } from "../lib/i18n";
 import { MaintenanceBanner } from "./MaintenanceScreen";
+import { pickerProjects } from "../lib/projectPicker";
 
 /** Botón con panel desplegable: se cierra con Escape, al hacer clic afuera o al cambiar de página. */
 function Disclosure({ button, buttonClass, label, align = "left", children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; children: ReactNode }) {
@@ -31,7 +32,7 @@ function Disclosure({ button, buttonClass, label, align = "left", children }: { 
     return () => { window.removeEventListener("mousedown", onDown); window.removeEventListener("keydown", onKey); };
   }, [open]);
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className="relative min-w-0 max-w-full">
       <button ref={trigger} type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} className={buttonClass}>{button}</button>
       {open && (
         <div className={cx("absolute top-full z-40 mt-1.5 w-72 rounded-xl border border-line bg-surface p-1.5 shadow-(--shadow-lift)", align === "right" ? "right-0" : "left-0")}>
@@ -53,18 +54,20 @@ export function Layout() {
   const projects = data?.projects.filter((p) => !p.archived) ?? [];
   const current = useMatch("/projects/:id/*")?.params.id;
   const currentProject = projects.find((p) => p.id === current);
-  const navClass = ({ isActive }: { isActive: boolean }) => cx("focus-ring rounded-lg px-2.5 py-1.5 text-sm font-medium transition", isActive ? "bg-ink/5 text-ink" : "text-ink-3 hover:text-ink");
+  const navClass = ({ isActive }: { isActive: boolean }) => cx("focus-ring shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium transition", isActive ? "bg-ink/5 text-ink" : "text-ink-3 hover:text-ink");
   return (
     <div className="flex min-h-full flex-col">
       <header className="no-print">
-        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-(--page-gutter) py-3 sm:gap-x-4">
-          <Link to="/" className="focus-ring order-1 rounded-md"><Logo /></Link>
-          <nav className="order-3 flex w-full items-center gap-1 sm:order-2 sm:ml-2 sm:w-auto" aria-label={t("Navegación principal")}>
+        {/* One row from sm up: the project switcher truncates and "Nuevo estudio" turns icon-only below lg. */}
+        <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-(--page-gutter) py-3 sm:flex-nowrap sm:gap-x-4">
+          <Link to="/" className="focus-ring order-1 shrink-0 rounded-md"><Logo /></Link>
+          <nav className="order-3 flex w-full min-w-0 items-center gap-1 sm:order-2 sm:ml-2 sm:w-auto" aria-label={t("Navegación principal")}>
             <NavLink to="/" end className={navClass}>{t("Inicio")}</NavLink>
-            <NavLink to="/projects" end className={navClass}>{t("Proyectos")}</NavLink>
-            <div className="ml-1">
+            {/* Not `end`: a project and its sub-pages still count as Projects. */}
+            <NavLink to="/projects" className={navClass}>{t("Proyectos")}</NavLink>
+            <div className="ml-1 min-w-0 max-w-52">
               <Disclosure
-                buttonClass="focus-ring flex max-w-52 items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-ink-2 transition hover:border-line-2 hover:text-ink"
+                buttonClass="focus-ring flex max-w-full items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-ink-2 transition hover:border-line-2 hover:text-ink"
                 button={<>
                   <span className="truncate" title={currentProject?.name}>{currentProject?.name ?? t("Cambiar de proyecto")}</span>
                   <ChevronDown size={14} className="shrink-0" />
@@ -83,22 +86,23 @@ export function Layout() {
               </Disclosure>
             </div>
           </nav>
-          <div className="order-2 ml-auto flex items-center gap-2 sm:order-3 sm:gap-3">
-            {current || !data ? (
-              // Dentro de un proyecto va directo. Si la lista aún no carga (o falló), Proyectos siempre sirve.
-              <Link to={current ? `/projects/${current}/new` : "/projects"} aria-label={t("Nuevo estudio")} className={primaryAction}>
-                <Plus size={16} /><span className="hidden sm:inline">{t("Nuevo estudio")}</span>
+          <div className="order-2 ml-auto flex shrink-0 items-center gap-2 sm:order-3 sm:gap-3">
+            {!data ? (
+              // While the list loads (or if it failed), Projects always works.
+              <Link to="/projects" aria-label={t("Nuevo estudio")} className={primaryAction}>
+                <Plus size={16} /><span className="hidden lg:inline">{t("Nuevo estudio")}</span>
               </Link>
             ) : projects.length === 0 ? (
               <Link to="/projects?crear=1" aria-label={t("Nuevo proyecto")} className={primaryAction}>
-                <Plus size={16} /><span className="hidden sm:inline">{t("Nuevo proyecto")}</span>
+                <Plus size={16} /><span className="hidden lg:inline">{t("Nuevo proyecto")}</span>
               </Link>
             ) : (
-              <Disclosure align="right" label={t("Nuevo estudio")} buttonClass={primaryAction} button={<><Plus size={16} /><span className="hidden sm:inline">{t("Nuevo estudio")}</span></>}>
+              // The same project picker on every page; inside a project, that project comes first.
+              <Disclosure align="right" label={t("Nuevo estudio")} buttonClass={primaryAction} button={<><Plus size={16} /><span className="hidden lg:inline">{t("Nuevo estudio")}</span></>}>
                 <p className="px-2.5 pt-1.5 pb-1 text-xs text-ink-3">{t("¿En qué proyecto?")}</p>
                 <div className="max-h-80 overflow-y-auto">
-                  {projects.slice(0, 12).map((p) => (
-                    <Link key={p.id} to={`/projects/${p.id}/new`} className={menuItem}>
+                  {pickerProjects(projects, current).map((p) => (
+                    <Link key={p.id} to={`/projects/${p.id}/new`} className={cx(menuItem, p.id === current && "bg-ink/5 font-medium text-ink")}>
                       <span className="truncate" title={p.name}>{p.name}</span>
                     </Link>
                   ))}

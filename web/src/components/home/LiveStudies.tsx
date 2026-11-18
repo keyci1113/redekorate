@@ -3,11 +3,12 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import { fmtNum, fmtPct, plural, relTime, t } from "../../lib/i18n";
 import {
-  COMPLETION_THRESHOLD, HOME_VIEWS, LIVE_SORT_PRESETS, completion, isLowCompletion, presetOf, sortLive, toggleSort, type Day, type HomeView, type LiveSort, type LiveSortKey,
+  COMPLETION_THRESHOLD, HOME_VIEWS, LIVE_SORT_PRESETS, STUDY_FILTERS, completion, filterStudies, type StudyFilter, isLowCompletion, presetOf, sortLive, toggleSort, type Day, type HomeView, type LiveSort, type LiveSortKey,
 } from "../../lib/home";
 import { familyColor, familyOf } from "../../lib/families";
 import { templateByKey } from "../../templates/catalog";
-import { cx } from "../ui";
+import { cx, StatusBadge } from "../ui";
+import type { StudyStatus } from "../../lib/types";
 import { Chip, CompletionBar, LowChip, Ring, Section, SectionState, TrendBars, completionSr } from "./bits";
 import type { Load, LiveStudy } from "./types";
 
@@ -90,7 +91,7 @@ function ViewPicker({ view, onChange }: { view: HomeView; onChange: (v: HomeView
   );
 }
 
-function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
+export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
     <div role="radiogroup" aria-label={label} className="inline-flex rounded-lg bg-ink/5 p-0.5">
       {options.map(([v, l]) => (
@@ -124,7 +125,7 @@ function DailyChart({ days }: { days: Day[] }) {
   const total = days.reduce((n, d) => n + d.n, 0);
   if (!total) return <p className="rounded-lg bg-paper px-3 py-3 text-sm text-ink-2">{t("Todavía no se registran respuestas diarias para este estudio.")}</p>;
   const this7 = days.slice(-7).reduce((n, d) => n + d.n, 0);
-  return <TrendBars days={days} height={56} summary={t("{a} respuestas en 14 días; {b} esta semana.", { a: fmtNum(total), b: fmtNum(this7) })} />;
+  return <TrendBars days={days} height={56} summary={t("{a} respuestas en 14 días; {b} en los últimos 7 días.", { a: fmtNum(total), b: fmtNum(this7) })} />;
 }
 
 const ResultsLink = ({ s }: { s: LiveStudy }) => (
@@ -229,16 +230,16 @@ function InlineDetail({ s, days }: { s: LiveStudy; days: Day[] }) {
  * Celdas de una fila. Angosto (<560px de contenedor): 2 líneas, [estudio | última respuesta] y [completado | tipo].
  * Ancho: 4 columnas en orden Estudio, Tipo, Completado, Última respuesta.
  */
-const ROW_GRID = cx("grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-left sm:px-5",
+export const ROW_GRID = cx("grid min-h-11 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 text-left sm:px-5",
   "@min-[560px]:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)_minmax(0,1.5fr)_minmax(0,1fr)]");
 
-function RowCells({ s }: { s: LiveStudy }) {
+export function RowCells({ s, status }: { s: LiveStudy; status?: StudyStatus }) {
   const rate = completion(s.responses, s.started);
   return (
     <>
       <span className="order-1 min-w-0">
         <span className="block truncate text-sm font-semibold" title={s.title}>{s.title}</span>
-        <span className="block truncate text-xs text-ink-2">{s.project_name}</span>
+        <span className="flex min-w-0 items-center gap-2 text-xs text-ink-2">{status && <StatusBadge status={status} />}<span className="truncate">{s.project_name}</span></span>
       </span>
       <span className="order-2 justify-self-end text-xs whitespace-nowrap text-ink-2 tabular-nums @min-[560px]:order-4 @min-[560px]:justify-self-start @min-[560px]:text-sm">
         <span className="sr-only">{t("Última respuesta")}: </span>{lastLabel(s)}
@@ -342,21 +343,29 @@ export function LiveStudies({ live, trend, studyTrend, load, view, onViewChange,
   );
 }
 
-/** Tabla simple para la lista completa de estudios activos (sin detalle). */
-export function LiveStudiesList({ live, load }: { live: LiveStudy[]; load: Load }) {
+/** The Studies page list: every status, with a status filter and the same sort presets as Home. */
+export function StudiesList({ studies, load, filter, onFilter }: { studies: (LiveStudy & { status: StudyStatus })[]; load: Load; filter: StudyFilter; onFilter: (f: StudyFilter) => void }) {
   const [sort, setSort] = useState<LiveSort>(LIVE_SORT_PRESETS.recent);
+  const shown = sortLive(filterStudies(studies, filter), sort);
+  const count = (f: StudyFilter) => filterStudies(studies, f).length;
+  const FILTER_NAME: Record<StudyFilter, string> = { all: t("Todos"), live: t("Activos"), draft: t("Borradores"), closed: t("Cerrados") };
   return (
-    <Section id="all-live" title={plural(live.length, { one: "{n} estudio activo", other: "{n} estudios activos" })}
-      actions={live.length > 1 && <Segmented<"recent" | "lowest" | "custom"> label={t("Ordenar estudios")} value={presetOf(sort)} onChange={(v) => { if (v !== "custom") setSort(LIVE_SORT_PRESETS[v]); }} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />}>
-      <SectionState load={load} empty={live.length === 0 ? {
-        title: t("Todavía no hay estudios activos"),
-        action: <Link to="/projects" className="press focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent">{t("Crear estudio")}</Link>,
+    <Section id="all-studies" title={plural(shown.length, { one: "{n} estudio", other: "{n} estudios" })}
+      actions={studies.length > 0 && <>
+        <Segmented<StudyFilter> label={t("Filtrar por estado")} value={filter} onChange={onFilter} options={STUDY_FILTERS.map((f) => [f, `${FILTER_NAME[f]} · ${fmtNum(count(f))}`])} />
+        {shown.length > 1 && <Segmented<"recent" | "lowest" | "custom"> label={t("Ordenar estudios")} value={presetOf(sort)} onChange={(v) => { if (v !== "custom") setSort(LIVE_SORT_PRESETS[v]); }} options={[["recent", t("Más reciente")], ["lowest", t("Menor completado")]]} />}
+      </>}>
+      <SectionState load={load} empty={shown.length === 0 ? {
+        title: studies.length ? t("Ningún estudio con este estado") : t("Todavía no hay estudios"),
+        action: studies.length
+          ? <button type="button" onClick={() => onFilter("all")} className="press focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg border border-line px-4 text-sm font-medium">{t("Ver todos")}</button>
+          : <Link to="/projects" className="press focus-ring inline-flex min-h-11 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-medium text-on-accent">{t("Crear estudio")}</Link>,
       } : null}>
         <div className="@container">
           <ul className="divide-y divide-line">
-            {sortLive(live, sort).map((s) => (
+            {shown.map((s) => (
               <li key={s.id}>
-                <Link to={`/studies/${s.id}/results`} className={cx("focus-ring hover:bg-ink/[0.03]", ROW_GRID)}><RowCells s={s} /></Link>
+                <Link to={s.status === "draft" ? `/studies/${s.id}/edit` : `/studies/${s.id}/results`} className={cx("focus-ring hover:bg-ink/[0.03]", ROW_GRID)}><RowCells s={s} status={s.status} /></Link>
               </li>
             ))}
           </ul>
