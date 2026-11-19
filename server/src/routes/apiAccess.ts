@@ -3,15 +3,16 @@
  *  - oauthServer: the OAuth 2.1 authorization server an MCP client discovers from /mcp's 401 (metadata,
  *    dynamic client registration, authorize, token, revoke). Public clients with PKCE S256 only.
  *  - connect (/api/connect, signed-in users): the consent step behind /authorize, and the Account page's
- *    list of access tokens and connected apps.
+ *    list of access tokens and connected apps, and the tool list the Connect AI apps page shows.
  */
 import express, { Router, type NextFunction, type Request, type Response } from "express";
 import { z } from "zod";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { oauthLimiter, registerLimiter } from "../lib/security.js";
+import { toolCatalog } from "../mcp/tools.js";
 import {
-  OAuthError, createCode, createPat, exchangeCode, findClient, listAccess, redirectMatches, redirectUriOk,
+  OAuthError, SCOPES, createCode, createPat, exchangeCode, findClient, listAccess, redirectMatches, redirectUriOk,
   refreshGrant, registerClient, revokeGrant, revokePat, revokeRaw, type OAuthClient,
 } from "../lib/apiAccess.js";
 
@@ -171,11 +172,19 @@ export function connectApi(baseUrl: (req: Request) => string) {
     res.json({ redirect: back({ code }) });
   });
 
-  r.get("/access", async (req, res) => res.json({ ...(await listAccess(req.user!.id)), mcp_url: `${baseUrl(req)}/mcp` }));
+  r.get("/access", async (req, res) => res.json({
+    ...(await listAccess(req.user!.id)), mcp_url: `${baseUrl(req)}/mcp`, openapi_url: `${baseUrl(req)}/api/v1/tools/openapi.json`,
+  }));
+
+  /** What an app can do once connected, for the Connect AI apps page. */
+  r.get("/tools", (_req, res) => res.json({ tools: toolCatalog() }));
 
   r.post("/tokens", async (req, res) => {
-    const b = parse(z.object({ name: z.string().trim().min(1).max(80), expires_days: z.union([z.literal(30), z.literal(90), z.literal(365)]).nullable().default(90) }), req.body);
-    const { token, row } = await createPat(req.user!.id, b.name, b.expires_days);
+    const b = parse(z.object({
+      name: z.string().trim().min(1).max(80), expires_days: z.union([z.literal(30), z.literal(90), z.literal(365)]).nullable().default(90),
+      scope: z.enum(SCOPES).default("write"),
+    }), req.body);
+    const { token, row } = await createPat(req.user!.id, b.name, b.expires_days, b.scope);
     res.status(201).json({ token, row });
   });
 

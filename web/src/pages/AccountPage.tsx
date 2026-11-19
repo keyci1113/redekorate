@@ -8,7 +8,7 @@ import type { Identity, User } from "../lib/types";
 import { Button, Card, ErrorNote, Field } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { AvatarField } from "../components/AvatarField";
-import { OutsideAccess } from "../components/OutsideAccess";
+import { OutsideAccessSummary } from "../components/OutsideAccess";
 import { Toggle } from "../components/editing";
 import { ProviderIcon, SsoButtons, ssoErrorMessage, type SsoProviderInfo } from "../components/SsoButtons";
 
@@ -140,7 +140,7 @@ export function AccountPage() {
 
         <Section icon={<Plug size={16} />} title={t("Acceso externo (MCP)")}
           text={t("Conecta Claude, ChatGPT u otras apps para que trabajen en tus proyectos. Usan tus mismos permisos y nunca pueden borrar nada. También pueden lanzar, cerrar y publicar estudios, y eso lo ven los participantes al momento. Cuando reemplazan el contenido de un estudio o un documento, la versión anterior queda guardada y se puede restaurar.")}>
-          <OutsideAccess />
+          <OutsideAccessSummary />
         </Section>
 
         <Section icon={<Trash2 size={16} className="text-bad" />} title={t("Eliminar cuenta")} text={t("Se borran de forma permanente tus proyectos, estudios, respuestas de participantes, insights e imágenes.")}>

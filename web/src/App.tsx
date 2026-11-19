@@ -38,6 +38,7 @@ const DashboardsPage = lazy(() => import("./pages/DashboardsPage").then((m) => (
 const WidgetSettingsPage = lazy(() => import("./pages/WidgetSettingsPage").then((m) => ({ default: m.WidgetSettingsPage })));
 const ProjectStartPage = lazy(() => import("./pages/ProjectStartPage").then((m) => ({ default: m.ProjectStartPage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
+const ConnectPage = lazy(() => import("./pages/ConnectPage").then((m) => ({ default: m.ConnectPage })));
 
 function Private({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -96,6 +97,7 @@ export function App() {
         <Route path="/orgs/:id/roadmap" element={<OrgRoadmapPage />} />
         <Route path="/my-work" element={<MyWorkPage />} />
         <Route path="/help" element={<HelpPage />} />
+        <Route path="/connect" element={<ConnectPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
       <Route path="/welcome" element={<Private><WelcomePage /></Private>} />

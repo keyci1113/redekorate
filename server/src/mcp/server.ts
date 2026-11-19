@@ -6,9 +6,9 @@ import { z } from "zod";
 import { Router, type Request, type Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { verifyBearer } from "../lib/apiAccess.js";
+import { verifyBearer, type Scope } from "../lib/apiAccess.js";
 import { COOKIE, internalSession, type AuthUser } from "../lib/auth.js";
-import { TOOLS, ToolError, type Api, type Ctx, type ToolDef } from "./tools.js";
+import { ToolError, toolsFor, type Api, type Ctx, type ToolDef } from "./tools.js";
 
 export const MCP_INSTRUCTIONS = `redekorate is a UX research platform: projects hold studies (surveys, usability tests, card sorts…),
 their responses, research documents and insights. Start with list_projects, then get_project.
@@ -25,12 +25,16 @@ documents). Before creating or filling a research document, read document_refere
 and, for one kind, the key and value shape of each section in data (a research plan is ux_blueprint). Diagrams,
 sitemaps and mood boards: diagram_reference.`;
 
-class ApiCallError extends Error {}
+/** An error the app's API (or this layer) gave for a request: its message is safe to show, with the HTTP status it came with. */
+export class ApiCallError extends Error {
+  constructor(message: string, readonly status = 400) { super(message); }
+}
 
-/** The app's REST API on this same server, called as `user`. */
-export function loopbackApi(apiBase: string, user: AuthUser): Api {
+/** The app's REST API on this same server, called as `user`. A read-only connection can't send anything but GET. */
+export function loopbackApi(apiBase: string, user: AuthUser, scope: Scope = "write"): Api {
   let cookie: Promise<string> | null = null;
   const call = async (method: string, path: string, body?: unknown) => {
+    if (method !== "GET" && scope !== "write") throw new ApiCallError("This connection is read-only", 403);
     cookie ??= internalSession(user).then((s) => `${COOKIE}=${s}`);
     const res = await fetch(`${apiBase}${path}`, {
       method,
@@ -41,7 +45,7 @@ export function loopbackApi(apiBase: string, user: AuthUser): Api {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const issues = Array.isArray(data.issues) ? ` ${data.issues.map((i: any) => `${Array.isArray(i.path) ? i.path.join(".") : i.path ?? ""}: ${i.message}`).join("; ")}` : "";
-      throw new ApiCallError(`${data.error ?? `HTTP ${res.status}`}${issues}`);
+      throw new ApiCallError(`${data.error ?? `HTTP ${res.status}`}${issues}`, res.status);
     }
     return data;
   };
@@ -57,9 +61,10 @@ export const toolAnnotations = (t: ToolDef) => ({
   title: t.title, readOnlyHint: !t.writes, destructiveHint: !!t.replaces, idempotentHint: !t.writes || !!t.replaces, openWorldHint: false,
 });
 
-export function buildServer(ctx: Ctx) {
+/** One MCP server for one request. A read-only connection is never shown the tools that write. */
+export function buildServer(ctx: Ctx, scope: Scope = "write") {
   const server = new McpServer({ name: "redekorate", version: "1.0.0" }, { instructions: MCP_INSTRUCTIONS });
-  for (const t of TOOLS) {
+  for (const t of toolsFor(scope)) {
     server.registerTool(t.name, {
       // Strict: a misspelled argument is refused with its name instead of being dropped without a word.
       title: t.title, description: t.description, inputSchema: z.object(t.input).strict(),
@@ -78,7 +83,7 @@ export function buildServer(ctx: Ctx) {
   return server;
 }
 
-const bearer = (req: Request) => /^Bearer\s+(\S+)$/i.exec(req.get("authorization") ?? "")?.[1];
+export const bearer = (req: Request) => /^Bearer\s+(\S+)$/i.exec(req.get("authorization") ?? "")?.[1];
 
 export function mcpRouter(opts: { apiBase: string; baseUrl: (req: Request) => string }) {
   const r = Router();
@@ -88,9 +93,9 @@ export function mcpRouter(opts: { apiBase: string; baseUrl: (req: Request) => st
 
   r.post("/", async (req, res) => {
     const raw = bearer(req);
-    const user = await verifyBearer(raw);
-    if (!user) return challenge(req, res, raw ? "invalid_token" : undefined);
-    const server = buildServer({ api: loopbackApi(opts.apiBase, user), baseUrl: opts.baseUrl(req) });
+    const access = await verifyBearer(raw);
+    if (!access) return challenge(req, res, raw ? "invalid_token" : undefined);
+    const server = buildServer({ api: loopbackApi(opts.apiBase, access.user, access.scope), baseUrl: opts.baseUrl(req) }, access.scope);
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => { void transport.close(); void server.close(); });
     await server.connect(transport);

@@ -8,6 +8,7 @@ import { BLOCK_REFERENCE, BLOCK_TYPES, DIAGRAM_REFERENCE, DIAGRAM_SHAPES, DOC_TE
 import { redactContacts } from "../lib/redact.js";
 import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
 import { DOC_KINDS, DOCUMENT_KINDS, documentReference } from "./documentReference.js";
+import type { Scope } from "../lib/apiAccess.js";
 
 /** The REST API as the token's user. No delete on purpose. */
 export interface Api {
@@ -323,3 +324,13 @@ export const TOOLS: ToolDef[] = [
     run: async ({ of, id, version_id }, { api }) => api.post(`${of === "study" ? "/studies" : "/documents"}/${id}/versions/${version_id}/restore`),
   }),
 ];
+
+/** The tools a connection gets: a read-only one never sees the tools that write. */
+export const toolsFor = (scope: Scope) => scope === "write" ? TOOLS : TOOLS.filter((t) => !t.writes);
+
+/** One tool as the Connect AI apps page lists it: what it does and what it takes, never how it runs. */
+export interface ToolInfo { name: string; title: string; description: string; writes: boolean; params: string[] }
+
+/** The page's list of tools, read straight from TOOLS so it can never fall out of step with what apps get. */
+export const toolCatalog = (): ToolInfo[] =>
+  TOOLS.map((t) => ({ name: t.name, title: t.title, description: t.description, writes: t.writes, params: Object.keys(t.input) }));

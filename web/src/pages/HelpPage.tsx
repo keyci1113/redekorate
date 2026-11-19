@@ -85,6 +85,12 @@ const HOW_TOS = (): HowTo[] => [
     t("Asígnala a estudios y marca si completó, no se presentó o declinó."),
     t("Usa un Screener de reclutamiento para filtrar candidatos antes de invitarlos."),
   ] },
+  { id: "ai-apps", title: t("Conectar Claude, ChatGPT u otras apps de IA"), where: t("Menú de la cuenta → Conectar apps de IA"), steps: [
+    t("Abre Conectar apps de IA y elige tu app en Cómo conectar una app."),
+    t("En Claude o ChatGPT, agrega un conector con la dirección del servidor MCP y entra con tu cuenta."),
+    t("En Claude Code, Cursor, un GPT o un script, crea un token y pega el comando que la guía ya llena con él."),
+    t("Revisa ahí mismo qué herramientas reciben las apps, y quita el acceso o revoca un token cuando quieras."),
+  ], note: t("Las apps actúan como tú, con tus permisos en cada proyecto, y nunca pueden borrar nada.") },
 ];
 
 const CONCEPTS = (): Concept[] => [
