@@ -535,8 +535,10 @@ export async function commentOnTicket(actor: Actor, projectId: string, number: u
     }
     // A mention is its own notice; everyone else already on the ticket hears there is a new comment.
     const base = { actor: actor.id, projectId: p.id, ticketId: t.id, lang: actor.lang };
-    await notify(c, { ...base, users: mentioned, kind: "tagged" });
-    await notify(c, { ...base, users: before.filter((u) => !mentioned.includes(u)), kind: "comment", data: { excerpt: b.body.replace(/\s+/g, " ").slice(0, 160) } });
+    // `comment: true` tells a mention in a comment apart from being tagged in the fields; the daily brief lists only the first.
+    const excerpt = b.body.replace(/\s+/g, " ").slice(0, 160);
+    await notify(c, { ...base, users: mentioned, kind: "tagged", data: { comment: true, excerpt } });
+    await notify(c, { ...base, users: before.filter((u) => !mentioned.includes(u)), kind: "comment", data: { excerpt } });
     await c.query("update tickets set updated_at = now() where id = $1", [t.id]);
   });
   emailLater(actor);

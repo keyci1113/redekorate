@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
 import { Bell, Building2, ChevronDown, CircleHelp, LogOut, Plug, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
@@ -15,6 +15,8 @@ import { ThemeSwitch } from "../lib/theme";
 import { t } from "../lib/i18n";
 import { MaintenanceBanner } from "./MaintenanceScreen";
 import { pickerProjects } from "../lib/projectPicker";
+import { readBriefOpen, writeBriefOpen } from "../lib/brief";
+import { BRIEF_WIDTH, BriefButton, BriefPanel, isWide, useBriefDot } from "./BriefPanel";
 
 /** Botón con panel desplegable: se cierra con Escape, al hacer clic afuera o al cambiar de página. */
 function Disclosure({ button, buttonClass, label, align = "left", wide, onOpen, children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; wide?: boolean; onOpen?: () => void; children: ReactNode }) {
@@ -107,9 +109,31 @@ function NotificationsBell() {
 
 const primaryAction = "focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-2.5 text-sm font-medium text-on-accent transition hover:bg-accent/90 sm:px-3.5";
 
+/**
+ * The daily brief's open state. It stays open across pages and is remembered per browser; a reload only reopens it
+ * on wide screens, where it sits beside the page instead of over it. On narrow screens following a link closes it.
+ */
+function useBrief(pathname: string) {
+  const [open, setOpen] = useState(() => readBriefOpen() && isWide());
+  const [byUser, setByUser] = useState(false);
+  const [dot, setDot] = useBriefDot();
+  const button = useRef<HTMLButtonElement>(null);
+  const set = (next: boolean) => { setOpen(next); writeBriefOpen(next); };
+  const close = () => { set(false); button.current?.focus(); };
+  const toggle = () => { if (open) close(); else { setByUser(true); set(true); } };
+  const seen = useCallback(() => setDot(false), [setDot]);
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) { first.current = false; return; }
+    if (!isWide()) setOpen(false);
+  }, [pathname]);
+  return { open, dot, button, toggle, close, seen, focusOnOpen: byUser };
+}
+
 export function Layout() {
   const { user, logout } = useAuth();
   const { pathname } = useLocation();
+  const brief = useBrief(pathname);
   const { data } = useLoad(() => api.get<{ projects: Project[] }>("/projects"), [pathname]);
   const projects = data?.projects.filter((p) => !p.archived) ?? [];
   const current = useMatch("/projects/:id/*")?.params.id;
@@ -174,6 +198,7 @@ export function Layout() {
                 </div>
               </Disclosure>
             )}
+            <BriefButton ref={brief.button} open={brief.open} dot={brief.dot} onClick={brief.toggle} />
             <NotificationsBell />
             <NavLink to="/help" aria-label={t("Ayuda y conceptos")} title={t("Ayuda y conceptos")}
               className={({ isActive }) => cx("focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition hover:border-line-2 hover:text-ink", isActive && "bg-ink/5 text-ink")}>
@@ -205,6 +230,8 @@ export function Layout() {
           </div>
         </div>
       </header>
+      {/* With the brief open on a wide screen, the empty box beside the page takes its width: the page narrows, nothing is covered. */}
+      <div className="flex min-w-0 flex-1">
       <main className="min-w-0 flex-1 bg-paper-2">
         <MaintenanceBanner />
         {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks. */}
@@ -217,6 +244,9 @@ export function Layout() {
           </Suspense>
         </ErrorBoundary>
       </main>
+      {brief.open && <div aria-hidden className="hidden shrink-0 bg-surface lg:block" style={{ width: BRIEF_WIDTH }} />}
+      </div>
+      {brief.open && <BriefPanel onClose={brief.close} onSeen={brief.seen} focusOnOpen={brief.focusOnOpen} />}
     </div>
   );
 }
