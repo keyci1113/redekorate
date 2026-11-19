@@ -65,6 +65,7 @@ export function Layout() {
             <NavLink to="/" end className={navClass}>{t("Inicio")}</NavLink>
             {/* Not `end`: a project and its sub-pages still count as Projects. */}
             <NavLink to="/projects" className={navClass}>{t("Proyectos")}</NavLink>
+            <NavLink to="/my-work" className={navClass}>{t("Mi trabajo")}</NavLink>
             <div className="ml-1 min-w-0 max-w-52">
               <Disclosure
                 buttonClass="focus-ring flex max-w-full items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-ink-2 transition hover:border-line-2 hover:text-ink"

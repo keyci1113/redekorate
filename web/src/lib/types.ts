@@ -69,7 +69,7 @@ export interface Insight {
 
 export interface Share { id: string; token: string; created_at: string }
 /** A report link: studies, documents and diagrams, and project-wide parts. */
-export type ReportSection = "overview" | "insights";
+export type ReportSection = "overview" | "insights" | "milestones";
 export interface ProjectShare { id: string; token: string; study_ids: string[]; study_titles: string[]; document_ids: string[]; document_titles: string[]; sections: ReportSection[]; created_at: string }
 
 export type ParticipantStudyStatus = "invited" | "completed" | "no_show" | "declined";

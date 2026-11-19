@@ -12,6 +12,8 @@ import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, 
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { TicketsTab } from "../tickets/TicketsTab";
+import { MilestonesTab } from "../roadmap/MilestonesTab";
+import { RoadmapTab } from "../roadmap/RoadmapTab";
 import { DocsPanel } from "../components/DocsPanel";
 import { ArchitecturePanel } from "../architecture/ArchitecturePanel";
 import { isDiagramKind } from "../architecture/model";
@@ -30,15 +32,17 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
-  type TabId = "studies" | "docs" | "architecture" | "insights" | "tickets" | "participants" | "report" | "members" | "comments";
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", tickets: "tickets", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
+  type TabId = "studies" | "docs" | "architecture" | "insights" | "tickets" | "milestones" | "roadmap" | "participants" | "report" | "members" | "comments";
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", tickets: "tickets", milestones: "milestones", roadmap: "roadmap", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
   // The tab lives in the URL, so any view inside it (ticket filters, an open ticket) can be linked, and links between tabs just work.
   const wanted: TabId = (TAB_FROM_PARAM as Record<string, TabId | undefined>)[params.get("tab") ?? ""] ?? "studies";
   const setTab = (next: TabId) => setParams(next === "studies" ? {} : { tab: next }, { replace: true });
-  // The Tickets tab's count; the tab refreshes it once it is open.
+  // Counts for the Tickets and Milestones tabs; each tab refreshes its own once it is open.
   const [ticketCount, setTicketCount] = useState<number | undefined>(undefined);
+  const [milestoneCount, setMilestoneCount] = useState<number | undefined>(undefined);
   useEffect(() => {
     api.get<{ tickets: unknown[] }>(`/projects/${id}/tickets`).then((r) => setTicketCount(r.tickets.length)).catch(() => {});
+    api.get<{ milestones: unknown[] }>(`/projects/${id}/milestones`).then((r) => setMilestoneCount(r.milestones.length)).catch(() => {});
   }, [id]);
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
@@ -60,7 +64,7 @@ export function ProjectPage() {
   const role = p.role;
   // Sections this person can open here; the tabs of the others are not shown.
   const research = hasArea(p.areas, "research"), ticketing = hasArea(p.areas, "tickets");
-  const RESEARCH_TABS: TabId[] = ["studies", "docs", "architecture", "insights", "participants", "report"], TICKET_TABS: TabId[] = ["tickets"];
+  const RESEARCH_TABS: TabId[] = ["studies", "docs", "architecture", "insights", "participants", "report"], TICKET_TABS: TabId[] = ["tickets", "milestones", "roadmap"];
   const allowed = (x: TabId) => (RESEARCH_TABS.includes(x) ? research : TICKET_TABS.includes(x) ? ticketing : true);
   const tab: TabId = allowed(wanted) ? wanted : research ? "studies" : ticketing ? "tickets" : "members";
   const canEdit = roleCanEdit(role);
@@ -102,6 +106,8 @@ export function ProjectPage() {
           { id: "participants", group: "research", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", group: "research", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
           { id: "tickets", group: "pm", label: t("Tickets"), count: ticketCount },
+          { id: "milestones", group: "pm", label: t("Hitos"), count: milestoneCount },
+          { id: "roadmap", group: "pm", label: t("Hoja de ruta") },
           { id: "members", group: "team", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
           { id: "comments", group: "team", label: t("Comentarios") },
         ] satisfies TabItem<TabId>[]).filter((x) => allowed(x.id))} />
@@ -122,6 +128,8 @@ export function ProjectPage() {
         {tab === "insights" && (
           <InsightsPanel projectId={p.id} projectName={p.name} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
         )}
+        {tab === "milestones" && <MilestonesTab projectId={p.id} onCount={setMilestoneCount} onRoadmap={() => setTab("roadmap")} />}
+        {tab === "roadmap" && <RoadmapTab projectId={p.id} />}
         {tab === "tickets" && <TicketsTab projectId={p.id} projectName={p.name} onCount={setTicketCount} onLinksChange={insights.reload} />}
         {tab === "participants" && (
           <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
@@ -129,7 +137,7 @@ export function ProjectPage() {
         {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} viaOrg={members.data?.via_org ?? []} onChange={members.reload} />)}
         {tab === "comments" && <CommentsPanel projectId={p.id} role={role} />}
         {tab === "report" && (
-          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} documents={uxDocs} diagrams={diagrams} hasDescription={!!p.description?.trim()} insightCount={insights.data?.insights.length ?? 0} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
+          <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} documents={uxDocs} diagrams={diagrams} hasDescription={!!p.description?.trim()} insightCount={insights.data?.insights.length ?? 0} milestones={ticketing} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />
         )}
       </div>
 

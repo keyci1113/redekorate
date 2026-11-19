@@ -30,6 +30,9 @@ const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m
 const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
 const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
 const TicketPage = lazy(() => import("./pages/TicketPage").then((m) => ({ default: m.TicketPage })));
+const MyWorkPage = lazy(() => import("./pages/MyWorkPage").then((m) => ({ default: m.MyWorkPage })));
+const PublicRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.PublicRoadmapPage })));
+const OrgRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.OrgRoadmapPage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
@@ -67,6 +70,7 @@ export function App() {
       <Route path="/r/:token" element={<ReportPage />} />
       <Route path="/pr/:token" element={<ProjectReportPage />} />
       <Route path="/d/:token" element={<PublicDocPage />} />
+      <Route path="/rm/:token" element={<PublicRoadmapPage />} />
 
       {/* Privado */}
       <Route element={<Private><Layout /></Private>}>
@@ -80,6 +84,8 @@ export function App() {
         <Route path="/account" element={<AccountPage />} />
         <Route path="/orgs" element={<OrgsPage />} />
         <Route path="/orgs/:id" element={<OrgPage />} />
+        <Route path="/orgs/:id/roadmap" element={<OrgRoadmapPage />} />
+        <Route path="/my-work" element={<MyWorkPage />} />
         <Route path="/help" element={<HelpPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>

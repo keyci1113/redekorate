@@ -1,5 +1,9 @@
 // Mensajes del servidor en inglés (el cliente envía x-lang: en|es)
 const EN: Record<string, string> = {
+  "Milestone no encontrado": "Milestone not found",
+  "Roadmap no encontrado": "Roadmap not found",
+  "Ya existe un milestone con ese nombre en este proyecto": "This project already has a milestone with that name",
+  "La fecha de inicio debe ser anterior a la de fin": "The start date must be before the end date",
   "Ese ticket no pertenece a este proyecto": "That ticket does not belong to this project",
   "Ticket no encontrado": "Ticket not found",
   "Este ticket ya se convirtió en un insight": "This ticket was already turned into an insight",

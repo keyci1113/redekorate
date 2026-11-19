@@ -56,6 +56,12 @@ const HOW_TOS = (): HowTo[] => [
     t("En el Tablero arrastra la tarjeta entre columnas para cambiar el estado, o usa el menú de la tarjeta. En la Lista ordena, filtra y edita varios a la vez."),
     t("Abre un ticket para editarlo, comentar y mencionar a alguien con @; todo cambio queda en su historial de actividad."),
   ], note: t("Solo quien es dueño del proyecto elimina tickets. Para conservar el historial, muévelos a Hecho.") },
+  { id: "roadmap", title: t("Planear con hitos y hoja de ruta"), where: t("Proyecto → Hitos / Hoja de ruta"), steps: [
+    t("En Hitos crea una entrega con nombre y fechas; asigna tickets a ese hito desde cada ticket o en lote desde la Lista."),
+    t("El avance y el estado salen de los tickets: en riesgo si hay tickets vencidos o sin asignar, hecho cuando todos lo están."),
+    t("En Hoja de ruta ves hitos y estudios en una línea de tiempo por mes o trimestre. Compartir crea un link de solo lectura, sin tickets ni respuestas."),
+    t("Mi trabajo, en la navegación, reúne los tickets asignados a ti en todos los proyectos."),
+  ] },
   { id: "documents", title: t("Llenar un documento de investigación"), where: t("Proyecto → Documentos"), steps: [
     t("Elige una plantilla: personas, journey map, affinity, guion de usabilidad, evaluación heurística…"),
     t("Los ejemplos aparecen solo como texto guía: nunca se guardan ni se exportan."),

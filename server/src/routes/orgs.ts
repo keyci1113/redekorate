@@ -1,6 +1,7 @@
 // Organizations: a workspace (personal or a company) with a logo, a color and people.
 // owner: everything, including deleting it · admin: settings, people and invitations · member: comments on every project.
 import { Router } from "express";
+import { orgRoadmap } from "./roadmap.js";
 import crypto from "node:crypto";
 import { z } from "zod";
 import { one, query } from "../lib/db.js";
@@ -115,6 +116,12 @@ orgs.delete("/:id", async (req, res) => {
 });
 
 /** The organization's projects with the caller's role in each. */
+// Milestones of every project of the organization the person can open: the organization roadmap.
+orgs.get("/:id/roadmap", async (req, res) => {
+  const org = await requireOrg(req.params.id, req.user!.id);
+  res.json({ organization: { id: org.id, name: org.name }, milestones: await orgRoadmap(req.params.id, req.user!.id) });
+});
+
 orgs.get("/:id/projects", async (req, res) => {
   await requireOrg(req.params.id, req.user!.id);
   const rows = await query(

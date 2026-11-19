@@ -122,7 +122,7 @@ projects.get("/:id/insights", async (req, res) => {
 
 // Project report: one link with the studies, documents and project-wide parts you pick.
 /** What a report link may hold besides studies and documents. */
-const REPORT_SECTIONS = ["overview", "insights"] as const;
+const REPORT_SECTIONS = ["overview", "insights", "milestones"] as const;
 projects.get("/:id/shares", async (req, res) => {
   await ownProject(req.params.id, req.user!.id, "viewer", "research");
   const rows = await query(
@@ -151,6 +151,8 @@ projects.post("/:id/shares", async (req, res) => {
   if (owned.length !== studyIds.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
   const docs = await query("select id from documents where project_id = $1 and id = any($2)", [req.params.id, docIds]);
   if (docs.length !== docIds.length) throw new HttpError(400, "Alguno de los documentos no pertenece a este proyecto");
+  // Milestones live in the tickets area: only someone who can see them may publish them.
+  if (sections.includes("milestones")) await ownProject(req.params.id, req.user!.id, "viewer", "tickets");
   const share = await one(
     "insert into report_shares(project_id, study_ids, document_ids, sections, token) values ($1,$2,$3,$4,$5) returning *",
     [req.params.id, studyIds, docIds, sections, tokenId()],

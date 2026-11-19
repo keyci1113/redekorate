@@ -1,5 +1,7 @@
 import { projectRole } from "../lib/access.js";
 import { Router } from "express";
+import { milestoneRows } from "../lib/milestones.js";
+import { publicRoadmap } from "./roadmap.js";
 import { z } from "zod";
 import { one, query } from "../lib/db.js";
 import { readUser } from "../lib/auth.js";
@@ -125,7 +127,15 @@ publicApi.get("/project-reports/:token", async (req, res) => {
   const insights = has("insights") ? await query(
     `select i.id, i.title, i.body, i.tags, i.severity, i.confidence, i.created_at, s.title as study_title
      from insights i left join studies s on s.id = i.study_id where i.project_id = $1 order by i.created_at desc`, [share.project_id]) : null;
-  res.json({ project, sections: share.sections, reports, documents, insights });
+  const milestones = has("milestones") ? (await milestoneRows("m.project_id = $1", [share.project_id])).map((m) => ({
+    id: m.id, name: m.name, begin_date: m.begin_date, end_date: m.end_date, state: m.state, progress: m.progress, total: m.total, done: m.done,
+  })) : null;
+  res.json({ project, sections: share.sections, reports, documents, insights, milestones });
+});
+
+// Read-only roadmap of a project, for whoever has its link.
+publicApi.get("/roadmap/:token", async (req, res) => {
+  res.json(await publicRoadmap(req.params.token));
 });
 
 publicApi.get("/docs/:token", async (req, res) => {

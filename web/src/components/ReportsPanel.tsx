@@ -11,7 +11,7 @@ import { t } from "../lib/i18n";
 
 export const projectReportUrl = (token: string) => `${window.location.origin}/pr/${token}`;
 
-const SECTION_LABEL = (): Record<ReportSection, string> => ({ overview: t("Resumen del proyecto"), insights: t("Todos los insights") });
+const SECTION_LABEL = (): Record<ReportSection, string> => ({ overview: t("Resumen del proyecto"), insights: t("Todos los insights"), milestones: t("Hitos y avance") });
 
 /** One group of checkboxes in the picker, with "all / none" for the group. */
 function Group({ title, items, picked, onToggle, onAll }: {
@@ -38,9 +38,9 @@ function Group({ title, items, picked, onToggle, onAll }: {
   );
 }
 
-export function ReportsPanel({ projectId, projectName, projectColor, studies, documents, diagrams, hasDescription, insightCount, shares, onChange, canEdit = true }: {
+export function ReportsPanel({ projectId, projectName, projectColor, studies, documents, diagrams, hasDescription, insightCount, milestones, shares, onChange, canEdit = true }: {
   projectId: string; projectName: string; projectColor?: string; studies: Pick<Study, "id" | "title">[];
-  documents: DocRecord[]; diagrams: DocRecord[]; hasDescription: boolean; insightCount: number;
+  documents: DocRecord[]; diagrams: DocRecord[]; hasDescription: boolean; insightCount: number; milestones: boolean;
   shares: ProjectShare[]; onChange: () => void; canEdit?: boolean;
 }) {
   // The PDF covers the studies' results; documents and diagrams have their own export on each document.
@@ -56,6 +56,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
   const sections: { id: ReportSection; label: string; hint?: string }[] = [
     ...(hasDescription ? [{ id: "overview" as const, label: SECTION_LABEL().overview }] : []),
     ...(insightCount ? [{ id: "insights" as const, label: SECTION_LABEL().insights, hint: String(insightCount) }] : []),
+    ...(milestones ? [{ id: "milestones" as const, label: SECTION_LABEL().milestones }] : []),
   ];
   const key = { section: (id: string) => `section:${id}`, study: (id: string) => `study:${id}`, doc: (id: string) => `doc:${id}` };
   const groups: { title: string; items: { id: string; label: string; hint?: string }[] }[] = [
@@ -95,7 +96,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
     <div className="space-y-5">
       <Card className="p-4">
         <p className="font-semibold">{t("Reporte compartible")}</p>
-        <p className="mt-1 text-sm text-ink-2">{t("Elige qué partes del proyecto incluir (estudios con sus resultados, documentos UX, diagramas e insights) y genera un link público de solo lectura.")}</p>
+        <p className="mt-1 text-sm text-ink-2">{t("Elige qué partes del proyecto incluir (estudios con sus resultados, documentos UX, diagramas, insights y hitos) y genera un link público de solo lectura.")}</p>
 
         {!canEdit ? (
           <p className="mt-3 text-sm text-ink-3">{t("Solo editores y dueños crean o revocan links.")}</p>
