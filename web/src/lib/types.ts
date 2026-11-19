@@ -64,6 +64,7 @@ export interface Insight {
   title: string; body: string; tags: string[]; severity: Severity; confidence: Confidence;
   created_at: string;
   reviewed_at?: string | null;   // null = pendiente de revisar
+  ticket_numbers?: number[];     // tickets created from or linked to this insight
 }
 
 export interface Share { id: string; token: string; created_at: string }

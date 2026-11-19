@@ -63,6 +63,7 @@ insights.patch("/:id", async (req, res) => {
 
 insights.delete("/:id", async (req, res) => {
   await ownInsight(req.params.id, req.user!.id);
+  await query("delete from ticket_links where target_type = 'insight' and target_id = $1", [req.params.id]);
   await query("delete from insights where id = $1", [req.params.id]);
   res.json({ ok: true });
 });

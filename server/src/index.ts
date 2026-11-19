@@ -16,6 +16,7 @@ import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
 import { admin } from "./routes/admin.js";
 import { orgs } from "./routes/orgs.js";
+import { tickets } from "./routes/tickets.js";
 import { errorHandler } from "./lib/http.js";
 import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
@@ -57,6 +58,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth/oauth", oauth);
 app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);
+app.use("/api/projects/:id/tickets", tickets);
 app.use("/api/projects", projects);
 app.use("/api/studies", studies);
 app.use("/api/insights", insights);

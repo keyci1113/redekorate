@@ -25,7 +25,13 @@ const StudyCreate = z.object({
   method: z.string().min(1).max(60),
   blocks: z.array(Block).default([]),
   settings: z.record(z.string(), z.unknown()).default({}),
+  ticket_number: z.number().int().positive().optional(),   // the study is created from this ticket of the project and linked to it
 });
+
+/** Tickets linked to a study (the ones it was created from, or linked by hand), for the study's own screens. */
+const linkedTickets = (studyId: string) => query(
+  `select t.number, t.title, t.status, t.type from ticket_links k join tickets t on t.id = k.ticket_id
+   where k.target_type = 'study' and k.target_id = $1 order by t.number`, [studyId]);
 
 const StudyUpdate = z.object({
   title: z.string().trim().min(1).max(200).optional(),
@@ -59,11 +65,19 @@ studies.post("/", async (req, res) => {
   const b = parse(StudyCreate, req.body);
   if (fromAssistant(req)) refuse(checkStudy(b.blocks, b.settings));
   await ownProject(b.project_id, req.user!.id, "editor");
+  // Checked before anything is created: a study must not be left behind when its ticket does not exist.
+  const ticket = b.ticket_number ? await one<{ id: string }>("select id from tickets where project_id = $1 and number = $2", [b.project_id, b.ticket_number]) : null;
+  if (b.ticket_number && !ticket) throw new HttpError(400, "Ese ticket no pertenece a este proyecto");
   const s = await one(
     `insert into studies(project_id, owner_id, title, method, blocks, settings, public_slug)
      values ($1,$2,$3,$4,$5,$6,$7) returning *`,
     [b.project_id, req.user!.id, b.title, b.method, JSON.stringify(b.blocks), JSON.stringify(b.settings), slugId()],
   );
+  if (ticket) {
+    await query("insert into ticket_links(ticket_id, target_type, target_id, relation) values ($1,'study',$2,'study')", [ticket.id, s!.id]);
+    await query("insert into ticket_activity(ticket_id, actor_id, action, to_value) values ($1,$2,'study_created',$3)", [ticket.id, req.user!.id, b.title]);
+    await query("update tickets set updated_at = now() where id = $1", [ticket.id]);
+  }
   await query("update projects set updated_at = now() where id = $1", [b.project_id]);
   res.status(201).json({ study: s });
 });
@@ -72,7 +86,7 @@ studies.get("/:id", async (req, res) => {
   const s = await ownStudy(req.params.id, req.user!.id);
   const project = await one(`select p.id, p.name, p.color, p.organization_id, ${ORG_COLS} from projects p left join organizations o on o.id = p.organization_id where p.id = $1`, [s.project_id]);
   await noteOpen(s.id, req.user!.id, "edit");
-  res.json({ study: await withDirty(s.id), project: { ...project, role: await projectRole(s.project_id, req.user!.id) } });
+  res.json({ study: await withDirty(s.id), project: { ...project, role: await projectRole(s.project_id, req.user!.id) }, tickets: await linkedTickets(s.id) });
 });
 
 studies.patch("/:id", async (req, res) => {
@@ -147,6 +161,7 @@ studies.post("/:id/duplicate", async (req, res) => {
 
 studies.delete("/:id", async (req, res) => {
   await ownStudy(req.params.id, req.user!.id, "editor");
+  await query("delete from ticket_links where target_type = 'study' and target_id = $1", [req.params.id]);   // tickets keep working, just without the link
   await query("delete from studies where id = $1", [req.params.id]);
   res.json({ ok: true });
 });
@@ -163,7 +178,7 @@ studies.get("/:id/results", async (req, res) => {
   );
   const insights = await query("select * from insights where study_id = $1 order by created_at desc", [s.id]);
   await noteOpen(s.id, req.user!.id, "results");
-  res.json({ study: s, sessions, answers, insights, role: await projectRole(s.project_id, req.user!.id) });
+  res.json({ study: s, sessions, answers, insights, role: await projectRole(s.project_id, req.user!.id), tickets: await linkedTickets(s.id) });
 });
 
 studies.delete("/:id/sessions/:sid", async (req, res) => {

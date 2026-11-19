@@ -27,7 +27,7 @@ import { CommentsPanel } from "../components/CommentsPanel";
 
 import { t } from "../lib/i18n";
 import { AccessNotice } from "../components/AccessNotice";
-interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole }
+interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole; tickets?: { number: number; title: string }[] }
 type TabId = "summary" | "responses" | "insights" | "comments" | "share";
 
 export function ResultsPage() {
@@ -54,6 +54,11 @@ export function ResultsPage() {
             <h1 className="page-title">{study.title}</h1>
             <StatusBadge status={study.status} />
           </div>
+          {!!data.tickets?.length && (
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-ink-3">{t("Vinculado a")}
+              {data.tickets.map((x) => <Link key={x.number} to={`/projects/${study.project_id}/tickets/${x.number}`} className="focus-ring rounded font-semibold text-accent-ink hover:underline"><span className="tabular-nums">#{x.number}</span> {x.title}</Link>)}
+            </p>
+          )}
         </div>
         <div className="flex gap-2">
           {canEdit && <Link to={`/studies/${study.id}/edit`}><Button variant="ghost" icon={<PenLine size={15} />}>{t("Editar")}</Button></Link>}

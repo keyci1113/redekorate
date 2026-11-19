@@ -1,5 +1,22 @@
 // Mensajes del servidor en inglés (el cliente envía x-lang: en|es)
 const EN: Record<string, string> = {
+  "Ese ticket no pertenece a este proyecto": "That ticket does not belong to this project",
+  "Ticket no encontrado": "Ticket not found",
+  "Este ticket ya se convirtió en un insight": "This ticket was already turned into an insight",
+  "Esa columna no existe en el tablero de este proyecto": "That column does not exist on this project's board",
+  "El tablero necesita entre 2 y 12 columnas": "The board needs between 2 and 12 columns",
+  "Cada columna necesita un nombre de hasta 40 caracteres": "Every column needs a name of up to 40 characters",
+  "Dos columnas no pueden llamarse igual": "Two columns cannot share a name",
+  "Al menos una columna debe contar como Por hacer": "At least one column must count as To do",
+  "Al menos una columna debe contar como Hecho": "At least one column must count as Done",
+  "Las columnas que cuentan como Hecho van al final del tablero": "Columns that count as Done go at the end of the board",
+  "Ese milestone no pertenece a este proyecto": "That milestone does not belong to this project",
+  "Solo se puede asignar o etiquetar a colaboradores del proyecto": "Only project collaborators can be assigned or tagged",
+  "Lo que quieres vincular no pertenece a este proyecto": "What you want to link does not belong to this project",
+  "Un ticket no se puede vincular consigo mismo": "A ticket can't be linked to itself",
+  "Un ticket no se puede fusionar consigo mismo": "A ticket can't be merged into itself",
+  "Este ticket no tiene a quién responder por correo": "This ticket has no one to reply to by email",
+  "No se pudo enviar el correo. Inténtalo de nuevo.": "The email could not be sent. Try again.",
   // Suffix of a duplicated study's title.
   "copia": "copy",
   "Elige al menos una parte del proyecto": "Choose at least one part of the project",

@@ -110,7 +110,10 @@ projects.get("/:id/studies", async (req, res) => {
 projects.get("/:id/insights", async (req, res) => {
   await ownProject(req.params.id, req.user!.id, "viewer", "research");
   const rows = await query(
-    `select i.*, s.title as study_title from insights i left join studies s on s.id = i.study_id
+    `select i.*, s.title as study_title,
+       coalesce((select array_agg(t.number order by t.number) from ticket_links k join tickets t on t.id = k.ticket_id
+                 where k.target_type = 'insight' and k.target_id = i.id), '{}') as ticket_numbers
+     from insights i left join studies s on s.id = i.study_id
      where i.project_id = $1 order by i.created_at desc`,
     [req.params.id],
   );
@@ -220,7 +223,7 @@ const CommentTarget = z.object({ study_id: z.string().uuid().optional(), documen
   .refine((v) => !(v.study_id && v.document_id), "Un comentario tiene un solo destino");
 const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.user_id, u.name, u.avatar
   from comments c left join users u on u.id = c.user_id
-  where c.project_id = $1 and c.study_id is not distinct from $2 and c.document_id is not distinct from $3 order by c.created_at`;
+  where c.project_id = $1 and c.ticket_id is null and c.study_id is not distinct from $2 and c.document_id is not distinct from $3 order by c.created_at`;
 const comments = (projectId: string, t: { study_id?: string; document_id?: string }) => query(COMMENTS_SQL, [projectId, t.study_id ?? null, t.document_id ?? null]);
 
 /** The target must live in this project, otherwise a comment could be attached to someone else's study. */

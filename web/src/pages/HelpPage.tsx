@@ -50,6 +50,12 @@ const HOW_TOS = (): HowTo[] => [
     t("Con link: pega la URL de un prototipo publicado (Figma Make, un sitio). Se muestra en un iframe y el participante reporta el resultado."),
     t("En cada tarea define pantalla inicial, meta y ruta esperada; redacta la tarea como un objetivo, sin decir dónde hacer clic."),
   ] },
+  { id: "tickets", title: t("Convertir un hallazgo en trabajo con tickets"), where: t("Proyecto → Tickets"), steps: [
+    t("Crea un ticket con Nuevo ticket, o desde un insight con Crear ticket: el insight y el ticket quedan vinculados entre sí."),
+    t("Elige el tipo (tarea, bug, pedido de investigación o cambio de diseño), la prioridad, a quién se asigna y la fecha límite."),
+    t("En el Tablero arrastra la tarjeta entre columnas para cambiar el estado, o usa el menú de la tarjeta. En la Lista ordena, filtra y edita varios a la vez."),
+    t("Abre un ticket para editarlo, comentar y mencionar a alguien con @; todo cambio queda en su historial de actividad."),
+  ], note: t("Solo quien es dueño del proyecto elimina tickets. Para conservar el historial, muévelos a Hecho.") },
   { id: "documents", title: t("Llenar un documento de investigación"), where: t("Proyecto → Documentos"), steps: [
     t("Elige una plantilla: personas, journey map, affinity, guion de usabilidad, evaluación heurística…"),
     t("Los ejemplos aparecen solo como texto guía: nunca se guardan ni se exportan."),
@@ -83,6 +89,7 @@ const CONCEPTS = (): Concept[] => [
   { id: "prototype", term: t("Prototipo"), body: t("Lo que se prueba en una tarea: pantallas subidas con zonas clicables, un HTML de un solo archivo con seguimiento de toques, o un link a un prototipo publicado. Las tareas tienen pantalla inicial, meta y ruta esperada."), related: ["method"] },
   { id: "organization", term: t("Organización"), body: t("Un espacio con nombre, logo y color para una empresa, un equipo o un estudio personal. Sus proyectos heredan la marca y todas sus personas los ven y comentan. Un proyecto es personal o pertenece a una organización."), related: ["project", "roles"] },
   { id: "roles", term: t("Roles"), body: t("En la instancia: admin (gestiona usuarios e invitaciones) y miembro. En un proyecto: dueño/a, editor, comentarista y solo lectura. En una organización: dueño/a, admin y miembro; a cada miembro se le elige qué proyectos ve, qué secciones abre (investigación UX, gestión de proyecto o todo) y qué puede hacer. Cuando aplican varios roles, gana el más alto."), related: ["project", "organization"] },
+  { id: "ticket", term: t("Ticket"), body: t("Un trabajo por hacer dentro de un proyecto: tarea, bug, pedido de investigación o cambio de diseño. Tiene número propio (#12), estado, prioridad, personas asignadas y mencionadas, fecha límite, hito y etiquetas, y puede vincularse con insights, estudios, documentos y otros tickets."), related: ["insight", "project", "roles"] },
   { id: "comments", term: t("Comentarios"), body: t("Conversación ligera sobre un proyecto, los resultados de un estudio o un documento. Pueden escribir comentaristas, editores y dueños; borran sus autores y quien es dueño del proyecto."), related: ["roles"] },
 ];
 

@@ -54,6 +54,23 @@
   --color-family-metrics: #1F6FEB;
   --color-family-org: #A16207;
 
+  /* Tickets: status and type chips, and priority marks. Each pair is a soft fill plus a text color that reaches 4.5:1 on it. */
+  --color-tk-todo: #EEEDF2;      --color-tk-todo-ink: #4A4656;
+  --color-tk-progress: #E0ECFF;  --color-tk-progress-ink: #1D4ED8;
+  --color-tk-review: #FEF0E1;    --color-tk-review-ink: #8F4400;
+  --color-tk-done: #DCFCE7;      --color-tk-done-ink: #166534;
+  --color-tk-task: #F3F1F7;      --color-tk-task-ink: #4A4656;
+  --color-tk-bug: #FDE8E8;       --color-tk-bug-ink: #B42318;
+  --color-tk-research: #F1EAFE;  --color-tk-research-ink: #5B21B6;
+  --color-tk-design: #E0F2FE;    --color-tk-design-ink: #075985;
+  --color-tk-urgent: #B42318;
+  --color-tk-high: #9A3412;
+  --color-tk-medium: #4A4656;
+  --color-tk-low: #5F5A6B;
+  --color-tk-bar-off: #D9D5E0;   /* unfilled priority bar */
+  --color-tk-column: #F0EEF4;    /* board column */
+  --color-tk-column-line: #E3E0E9; /* board column edge: where one column ends and the next begins */
+
   /* Capas suaves: borde fino en reposo; sombra en lo enfocado o lo que pide atención. */
   --shadow-lift: 0 1px 2px rgb(22 25 31 / 0.05), 0 8px 24px rgb(22 25 31 / 0.08);
 }
@@ -257,6 +274,56 @@ article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb,
   @starting-style { .view-pop:popover-open { transform: none; } }
   .anim-view, .anim-expand { animation: rk-fade 150ms linear; }
   .press:active { transform: none; }
+}
+
+/* Tickets in dark mode: the same tokens, redefined (system preference unless data-theme overrides it). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-tk-todo: #2A2B33;      --color-tk-todo-ink: #C7CBD4;
+    --color-tk-progress: #172554;  --color-tk-progress-ink: #93C5FD;
+    --color-tk-review: #3A2208;    --color-tk-review-ink: #FDBA74;
+    --color-tk-done: #0E2A1F;      --color-tk-done-ink: #86EFAC;
+    --color-tk-task: #24262E;      --color-tk-task-ink: #C7CBD4;
+    --color-tk-bug: #3B1414;       --color-tk-bug-ink: #FCA5A5;
+    --color-tk-research: #2A2338;  --color-tk-research-ink: #D6AEF9;
+    --color-tk-design: #0C2A3D;    --color-tk-design-ink: #7DD3FC;
+    --color-tk-urgent: #FCA5A5;
+    --color-tk-high: #FDBA74;
+    --color-tk-medium: #C7CBD4;
+    --color-tk-low: #A0A5B2;
+    --color-tk-bar-off: #3B3F4C;
+    --color-tk-column: #15171E;
+    --color-tk-column-line: #303441;
+  }
+}
+:root[data-theme="dark"] {
+  --color-tk-todo: #2A2B33;      --color-tk-todo-ink: #C7CBD4;
+  --color-tk-progress: #172554;  --color-tk-progress-ink: #93C5FD;
+  --color-tk-review: #3A2208;    --color-tk-review-ink: #FDBA74;
+  --color-tk-done: #0E2A1F;      --color-tk-done-ink: #86EFAC;
+  --color-tk-task: #24262E;      --color-tk-task-ink: #C7CBD4;
+  --color-tk-bug: #3B1414;       --color-tk-bug-ink: #FCA5A5;
+  --color-tk-research: #2A2338;  --color-tk-research-ink: #D6AEF9;
+  --color-tk-design: #0C2A3D;    --color-tk-design-ink: #7DD3FC;
+  --color-tk-urgent: #FCA5A5;
+  --color-tk-high: #FDBA74;
+  --color-tk-medium: #C7CBD4;
+  --color-tk-low: #A0A5B2;
+  --color-tk-bar-off: #3B3F4C;
+  --color-tk-column: #15171E;
+  --color-tk-column-line: #303441;
+}
+
+
+/* Tickets motion: only the side panel and dialogs animate. */
+@keyframes tkPanelIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }
+@keyframes tkDialogIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes tkFade { from { opacity: 0; } to { opacity: 1; } }
+.tk-panel { animation: tkPanelIn 200ms cubic-bezier(0.23, 1, 0.32, 1); }
+.tk-dialog { animation: tkDialogIn 150ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  /* The site-wide reduced-motion rule zeroes every animation; the fade is restated with the same weight so it survives. */
+  .tk-panel, .tk-dialog { animation-name: tkFade; animation-timing-function: linear; animation-duration: 150ms !important; }
 }
 
 /* Page change: the new page fades in. Opacity only, on purpose: a transform here would make the page the anchor of every

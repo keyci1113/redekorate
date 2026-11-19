@@ -29,6 +29,7 @@ const PublicDocPage = lazy(() => import("./pages/PublicDocPage").then((m) => ({ 
 const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgsPage })));
 const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
 const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
+const TicketPage = lazy(() => import("./pages/TicketPage").then((m) => ({ default: m.TicketPage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
@@ -73,6 +74,7 @@ export function App() {
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/projects/:id/new" element={<NewStudyPage />} />
+        <Route path="/projects/:id/tickets/:number" element={<TicketPage />} />
         <Route path="/studies" element={<LiveStudiesPage />} />
         <Route path="/studies/:id/results" element={<ResultsPage />} />
         <Route path="/account" element={<AccountPage />} />

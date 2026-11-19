@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
@@ -11,6 +11,7 @@ import { hasArea } from "../lib/access";
 import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, cx, type TabItem } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
+import { TicketsTab } from "../tickets/TicketsTab";
 import { DocsPanel } from "../components/DocsPanel";
 import { ArchitecturePanel } from "../architecture/ArchitecturePanel";
 import { isDiagramKind } from "../architecture/model";
@@ -29,11 +30,16 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params, setParams] = useSearchParams();
-  type TabId = "studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "members" | "comments";
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
-  // The tab lives in the URL, so any view inside it can be linked, and links between tabs just work.
+  type TabId = "studies" | "docs" | "architecture" | "insights" | "tickets" | "participants" | "report" | "members" | "comments";
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", tickets: "tickets", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
+  // The tab lives in the URL, so any view inside it (ticket filters, an open ticket) can be linked, and links between tabs just work.
   const wanted: TabId = (TAB_FROM_PARAM as Record<string, TabId | undefined>)[params.get("tab") ?? ""] ?? "studies";
   const setTab = (next: TabId) => setParams(next === "studies" ? {} : { tab: next }, { replace: true });
+  // The Tickets tab's count; the tab refreshes it once it is open.
+  const [ticketCount, setTicketCount] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    api.get<{ tickets: unknown[] }>(`/projects/${id}/tickets`).then((r) => setTicketCount(r.tickets.length)).catch(() => {});
+  }, [id]);
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -53,10 +59,10 @@ export function ProjectPage() {
   const uxDocs = allDocs.filter((d) => !isDiagramKind(d.kind)), diagrams = allDocs.filter((d) => isDiagramKind(d.kind));
   const role = p.role;
   // Sections this person can open here; the tabs of the others are not shown.
-  const research = hasArea(p.areas, "research");
-  const RESEARCH_TABS: TabId[] = ["studies", "docs", "architecture", "insights", "participants", "report"];
-  const allowed = (x: TabId) => (RESEARCH_TABS.includes(x) ? research : true);
-  const tab: TabId = allowed(wanted) ? wanted : research ? "studies" : "members";
+  const research = hasArea(p.areas, "research"), ticketing = hasArea(p.areas, "tickets");
+  const RESEARCH_TABS: TabId[] = ["studies", "docs", "architecture", "insights", "participants", "report"], TICKET_TABS: TabId[] = ["tickets"];
+  const allowed = (x: TabId) => (RESEARCH_TABS.includes(x) ? research : TICKET_TABS.includes(x) ? ticketing : true);
+  const tab: TabId = allowed(wanted) ? wanted : research ? "studies" : ticketing ? "tickets" : "members";
   const canEdit = roleCanEdit(role);
   const isOwner = roleIsOwner(role);
 
@@ -87,7 +93,7 @@ export function ProjectPage() {
       <AccessNotice role={role} owner={p.owner_name} className="mt-4 max-w-2xl" />
 
       <div className="mt-8">
-        {/* Two groups: the research itself, then the team's shared space. */}
+        {/* Three groups, in the order work happens: research, project management, then the team's shared space. */}
         <Tabs value={tab} onChange={setTab} label={t("Secciones del proyecto")} items={([
           { id: "studies", group: "research", label: t("Estudios"), count: list.length },
           { id: "docs", group: "research", label: t("Documentos"), count: uxDocs.length },
@@ -95,6 +101,7 @@ export function ProjectPage() {
           { id: "insights", group: "research", label: t("Insights"), count: insights.data?.insights.length ?? 0 },
           { id: "participants", group: "research", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", group: "research", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
+          { id: "tickets", group: "pm", label: t("Tickets"), count: ticketCount },
           { id: "members", group: "team", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
           { id: "comments", group: "team", label: t("Comentarios") },
         ] satisfies TabItem<TabId>[]).filter((x) => allowed(x.id))} />
@@ -113,8 +120,9 @@ export function ProjectPage() {
         {tab === "docs" && <DocsPanel projectId={p.id} docs={uxDocs} onChange={docs.reload} preselect={params.get("new")} canEdit={canEdit} />}
         {tab === "architecture" && <ArchitecturePanel projectId={p.id} diagrams={diagrams} onChange={docs.reload} canEdit={canEdit} />}
         {tab === "insights" && (
-          <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
+          <InsightsPanel projectId={p.id} projectName={p.name} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
         )}
+        {tab === "tickets" && <TicketsTab projectId={p.id} projectName={p.name} onCount={setTicketCount} onLinksChange={insights.reload} />}
         {tab === "participants" && (
           <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
         )}
