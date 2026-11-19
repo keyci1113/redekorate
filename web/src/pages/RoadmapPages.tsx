@@ -4,7 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import { t } from "../lib/i18n";
-import { ErrorNote, Spinner } from "../components/ui";
+import { ErrorNote, PageSkeleton, Spinner } from "../components/ui";
 import { LogoMark, Wordmark } from "../components/Logo";
 import { Timeline, TimelineControls, milestoneItem, type BarKind, type TimelineGroup } from "../roadmap/parts";
 import { MILESTONE_KINDS, studyItem } from "../roadmap/RoadmapTab";
@@ -44,7 +44,7 @@ export function OrgRoadmapPage() {
   const load = useLoad(() => api.get<{ organization: { id: string; name: string }; milestones: Milestone[] }>(`/orgs/${id}/roadmap`), [id]);
   const [zoom, setZoom] = useState<Zoom>("quarter");
   const [shift, setShift] = useState(0);
-  if (load.loading) return <Spinner />;
+  if (load.loading) return <PageSkeleton />;
   if (load.error || !load.data) return <div className="p-10"><ErrorNote>{load.error}</ErrorNote></div>;
   const d = load.data;
   const byProject = new Map<string, { name: string; items: Milestone[] }>();

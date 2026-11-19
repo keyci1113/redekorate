@@ -5,7 +5,7 @@ import { Calendar, Flag, Map as MapIcon, Pencil, Plus } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 import type { ProjectRole } from "../lib/types";
 import { Button, Empty, ErrorNote } from "../components/ui";
 import { STATUSES, isoDay } from "../tickets/model";
@@ -54,7 +54,7 @@ export function MilestonesTab({ projectId, onCount, onRoadmap }: { projectId: st
                 </div>
                 <div className="flex items-center gap-3.5">
                   <span role="img" aria-label={t("{n}% completo", { n: m.progress })} className="h-2 flex-1 overflow-hidden rounded bg-ink/[0.08]"><span className="block h-2 rounded bg-chart-1" style={{ width: `${m.progress}%` }} /></span>
-                  <span className="text-[13px] font-bold tabular-nums">{t("{a} de {b} hechos · {c}%", { a: m.done, b: m.total, c: m.progress })}</span>
+                  <span className="text-[13px] font-bold tabular-nums">{plural(m.total, { one: "{a} de {n} hecho · {c}%", other: "{a} de {n} hechos · {c}%" }, { a: m.done, c: m.progress })}</span>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <span className="flex flex-wrap gap-3.5">

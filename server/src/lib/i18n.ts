@@ -90,6 +90,7 @@ const EN: Record<string, string> = {
   "Datos inválidos": "Invalid data",
   "El enlace no es válido o ya expiró. Solicita uno nuevo.": "This link is invalid or has expired. Request a new one.",
   "El estudio no pertenece a este proyecto": "The study does not belong to this project",
+  "Para guardar el teléfono o el correo, marca que dio su consentimiento informado": "To keep the phone or email, tick that they gave informed consent",
   "El registro está cerrado. Pide acceso a la administradora.": "Sign-up is closed. Ask the administrator for access.",
   "Error interno del servidor": "Internal server error",
   "Este estudio no está recibiendo respuestas": "This study is not accepting responses",

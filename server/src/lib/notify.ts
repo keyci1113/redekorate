@@ -3,7 +3,8 @@ import type { PoolClient } from "pg";
 import { pool } from "./db.js";
 import { sendMail } from "./mail.js";
 
-export type NotifyKind = "assigned" | "tagged" | "status" | "comment";
+export const NOTIFY_KINDS = ["assigned", "tagged", "status", "comment"] as const;
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 type Db = Pick<PoolClient, "query">;
 
 /** Who hears about a change: the given people once each, never the person who made it. */
@@ -62,11 +63,12 @@ export async function flushEmails(baseUrl: string): Promise<number> {
     `update notifications n set emailed_at = now()
      from users u, tickets t, projects p, (select id from notifications where emailed_at is null order by created_at limit 50 for update skip locked) pick
      where n.id = pick.id and u.id = n.user_id and t.id = n.ticket_id and p.id = n.project_id
-     returning n.kind, n.data, n.lang, t.number, t.title, t.project_id, p.name as project_name, u.email, u.notify_email, u.disabled_at,
+     returning n.kind, n.data, n.lang, t.number, t.title, t.project_id, p.name as project_name, u.email, u.notify_email, u.notify_email_off, u.disabled_at,
        (select a.name from users a where a.id = n.actor_id) as actor_name`);
   let sent = 0;
   for (const r of rows) {
-    if (!r.notify_email || r.disabled_at) continue;
+    // The master switch, then the kinds this person turned off. The bell shows them either way.
+    if (!r.notify_email || r.disabled_at || r.notify_email_off.includes(r.kind)) continue;
     const mail = emailFor(r as NoticeRow, `${baseUrl}/projects/${r.project_id}/tickets/${r.number}`);
     try { await sendMail(r.email, mail.subject, mail.text); sent++; }
     catch (e) { console.warn("[notify] email not sent:", e instanceof Error ? e.message : e); }

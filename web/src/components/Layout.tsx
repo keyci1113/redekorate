@@ -7,7 +7,8 @@ import { timeAgo, useLoad } from "../lib/hooks";
 import type { Project } from "../lib/types";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
-import { cx, Spinner } from "./ui";
+import { cx, PageSkeleton } from "./ui";
+import { PageProjectCtx } from "../lib/pageProject";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { LangSwitch } from "../lib/i18n";
 import { ThemeSwitch } from "../lib/theme";
@@ -136,7 +137,9 @@ export function Layout() {
   const brief = useBrief(pathname);
   const { data } = useLoad(() => api.get<{ projects: Project[] }>("/projects"), [pathname]);
   const projects = data?.projects.filter((p) => !p.archived) ?? [];
-  const current = useMatch("/projects/:id/*")?.params.id;
+  // A page whose address has no project in it (a study's results) reports its project through PageProjectCtx.
+  const [pageProject, setPageProject] = useState<string | null>(null);
+  const current = useMatch("/projects/:id/*")?.params.id ?? pageProject ?? undefined;
   const currentProject = projects.find((p) => p.id === current);
   const navClass = ({ isActive }: { isActive: boolean }) => cx("focus-ring shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium transition", isActive ? "bg-ink/5 text-ink" : "text-ink-3 hover:text-ink");
   return (
@@ -147,8 +150,9 @@ export function Layout() {
           <Link to="/" className="focus-ring order-1 shrink-0 rounded-md"><Logo /></Link>
           <nav className="order-3 flex w-full min-w-0 items-center gap-1 sm:order-2 sm:ml-2 sm:w-auto" aria-label={t("Navegación principal")}>
             <NavLink to="/" end className={navClass}>{t("Inicio")}</NavLink>
-            {/* Not `end`: a project and its sub-pages still count as Projects. */}
-            <NavLink to="/projects" className={navClass}>{t("Proyectos")}</NavLink>
+            {/* Not `end`: a project and its sub-pages still count as Projects; so does a page that belongs to a project without
+                saying so in its address, like a study's results. */}
+            <NavLink to="/projects" className={({ isActive }) => navClass({ isActive: isActive || !!current })}>{t("Proyectos")}</NavLink>
             <NavLink to="/my-work" className={navClass}>{t("Mi trabajo")}</NavLink>
             <div className="ml-1 min-w-0 max-w-52">
               <Disclosure
@@ -234,12 +238,15 @@ export function Layout() {
       <div className="flex min-w-0 flex-1">
       <main className="min-w-0 flex-1 bg-paper-2">
         <MaintenanceBanner />
-        {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks. */}
+        {/* Errors and loading stay inside the frame: the menu keeps working while a page loads or if one breaks,
+            and a page still loading shows a light skeleton in the content area only. */}
         <ErrorBoundary resetKey={pathname}>
-          <Suspense fallback={<Spinner />}>
+          <Suspense fallback={<PageSkeleton />}>
             {/* Keyed by the path only: a new page fades in, while a tab or filter change (?tab=…) keeps the page as it is. */}
             <div key={pathname} className="rk-page-in">
-              <Outlet />
+              <PageProjectCtx.Provider value={setPageProject}>
+                <Outlet />
+              </PageProjectCtx.Provider>
             </div>
           </Suspense>
         </ErrorBoundary>

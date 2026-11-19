@@ -2,11 +2,14 @@
 import { t } from "./i18n";
 import { passwordOk } from "../components/PasswordStrength";
 
+// Loose on purpose: the server has the last word, this only catches typos before sending.
+export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /** The sign-in and sign-up checks, in the app language rather than the browser's native bubbles. */
 export function authFormError(mode: "login" | "register", form: { name: string; email: string; password: string }): string | null {
   if (mode === "register" && !form.name.trim()) return t("Escribe tu nombre.");
   if (!form.email.trim()) return t("Escribe tu correo.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return t("Escribe un correo válido, como nombre@empresa.com.");
+  if (!EMAIL_RE.test(form.email.trim())) return t("Escribe un correo válido, como nombre@empresa.com.");
   if (!form.password) return t("Escribe tu contraseña.");
   if (mode === "register" && !passwordOk(form.password)) return t("Tu contraseña aún no cumple los requisitos.");
   return null;

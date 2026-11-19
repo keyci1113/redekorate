@@ -4,6 +4,8 @@ import type { ActivityRow, Day } from "../../lib/home";
 export interface LiveStudy {
   id: string; project_id: string; title: string; method: string; project_name: string; project_color: string;
   responses: number; started: number; last_response_at: string | null;
+  /** Why the study needs a look (live studies only), decided on the server. */
+  attention?: "low_completion" | "silent" | null;
 }
 export interface Draft { id: string; title: string; method: string; updated_at: string; project_name: string; project_color: string }
 export interface RecentOpen { id: string; title: string; method: string; status: string; project_id: string; project_name: string; project_color: string; opened_at: string; where: "edit" | "results" }

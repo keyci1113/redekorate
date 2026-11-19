@@ -14,10 +14,10 @@ const HOW_TOS = (): HowTo[] => [
     t("Crea un proyecto (o abre uno) y pulsa Nuevo estudio."),
     t("Elige un método. Si no sabes cuál, empieza por tu pregunta: los chips de arriba filtran los métodos recomendados."),
     t("Ponle nombre, elige el idioma que verán los participantes y pulsa Usar este método. El template trae los bloques listos."),
-    t("En el builder edita los textos, agrega o quita bloques y revisa la vista previa a la derecha."),
+    t("En el editor edita los textos, agrega o quita bloques y revisa la vista previa a la derecha."),
   ] },
-  { id: "publish", title: t("Publicar un estudio y enviar el link"), where: t("Builder → Publicar"), steps: [
-    t("Pulsa Publicar en el builder. Se revisa que no falte nada (por ejemplo, una tarea sin pantalla meta)."),
+  { id: "publish", title: t("Publicar un estudio y enviar el link"), where: t("Editor → Publicar"), steps: [
+    t("Pulsa Publicar en el editor. Se revisa que no falte nada (por ejemplo, una tarea sin pantalla meta)."),
     t("Copia el link para participantes (también está en Resultados). Puedes agregar ?pid=123 o ?source=email para distinguir de dónde llegan."),
     t("Comparte el link. Nadie necesita cuenta: el estudio funciona en celular y en computadora."),
   ], note: t("Un estudio activo guarda una versión publicada. Si sigues editando, los participantes ven la publicada hasta que pulses Publicar cambios.") },
@@ -58,7 +58,7 @@ const HOW_TOS = (): HowTo[] => [
   ], note: t("Solo quien es dueño del proyecto elimina tickets. Para conservar el historial, muévelos a Hecho.") },
   { id: "roadmap", title: t("Planear con hitos y hoja de ruta"), where: t("Proyecto → Hitos / Hoja de ruta"), steps: [
     t("En Hitos crea una entrega con nombre y fechas; asigna tickets a ese hito desde cada ticket o en lote desde la Lista."),
-    t("El avance y el estado salen de los tickets: en riesgo si hay tickets vencidos o sin asignar, hecho cuando todos lo están."),
+    t("El avance y el estado salen de los tickets: en riesgo si vence en 14 días o menos con tickets abiertos, atrasado si tiene tickets vencidos, hecho cuando todos lo están."),
     t("En Hoja de ruta ves hitos y estudios en una línea de tiempo por mes o trimestre. Compartir crea un link de solo lectura, sin tickets ni respuestas."),
     t("Mi trabajo, en la navegación, reúne los tickets asignados a ti en todos los proyectos."),
   ] },

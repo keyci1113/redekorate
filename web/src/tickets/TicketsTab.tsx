@@ -389,7 +389,7 @@ function ListTable({ rows, cols, total, sort, onSort, open, hrefFor, selectable,
     <div className="overflow-hidden rounded-2xl border border-line bg-surface">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1100px] border-collapse text-sm">
-          <caption className="sr-only">{selected.size ? t("Tickets, {n} seleccionados", { n: selected.size }) : t("Tickets, ordenados por {a}", { a: sortName(sort.key) })}</caption>
+          <caption className="sr-only">{selected.size ? plural(selected.size, { one: "Tickets, {n} seleccionado", other: "Tickets, {n} seleccionados" }) : t("Tickets, ordenados por {a}", { a: sortName(sort.key) })}</caption>
           <thead>
             <tr>
               {selectable && (

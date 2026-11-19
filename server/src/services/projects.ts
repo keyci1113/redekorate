@@ -8,6 +8,7 @@ import { HttpError, parse } from "../lib/http.js";
 import { ORG_COLS, accessJoins, accessWhere, areasSql, requireProject, roleSql } from "../lib/access.js";
 import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
 import { removeStored } from "../routes/files.js";
+import { CANVAS_KINDS } from "../mcp/documentReference.js";
 import type { Actor } from "./actor.js";
 
 export const Color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
@@ -42,11 +43,13 @@ export async function listProjects(actor: Actor, input: unknown = {}) {
        (select count(*)::int from participants pa where pa.project_id = p.id) as participant_count,
        (select count(*)::int from report_shares rs where rs.project_id = p.id and rs.revoked_at is null) as share_count,
        (select count(*)::int from insights i where i.project_id = p.id) as insight_count,
-       (select count(*)::int from documents d where d.project_id = p.id) as document_count
+       (select count(*)::int from documents d where d.project_id = p.id and d.kind <> all($3::text[])) as document_count,
+       (select count(*)::int from documents d where d.project_id = p.id and d.kind = any($3::text[])) as diagram_count
      ${accessJoins("$1")}
        join users u on u.id = p.owner_id
      where ${accessWhere("$1")} and ($2::text is null or p.category = $2) order by p.updated_at desc`,
-    [actor.id, filter.category ?? null],
+    // UX documents and diagrams are counted apart, as the project's tabs show them.
+    [actor.id, filter.category ?? null, CANVAS_KINDS],
   );
   return { projects: rows };
 }

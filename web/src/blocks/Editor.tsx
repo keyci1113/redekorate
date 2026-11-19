@@ -251,7 +251,7 @@ function TreeEditor({ block, set }: { block: TreeTestBlock; set: Set }) {
           onChange={(e) => set({ treeText: e.target.value })} />
       </Field>
       <div>
-        <p className="mb-1.5 text-[13px] font-medium text-ink-2">{t("Respuesta(s) correcta(s)")}</p>
+        <p className="mb-1.5 text-[13px] font-medium text-ink-2">{t("Respuestas correctas")}</p>
         <p className="mb-2 text-xs text-ink-3">{t("Haz clic en el o los destinos donde está la respuesta.")}</p>
         <div className="max-h-64 overflow-y-auto rounded-lg border border-line bg-paper/50 p-2">
           <TreePick nodes={tree} depth={0} correct={block.correct} onToggle={toggle} />

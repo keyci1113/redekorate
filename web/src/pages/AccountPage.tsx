@@ -36,6 +36,15 @@ function useForm() {
   return { run, busy, note };
 }
 
+type NoticeKind = "assigned" | "tagged" | "status" | "comment";
+/** The notification kinds the server sends (server/src/lib/notify.ts NOTIFY_KINDS), each with what it means here. */
+const NOTICE_KINDS = (): [NoticeKind, string][] => [
+  ["assigned", t("Me asignan un ticket")],
+  ["tagged", t("Me mencionan o me etiquetan en un ticket")],
+  ["status", t("Se mueve un ticket en el que estoy")],
+  ["comment", t("Comentan un ticket en el que estoy")],
+];
+
 interface SignIn { identities: Identity[]; has_password: boolean; providers: SsoProviderInfo[] }
 
 export function AccountPage() {
@@ -47,11 +56,12 @@ export function AccountPage() {
   const [del, setDel] = useState("");
   const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm(), linking = useForm();
   const signIn = useLoad(() => api.get<SignIn>("/auth/oauth/identities"), []);
-  const notices = useLoad(() => api.get<{ email: boolean }>("/notifications"), []);
-  const setEmailNotices = (email: boolean) => {
-    notices.setData((d) => d && { ...d, email });
-    void api.put("/notifications/settings", { email }).catch(() => notices.reload());
+  const notices = useLoad(() => api.get<{ email: boolean; email_off?: NoticeKind[] }>("/notifications"), []);
+  const saveNotices = (patch: { email?: boolean; email_off?: NoticeKind[] }) => {
+    notices.setData((d) => d && { ...d, ...patch });
+    void api.put("/notifications/settings", patch).catch(() => notices.reload());
   };
+  const emailOff = notices.data?.email_off ?? [];
   const hasPassword = signIn.data?.has_password ?? true;
   const ssoError = ssoErrorMessage(params.get("error"));
 
@@ -64,7 +74,7 @@ export function AccountPage() {
           <form className="space-y-4" onSubmit={profile.run(async () => {
             const { user: u } = await api.patch<{ user: User }>("/auth/me", { name }); setUser(u); return t("Perfil actualizado");
           })}>
-            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Usuarios y en los colaboradores de cada proyecto. Arrástrala y acércala para encuadrarla en el círculo.")}>
+            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Personas de tu organización y en los colaboradores de cada proyecto. Arrástrala y acércala para encuadrarla en el círculo.")}>
               <AvatarField name={user?.name ?? ""} avatar={user?.avatar} onSave={async (url) => {
                 const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); setUser(u);
               }} />
@@ -107,8 +117,20 @@ export function AccountPage() {
 
         <div id="notificaciones" className="scroll-mt-6">
           <Section icon={<Bell size={16} />} title={t("Notificaciones")} text={t("Te avisamos cuando te asignan un ticket, te mencionan, o cuando se mueve o se comenta un ticket en el que estás. Siempre lo ves en la campana de arriba.")}>
-            <Toggle checked={notices.data?.email ?? true} onChange={setEmailNotices} label={t("Avisarme también por correo")}
+            <Toggle checked={notices.data?.email ?? true} onChange={(email) => saveNotices({ email })} label={t("Avisarme también por correo")}
               hint={t("Un correo a {a} por cada novedad. Lo que tú mismo haces nunca te genera avisos.", { a: user?.email ?? "" })} />
+            {(notices.data?.email ?? true) && (
+              <fieldset className="mt-4 space-y-2">
+                <legend className="mb-1 text-[13px] font-medium text-ink-2">{t("Por correo, avisarme cuando:")}</legend>
+                {NOTICE_KINDS().map(([kind, label]) => (
+                  <label key={kind} className="flex cursor-pointer items-center gap-2.5 text-sm">
+                    <input type="checkbox" className="h-4 w-4 accent-accent" checked={!emailOff.includes(kind)} disabled={!notices.data}
+                      onChange={(e) => saveNotices({ email_off: e.target.checked ? emailOff.filter((k) => k !== kind) : [...emailOff, kind] })} />
+                    {label}
+                  </label>
+                ))}
+              </fieldset>
+            )}
           </Section>
         </div>
 
@@ -143,7 +165,14 @@ export function AccountPage() {
           <OutsideAccessSummary />
         </Section>
 
-        <Section icon={<Trash2 size={16} className="text-bad" />} title={t("Eliminar cuenta")} text={t("Se borran de forma permanente tus proyectos, estudios, respuestas de participantes, insights e imágenes.")}>
+        <Section icon={<Trash2 size={16} className="text-bad" />} title={t("Eliminar cuenta")} text={t("Se borra de forma permanente y no se puede deshacer.")}>
+          {/* What DELETE /api/auth/me really does: it deletes the user row and the database cascades (server/migrations). */}
+          <ul className="mb-4 list-disc space-y-1.5 pl-5 text-sm text-ink-2">
+            <li>{t("Los proyectos de los que eres dueño/a se borran con todo lo que tienen (estudios, respuestas, documentos, insights, tickets y archivos), también si están en una organización o compartidos: sus colaboradores dejan de verlos.")}</li>
+            <li>{t("En proyectos de otras personas se borran los estudios, documentos, insights y participantes que creaste tú. Tus tickets y comentarios se quedan, sin autor.")}</li>
+            <li>{t("Sales de tus organizaciones y de los proyectos compartidos contigo; esas organizaciones y los demás proyectos siguen igual.")}</li>
+            <li>{t("Si quieres conservar un proyecto, pide a quien lo vaya a mantener que lo duplique o exporte antes.")}</li>
+          </ul>
           <form className="space-y-3" onSubmit={danger.run(async () => {
             if (!confirm(t("¿Seguro? Esta acción no se puede deshacer."))) return;
             await api.del("/auth/me", hasPassword ? { password: del } : { confirm: del }); setUser(null); nav("/login");

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, Building2, FileText, Folder, FolderPlus, Lightbulb, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, Building2, FileText, Folder, FolderPlus, Lightbulb, Network, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Organization, Project, Study } from "../lib/types";
@@ -99,6 +99,7 @@ function ProjectStudies({ project: p }: { project: Project }) {
 function ProjectContents({ project: p }: { project: Project }) {
   const rows: [LucideIcon, string, number, string][] = [
     [FileText, t("Documentos UX"), p.document_count ?? 0, "docs"],
+    [Network, t("Arquitectura"), p.diagram_count ?? 0, "architecture"],
     [Lightbulb, t("Insights"), p.insight_count ?? 0, "insights"],
     [UsersRound, t("Participantes"), p.participant_count ?? 0, "participants"],
     [Share2, t("Reportes compartidos"), p.share_count ?? 0, "report"],
@@ -148,6 +149,20 @@ export function ProjectsPage() {
   const setSpace = (v: string) => setParam("org", v === "all" ? null : v);
   const totals = projects.reduce((a, p) => ({ studies: a.studies + (p.study_count ?? 0), responses: a.responses + (p.response_count ?? 0), live: a.live + (p.live_count ?? 0) }), { studies: 0, responses: 0, live: 0 });
   const selected = projects.find((p) => p.id === params.get("project")) ?? projects[0];
+  // Picking a project shows its detail below the whole grid, so bring it into view (and focus) right after the pick.
+  const detail = useRef<HTMLDivElement>(null);
+  const [reveal, setReveal] = useState<string | null>(null);
+  useEffect(() => {
+    if (!reveal || reveal !== selected?.id || !detail.current) return;
+    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    detail.current.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+    detail.current.focus({ preventScroll: true });
+    setReveal(null);
+  }, [reveal, selected?.id]);
+  const select = (id: string) => {
+    setParams((prev) => { const next = new URLSearchParams(prev); next.set("project", id); return next; }, { replace: true });
+    setReveal(id);
+  };
 
   return (
     <div className="page">
@@ -195,7 +210,7 @@ export function ProjectsPage() {
         ) : (
           <>
             <ul className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {projects.map((p) => <ProjectCard key={p.id} project={p} on={p.id === selected?.id} onSelect={() => setParams((prev) => { const next = new URLSearchParams(prev); next.set("project", p.id); return next; }, { replace: true })} />)}
+              {projects.map((p) => <ProjectCard key={p.id} project={p} on={p.id === selected?.id} onSelect={() => select(p.id)} />)}
               <li className="min-h-44">
                 <button type="button" onClick={() => setOpen(true)} className="focus-ring flex h-full min-h-44 w-full flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-line-2 p-5 text-center text-sm font-semibold text-ink-2 transition hover:border-accent hover:text-accent">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-ink/5" aria-hidden><Plus size={18} /></span>
@@ -204,7 +219,7 @@ export function ProjectsPage() {
               </li>
             </ul>
             {selected && (
-              <div className="mt-7 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,2.4fr)_minmax(280px,1fr)]">
+              <div ref={detail} tabIndex={-1} role="region" aria-label={selected.name} className="mt-7 grid scroll-mt-6 grid-cols-1 items-start gap-6 outline-none lg:grid-cols-[minmax(0,2.4fr)_minmax(280px,1fr)]">
                 <ProjectStudies key={selected.id} project={selected} />
                 <ProjectContents project={selected} />
               </div>

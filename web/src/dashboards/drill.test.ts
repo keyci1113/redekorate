@@ -2,9 +2,8 @@ import { describe, expect, it } from "vitest";
 import { drillPath, liveStudiesFor, milestonesFor, projectsFor, responsesByStudy, studyLink, ticketLink } from "./drill";
 import type { LiveStudy, MilestoneRow, ProjectRow } from "./model";
 
-const NOW = new Date("2026-11-17T12:00:00Z").getTime();
-const study = (id: string, started: number, finished: number, last: string | null = "2026-11-17T10:00:00Z"): LiveStudy =>
-  ({ id, title: id, method: "survey", published_at: "2026-11-01T00:00:00Z", project_name: "P", started, finished, last_response_at: last });
+const study = (id: string, started: number, finished: number, attention: LiveStudy["attention"] = null): LiveStudy =>
+  ({ id, title: id, method: "survey", published_at: "2026-11-01T00:00:00Z", project_name: "P", started, finished, last_response_at: "2026-11-17T10:00:00Z", attention });
 
 describe("API paths", () => {
   it("keeps the dashboard's filters and adds the figure", () => {
@@ -29,26 +28,26 @@ describe("links", () => {
 });
 
 describe("live studies behind a tile", () => {
-  const live = [study("b-ok", 10, 10), study("a-low", 10, 5), study("c-silent", 2, 2, "2026-11-10T00:00:00Z"), study("d-new", 1, 1)];
+  const live = [study("b-ok", 10, 10), study("a-low", 10, 5, "low_completion"), study("c-silent", 2, 2, "silent"), study("d-new", 1, 1)];
   it("all of them, the ones that need attention first", () => {
-    expect(liveStudiesFor(live, "all", NOW, 0.88, 5).map((s) => s.id)).toEqual(["a-low", "c-silent", "b-ok", "d-new"]);
+    expect(liveStudiesFor(live, "all", 5).map((s) => s.id)).toEqual(["a-low", "c-silent", "b-ok", "d-new"]);
   });
   it("only those that need attention", () => {
-    expect(liveStudiesFor(live, "attention", NOW, 0.88, 5).map((s) => s.id)).toEqual(["a-low", "c-silent"]);
+    expect(liveStudiesFor(live, "attention", 5).map((s) => s.id)).toEqual(["a-low", "c-silent"]);
   });
   it("by completion leaves out studies with too few sessions to judge", () => {
-    expect(liveStudiesFor(live, "by_completion", NOW, 0.88, 5).map((s) => s.id)).toEqual(["a-low", "b-ok"]);
+    expect(liveStudiesFor(live, "by_completion", 5).map((s) => s.id)).toEqual(["a-low", "b-ok"]);
   });
   it("does not reorder the list it was given", () => {
     const copy = [...live];
-    liveStudiesFor(live, "all", NOW, 0.88, 5);
+    liveStudiesFor(live, "all", 5);
     expect(live).toEqual(copy);
   });
 });
 
 describe("projects behind a tile", () => {
   const row = (name: string, health: ProjectRow["health"], live = 0, open = 0, overdue = 0): ProjectRow =>
-    ({ id: name, name, description: "", color: "#000", live_studies: live, responses_7d: 0, low_completion: 0, open_tickets: open, overdue, health, next_milestone: null });
+    ({ id: name, name, description: "", color: "#000", live_studies: live, responses_7d: 0, studies_attention: 0, low_completion: 0, milestones_behind: 0, milestones_at_risk: 0, open_tickets: open, overdue, health, next_milestone: null });
   const rows = [row("Quiet", "quiet"), row("Risk", "at_risk", 1, 4, 2), row("Ok", "on_track", 2, 1), row("Watch", "needs_attention", 0, 3, 1)];
   it("sorts the worst health first", () => {
     expect(projectsFor(rows, "all").map((r) => r.name)).toEqual(["Risk", "Watch", "Ok", "Quiet"]);

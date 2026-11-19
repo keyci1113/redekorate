@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FileBarChart2, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, FileBarChart2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import type { ProjectShare, ReportSection, Study } from "../lib/types";
@@ -7,7 +7,7 @@ import type { DocRecord } from "../docs/types";
 import { Button, Card, Empty, ErrorNote, Tag } from "./ui";
 import { ShareLink } from "../pages/BuilderPage";
 import { ProjectReportPdf, ReportPdfButton, type ReportStudy } from "./ReportPdf";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 
 export const projectReportUrl = (token: string) => `${window.location.origin}/pr/${token}`;
 
@@ -97,6 +97,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
       <Card className="p-4">
         <p className="font-semibold">{t("Reporte compartible")}</p>
         <p className="mt-1 text-sm text-ink-2">{t("Elige qué partes del proyecto incluir (estudios con sus resultados, documentos UX, diagramas, insights y hitos) y genera un link público de solo lectura.")}</p>
+        <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-2"><ShieldCheck size={15} aria-hidden className="mt-0.5 shrink-0 text-good" />{t("El reporte nunca incluye datos personales de los participantes y puedes revocar el link cuando quieras.")}</p>
 
         {!canEdit ? (
           <p className="mt-3 text-sm text-ink-3">{t("Solo editores y dueños crean o revocan links.")}</p>
@@ -110,7 +111,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
             {err && <div className="mt-3"><ErrorNote>{err}</ErrorNote></div>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="primary" disabled={!picked.size || busy} onClick={create}>
-                {busy ? t("Creando…") : picked.size ? t("Crear link con {a} elemento(s)", { a: picked.size }) : t("Elige qué incluir")}
+                {busy ? t("Creando…") : picked.size ? plural(picked.size, { one: "Crear link con {n} elemento", other: "Crear link con {n} elementos" }) : t("Elige qué incluir")}
               </Button>
               <Button variant="ghost" onClick={() => setPicked(new Set(groups.flatMap((g) => g.items.map((i) => i.id))))}>{t("Incluir todo el proyecto")}</Button>
               {studyIds.length > 0 && <ReportPdfButton title={projectName} label={t("PDF de los estudios")} load={pdf(studyIds)} />}
@@ -120,8 +121,9 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
         )}
       </Card>
 
-      {shares.length > 0 && (
-        <div className="space-y-3">
+      <section aria-labelledby="report-links" className="space-y-3">
+        <h3 id="report-links" className="font-semibold">{t("Links creados")}<span className="font-normal text-ink-3 tabular-nums"> · {shares.length}</span></h3>
+        {shares.length === 0 && <p className="text-sm text-ink-3">{t("Aún no hay links. Los que crees aparecen aquí, para copiarlos, abrirlos o revocarlos.")}</p>}
           {shares.map((sh) => (
             <Card key={sh.id} className="p-4">
               <div className="flex flex-wrap gap-1.5">
@@ -132,13 +134,13 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
               <div className="mt-2.5"><ShareLink url={projectReportUrl(sh.token)} /></div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="flex items-center gap-3"><p className="text-xs text-ink-3">{t("Creado")} {timeAgo(sh.created_at)}</p>
+                  <a href={projectReportUrl(sh.token)} target="_blank" rel="noopener noreferrer" className="focus-ring inline-flex items-center gap-1 rounded text-xs font-medium text-accent-ink hover:underline"><ExternalLink size={12} aria-hidden />{t("Ver como lo verán")}</a>
                   {sh.study_ids.length > 0 && <ReportPdfButton size="sm" variant="ghost" title={projectName} label={t("PDF de los estudios")} load={pdf(sh.study_ids)} />}</span>
                 {canEdit && <button onClick={() => revoke(sh.id)} className="flex items-center gap-1 text-xs font-medium text-bad hover:underline"><Trash2 size={12} /> {t("Revocar")}</button>}
               </div>
             </Card>
           ))}
-        </div>
-      )}
+      </section>
     </div>
   );
 }

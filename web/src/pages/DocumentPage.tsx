@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Check, Copy, Gauge, Link2, MessageSquare, Save, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { copy, timeAgo, uid, useLoad } from "../lib/hooks";
+import { useNamedTitle } from "../lib/pageTitle";
 import { t, type Lang } from "../lib/i18n";
 import type { Project } from "../lib/types";
 import { BackLink, Button, ErrorNote, Field, Modal, Spinner, cx } from "../components/ui";
@@ -43,6 +44,7 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   const first = useRef(true);
   const readOnly = !canEdit(project.role);
   // Sharing, copying and deleting stay with the project team; someone the document was shared with only works on it.
+  useNamedTitle(title);
   const team = isTeam(project);
 
   useEffect(() => {
@@ -77,20 +79,23 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface/95 px-(--page-gutter) backdrop-blur print:hidden">
         <BackLink compact to={team ? `/projects/${project.id}?tab=docs` : "/projects"} color={project.color} label={project.name} section={t("Documentos")} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={t("Título del documento")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
-        <span className="hidden text-xs text-ink-3 md:block">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={t("Título del documento")} title={title}
+          className="focus-ring min-w-[7rem] flex-1 truncate rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
+        {/* Like the study editor (QA-01): the title truncates, the status never wraps and only shows from xl, and below xl the
+            secondary buttons keep just their icon, so at ~1040px the bar fits without clipping Share or scrolling sideways. */}
+        <span className="hidden shrink-0 text-xs whitespace-nowrap text-ink-3 xl:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
         </span>
-        <div className={cx("flex rounded-lg bg-ink/5 p-0.5 text-xs font-semibold", readOnly && "hidden")} title={t("Idioma del documento")}>
+        <div className={cx("flex shrink-0 rounded-lg bg-ink/5 p-0.5 text-xs font-semibold", readOnly && "hidden")} title={t("Idioma del documento")}>
           {(["es", "en"] as const).map((l) => (
             <button key={l} type="button" onClick={() => setLangDoc(l)} className={cx("rounded-md px-2 py-1 uppercase", lang === l ? "bg-surface shadow-sm" : "text-ink-3")}>{l}</button>
           ))}
         </div>
-        {doc.kind === "usability_script" && team && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript} className="max-lg:hidden">{t("Crear matriz de resultados")}</Button>}
-        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
-        <ExportMenu tpl={tpl} title={title} data={content} lang={lang} projectName={project.name} />
-        <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)} aria-label={t("Comentarios")}><span className="max-sm:hidden">{t("Comentarios")}</span></Button>
-        {team && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
+        {doc.kind === "usability_script" && team && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript} className="shrink-0 max-sm:hidden" aria-label={t("Crear matriz de resultados")} title={t("Crear matriz de resultados")}><span className="hidden xl:inline">{t("Crear matriz de resultados")}</span></Button>}
+        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="shrink-0 max-sm:hidden" aria-label={t("Guardar como…")} title={t("Guardar como…")}><span className="hidden xl:inline">{t("Guardar como…")}</span></Button>}
+        <span className="shrink-0"><ExportMenu tpl={tpl} title={title} data={content} lang={lang} projectName={project.name} /></span>
+        <Button size="sm" variant="ghost" className="shrink-0" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)} aria-label={t("Comentarios")} title={t("Comentarios")}><span className="hidden xl:inline">{t("Comentarios")}</span></Button>
+        {team && <Button size="sm" className="shrink-0" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
       </header>
 
       <main className="page print:p-0">

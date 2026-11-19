@@ -63,26 +63,25 @@ export function Chip({ color, children, className }: { color?: string; children:
   );
 }
 
-/** Chip "Bajo": ícono + texto, nunca solo color. */
+/** "Low" chip: icon + text, never color alone. Its tooltip says what the threshold measures. */
 export function LowChip() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-caution-soft px-2 py-0.5 text-xs font-semibold text-caution-ink">
+    <span title={t("Terminaron menos de {a} de quienes iniciaron.", { a: fmtPct(COMPLETION_THRESHOLD) })} className="inline-flex items-center gap-1 rounded-full bg-caution-soft px-2 py-0.5 text-xs font-semibold text-caution-ink">
       <TriangleAlert size={12} aria-hidden />{t("Bajo")}
     </span>
   );
 }
 
 /** Texto para lectores de pantalla sobre el completado. */
-export function completionSr(rate: number | null) {
+export function completionSr(rate: number | null, low = isLowCompletion(rate)) {
   if (rate === null) return t("Sin participantes todavía");
-  return isLowCompletion(rate)
+  return low
     ? t("{a} completado, por debajo de {b}", { a: fmtPct(rate), b: fmtPct(COMPLETION_THRESHOLD) })
     : t("{a} completado", { a: fmtPct(rate) });
 }
 
-/** Barra de completado: naranja si está por debajo del umbral. */
-export function CompletionBar({ rate }: { rate: number | null }) {
-  const low = isLowCompletion(rate);
+/** Completion bar: orange when flagged low (`low`, by default under the threshold). */
+export function CompletionBar({ rate, low = isLowCompletion(rate) }: { rate: number | null; low?: boolean }) {
   return (
     <span className="block h-2 w-full overflow-hidden rounded-full bg-ink/10" aria-hidden>
       {rate !== null && <span className={cx("block h-full rounded-full", low ? "bg-caution" : "bg-accent")} style={{ width: `${Math.max(rate * 100, 2)}%` }} />}
@@ -91,10 +90,10 @@ export function CompletionBar({ rate }: { rate: number | null }) {
 }
 
 /** Anillo de completado. */
-export function Ring({ rate, size = 96 }: { rate: number | null; size?: number }) {
-  const r = 42, c = 2 * Math.PI * r, low = isLowCompletion(rate);
+export function Ring({ rate, size = 96, low = isLowCompletion(rate) }: { rate: number | null; size?: number; low?: boolean }) {
+  const r = 42, c = 2 * Math.PI * r;
   return (
-    <svg width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={completionSr(rate)} className="shrink-0">
+    <svg width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={completionSr(rate, low)} className="shrink-0">
       <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="10" className="text-ink/10" />
       {rate !== null && (
         <circle cx="50" cy="50" r={r} fill="none" strokeWidth="10" strokeLinecap="round" transform="rotate(-90 50 50)"
