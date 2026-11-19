@@ -10,8 +10,10 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { verifyBearer } from "../lib/apiAccess.js";
-import { ApiCallError, MCP_INSTRUCTIONS, bearer, loopbackApi } from "./server.js";
-import { TOOLS, ToolError, toolsFor, type ToolDef } from "./tools.js";
+import { ApiCallError, MCP_INSTRUCTIONS, bearer, loopbackApi, outsideActor } from "./server.js";
+import { ImageResult, TOOLS, ToolError, toolsFor, type ToolDef } from "./tools.js";
+import { HttpError } from "../lib/http.js";
+import { translate } from "../lib/i18n.js";
 
 export const API_VERSION = "1.0.0";
 /** Where the operations live, relative to the app's address. */
@@ -106,9 +108,14 @@ export function toolsApi(opts: { apiBase: string; baseUrl: (req: Request) => str
       return fail(res, 400, "Invalid input", { issues: args.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })) });
 
     try {
-      const ctx = { api: loopbackApi(opts.apiBase, access.user, access.scope), baseUrl: opts.baseUrl(req) };
-      res.json((await t.run(args.data, ctx)) ?? null);
+      const baseUrl = opts.baseUrl(req);
+      const ctx = { api: loopbackApi(opts.apiBase, access.user, access.scope), baseUrl, actor: outsideActor(access.user, baseUrl) };
+      const out = await t.run(args.data, ctx);
+      // An image (a ticket screenshot) travels as base64 in JSON here; the REST API at /api/v1 serves the bytes.
+      if (out instanceof ImageResult) return void res.json({ mime: out.mime, data_base64: out.bytes.toString("base64"), note: out.note });
+      res.json(out ?? null);
     } catch (e) {
+      if (e instanceof HttpError) return fail(res, e.status, translate(e.message, "en"), e.extra);
       if (e instanceof ApiCallError) return fail(res, e.status >= 500 ? 502 : e.status, e.message);
       if (e instanceof ToolError) return fail(res, 400, e.message);
       console.error(`ai operation ${t.name}`, e);

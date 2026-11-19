@@ -42,6 +42,7 @@ before(async () => {
   app.use("/api/v1/tools", toolsApi({ apiBase: `${base}/api`, baseUrl: () => base }));
   app.use("/api/auth", auth);
   app.use("/api/orgs", orgs);
+  app.use("/api/projects/:id/tickets", (await import("../routes/tickets.js")).tickets);
   app.use("/api/projects", projects);
   app.use(errorHandler);
   server = server0;
@@ -79,4 +80,25 @@ test("a revoked token is refused", { skip }, async () => {
   const { pool } = await import("../lib/db.js");
   await pool.query("update api_tokens set revoked_at = now() where name = 'read'");
   assert.equal((await op("whoami", readToken)).status, 401);
+});
+
+test("ticket tools run over HTTP, and a replaced description can be put back", { skip }, async () => {
+  const { createPat } = await import("../lib/apiAccess.js");
+  const { pool } = await import("../lib/db.js");
+  const owner = (await pool.query("select id from users where email = 'owner@tools.test'")).rows[0].id;
+  const reader = (await createPat(owner, "read again", 30, "read")).token;
+  const project = (await op("create_project", writeToken, { name: "Tickets" })).body.id;
+  const made = await op("create_ticket", writeToken, { project_id: project, title: "Broken", description: "First", column: "To do" });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const read = await op("get_ticket", writeToken, { project_id: project, number: made.body.number });
+  assert.equal(read.body.from_feedback_widget, false);
+  assert.equal((await op("update_ticket", writeToken, { project_id: project, number: 1, description: "Second" })).status, 400, "base_updated_at is required");
+  assert.equal((await op("update_ticket", writeToken, { project_id: project, number: 1, description: "Second", base_updated_at: read.body.updated_at })).status, 200);
+  const versions = (await op("list_versions", writeToken, { of: "ticket", project_id: project, number: 1 })).body;
+  assert.equal(versions.length, 1);
+  assert.equal((await op("restore_version", reader, { of: "ticket", project_id: project, number: 1, version_id: versions[0].id })).status, 403);
+  const list = await op("list_tickets", reader, { project_id: project, query: "brok" });
+  assert.deepEqual([list.status, list.body.total, list.body.tickets[0].column], [200, 1, "To do"]);
+  const shot = await op("get_ticket_screenshot", writeToken, { project_id: project, number: 1 });
+  assert.deepEqual([shot.status, shot.body.error], [404, "Image not found"]);
 });
