@@ -6,7 +6,7 @@ import { useAuth } from "../lib/auth";
 import { timeAgo, useLoad } from "../lib/hooks";
 import { assignableOrgRoles, canManageOrg } from "../lib/roles";
 import type { OrgInvite, OrgMember, OrgRole, Organization, Project } from "../lib/types";
-import { Button, Card, Empty, ErrorNote, Field, Modal, Spinner, Tabs, Tag, cx } from "../components/ui";
+import { Button, Card, Empty, ErrorNote, Field, Modal, PageSkeleton, Spinner, Tabs, Tag, cx } from "../components/ui";
 import { Avatar } from "../components/Avatar";
 import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
@@ -73,7 +73,7 @@ export function OrgPage() {
   const org = useLoad(() => api.get<{ organization: Organization }>(`/orgs/${id}`), [id]);
   const projects = useLoad(() => api.get<{ projects: Project[] }>(`/orgs/${id}/projects`), [id]);
   const members = useLoad(() => api.get<{ members: OrgMember[] }>(`/orgs/${id}/members`), [id]);
-  if (org.loading) return <Spinner />;
+  if (org.loading) return <PageSkeleton />;
   if (org.error || !org.data) return <div className="p-10"><ErrorNote>{org.error}</ErrorNote></div>;
   const o = org.data.organization;
   const manage = canManageOrg(o.role);

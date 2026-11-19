@@ -1,9 +1,9 @@
-// The daily brief: a sun button in the header and a panel on the right. From lg up the panel pushes the page
+// The daily brief: a newspaper button in the header and a panel on the right. From lg up the panel pushes the page
 // (Layout leaves room for it beside the content); below lg it is a sheet over the page with a backdrop.
 // Like the ticket drawer, it slides in from the right edge and closes with X or Escape.
 import { forwardRef, useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { AtSign, BarChart3, Flag, Inbox, Lightbulb, MessageSquare, RefreshCw, Sun, UserPlus, X } from "lucide-react";
+import { AtSign, BarChart3, Flag, Inbox, Lightbulb, MessageSquare, Newspaper, RefreshCw, Sun, UserPlus, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { fmtNum, locale, plural, t } from "../lib/i18n";
@@ -34,7 +34,8 @@ export const BriefButton = forwardRef<HTMLButtonElement, { open: boolean; dot: b
   return (
     <button ref={ref} type="button" onClick={onClick} aria-expanded={open} aria-controls="daily-brief" aria-label={label} title={t("Resumen del día|brief")}
       className={cx("focus-ring relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition hover:border-line-2 hover:text-ink", open && "bg-ink/5 text-ink")}>
-      <Sun size={18} aria-hidden />
+      {/* A newspaper, not a sun: a sun with a dot read as the light/dark theme switch. */}
+      <Newspaper size={18} aria-hidden />
       {dot && <span aria-hidden className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-accent ring-2 ring-surface" />}
     </button>
   );

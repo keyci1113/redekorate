@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import { Link, useNavigate } from "react-router-dom";
 import { Check, Copy, FlaskConical, Link2, MessageSquare, Save, Shapes, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
+import { useNamedTitle } from "../lib/pageTitle";
 import { timeAgo } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import type { Project } from "../lib/types";
@@ -31,6 +32,7 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
   const readOnly = !canEdit(project.role);
   // Sharing, copying and deleting stay with the project team; someone the diagram was shared with only works on it.
   const team = isTeam(project);
+  useNamedTitle(title);
   const back = team ? `/projects/${project.id}?tab=architecture` : "/projects";
 
   useEffect(() => {
@@ -58,19 +60,22 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
       <header className="z-30 flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-(--page-gutter)">
         <BackLink compact to={back} color={project.color} label={project.name} section={t("Arquitectura")} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={board ? t("Título del tablero") : t("Título del diagrama")} className="focus-ring min-w-24 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
-        <span className="hidden text-xs text-ink-3 md:block">
+        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={board ? t("Título del tablero") : t("Título del diagrama")} title={title}
+          className="focus-ring min-w-[7rem] flex-1 truncate rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
+        {/* Like the study editor (QA-01): the title truncates, the status never wraps and only shows from xl, and below xl the
+            secondary buttons keep just their icon, so at ~1040px the bar fits without clipping Share or scrolling sideways. */}
+        <span className="hidden shrink-0 text-xs whitespace-nowrap text-ink-3 xl:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
         </span>
-        {board && team && !readOnly && <Button size="sm" variant="ghost" icon={<FlaskConical size={15} />} onClick={() => setTestOpen(true)}><span className="max-md:hidden">{t("Probar con participantes")}</span></Button>}
-        {doc.kind === "sitemap" && team && <Button size="sm" variant="ghost" icon={<Shapes size={15} />} onClick={openAsDiagram} className="max-lg:hidden">{t("Abrir como diagrama")}</Button>}
-        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
-        <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)}><span className="hidden sm:inline">{t("Comentarios")}</span></Button>
-        {team && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
+        {board && team && !readOnly && <Button size="sm" variant="ghost" className="shrink-0" icon={<FlaskConical size={15} />} onClick={() => setTestOpen(true)} aria-label={t("Probar con participantes")} title={t("Probar con participantes")}><span className="hidden xl:inline">{t("Probar con participantes")}</span></Button>}
+        {doc.kind === "sitemap" && team && <Button size="sm" variant="ghost" icon={<Shapes size={15} />} onClick={openAsDiagram} className="shrink-0 max-sm:hidden" aria-label={t("Abrir como diagrama")} title={t("Abrir como diagrama")}><span className="hidden xl:inline">{t("Abrir como diagrama")}</span></Button>}
+        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="shrink-0 max-sm:hidden" aria-label={t("Guardar como…")} title={t("Guardar como…")}><span className="hidden xl:inline">{t("Guardar como…")}</span></Button>}
+        <Button size="sm" variant="ghost" className="shrink-0" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)} aria-label={t("Comentarios")} title={t("Comentarios")}><span className="hidden xl:inline">{t("Comentarios")}</span></Button>
+        {team && <Button size="sm" className="shrink-0" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
         {team && <>
-          <button type="button" title={t("Duplicar")} aria-label={t("Duplicar")} className="focus-ring hidden h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-ink/5 hover:text-ink sm:flex"
+          <button type="button" title={t("Duplicar")} aria-label={t("Duplicar")} className="focus-ring hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-3 hover:bg-ink/5 hover:text-ink sm:flex"
             onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}><Copy size={15} /></button>
-          <button type="button" title={t("Eliminar")} aria-label={t("Eliminar")} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"
+          <button type="button" title={t("Eliminar")} aria-label={t("Eliminar")} className="focus-ring flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"
             onClick={async () => { if (!confirm(board ? t("¿Eliminar este tablero?") : t("¿Eliminar este diagrama?"))) return; await api.del(`/documents/${doc.id}`); nav(back); }}><Trash2 size={15} /></button>
         </>}
       </header>

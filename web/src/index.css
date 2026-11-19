@@ -321,6 +321,9 @@ article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb,
   --color-chart-2: #12A594;
 }
 
+/* Loading states wait a moment before showing, so a quick page or data load never flashes "Loading…" or a skeleton. */
+@keyframes rk-delayed-in { from { opacity: 0; } }
+.rk-delayed { animation: rk-delayed-in 200ms var(--ease-out) 300ms both; }
 
 /* Tickets motion: only the side panel and dialogs animate. */
 @keyframes tkPanelIn { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: none; } }

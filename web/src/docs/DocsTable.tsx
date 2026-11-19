@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowDown, ArrowUp, Link2, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, LayoutGrid, Link2, Search, Table2, X } from "lucide-react";
 import { timeAgo } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import { ErrorNote, cx } from "../components/ui";
@@ -11,6 +11,30 @@ import type { DocRecord } from "./types";
 
 /** What a list row needs to know about its template. */
 export interface RowInfo { icon: ReactNode; type: string; category: string; categoryId: string }
+
+export type DocsView = "cards" | "table";
+
+/** Cards or table, remembered per viewer in this browser under `key` (each list keeps its own choice). */
+export function useDocsView(key: string): [DocsView, (v: DocsView) => void] {
+  const [view, setView] = useState<DocsView>(() => { try { return localStorage.getItem(key) === "table" ? "table" : "cards"; } catch { return "cards"; } });
+  return [view, (v) => { setView(v); try { localStorage.setItem(key, v); } catch { /* no storage */ } }];
+}
+
+/** The cards / table switch above a list of documents. */
+export function DocsViewToggle({ view, onChange }: { view: DocsView; onChange: (v: DocsView) => void }) {
+  const btn = (v: DocsView, icon: ReactNode, label: string) => (
+    <button type="button" aria-pressed={view === v} title={label} onClick={() => onChange(v)}
+      className={cx("focus-ring flex h-9 w-9 items-center justify-center rounded-md transition", view === v ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}>
+      {icon}<span className="sr-only">{label}</span>
+    </button>
+  );
+  return (
+    <div role="group" aria-label={t("Vista")} className="flex rounded-lg bg-ink/5 p-0.5">
+      {btn("cards", <LayoutGrid size={16} />, t("Tarjetas"))}
+      {btn("table", <Table2 size={16} />, t("Tabla"))}
+    </div>
+  );
+}
 
 const select = "field !h-10 !min-h-10 !w-auto !py-0 pr-8 text-[13px]";
 
@@ -73,10 +97,14 @@ export function DocFilterBar({ docs, filters, onChange, info, shown }: {
 
 const COLS = (): [DocSortKey, string][] => [["title", t("Nombre")], ["type", t("Tipo")], ["category", t("Categoría")], ["language", t("Idioma")], ["updated", t("Editado")]];
 
-/** The documents as a sortable table; the name opens the document, editors get the ⋯ menu on each row. */
-export function DocsTable({ rows, sort, onSort, info, canEdit, onChange }: {
-  rows: DocRecord[]; sort: DocSort; onSort: (k: DocSortKey) => void; info: (d: DocRecord) => RowInfo; canEdit: boolean; onChange: () => void;
+/**
+ * The documents as a sortable table; the name opens the document, editors get the ⋯ menu on each row.
+ * `caption` names the table for screen readers; `noCategory` drops the Category column for lists whose items have none (Architecture).
+ */
+export function DocsTable({ rows, sort, onSort, info, canEdit, onChange, caption = t("Documentos UX"), noCategory = false }: {
+  rows: DocRecord[]; sort: DocSort; onSort: (k: DocSortKey) => void; info: (d: DocRecord) => RowInfo; canEdit: boolean; onChange: () => void; caption?: string; noCategory?: boolean;
 }) {
+  const cols = COLS().filter(([key]) => !(noCategory && key === "category"));
   const [err, setErr] = useState<string | null>(null);
   const cell = "border-b border-line/60 px-3 py-2.5";
   return (
@@ -85,10 +113,10 @@ export function DocsTable({ rows, sort, onSort, info, canEdit, onChange }: {
       {/* relative: screen-reader-only labels are absolutely positioned and would otherwise escape the scroll box and widen the page. */}
       <div className="relative overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-sm">
-          <caption className="sr-only">{t("Documentos UX")}</caption>
+          <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>
-              {COLS().map(([key, label]) => (
+              {cols.map(([key, label]) => (
                 <th key={key} scope="col" aria-sort={sort.key === key ? (sort.dir === "asc" ? "ascending" : "descending") : undefined}
                   className={cx("border-b border-line px-3 py-1 text-left text-xs font-semibold text-ink-3", key === "language" && "w-24")}>
                   <button type="button" onClick={() => onSort(key)} className={cx("focus-ring inline-flex min-h-10 items-center gap-1 rounded whitespace-nowrap", sort.key === key && "text-ink")}>
@@ -112,7 +140,7 @@ export function DocsTable({ rows, sort, onSort, info, canEdit, onChange }: {
                     </span>
                   </td>
                   <td className={cx(cell, "text-[13px] whitespace-nowrap")}>{m.type}</td>
-                  <td className={cx(cell, "text-[13px] whitespace-nowrap text-ink-2")}>{m.category || <span className="text-ink-3">—</span>}</td>
+                  {!noCategory && <td className={cx(cell, "text-[13px] whitespace-nowrap text-ink-2")}>{m.category || <span className="text-ink-3">—</span>}</td>}
                   <td className={cell}><span className="rounded bg-ink/5 px-1.5 py-0.5 text-[10px] font-bold text-ink-2 uppercase">{d.language}</span></td>
                   <td className={cx(cell, "text-[13px] whitespace-nowrap text-ink-2")} title={new Date(d.updated_at).toLocaleString()}>{timeAgo(d.updated_at)}</td>
                   <td className={cx(cell, "py-1 text-right")}>{canEdit && <DocActions doc={d} onChange={onChange} onError={setErr} />}</td>

@@ -127,10 +127,32 @@ export function Empty({ icon, title, text, action }: { icon: ReactNode; title: s
   );
 }
 
+/** A loading note. It fades in only after a short wait (rk-delayed), so a fast load doesn't flash "Loading…". */
 export function Spinner({ label = t("Cargando…") }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-20 text-sm text-ink-3">
+    <div role="status" className="rk-delayed flex items-center justify-center gap-2 py-20 text-sm text-ink-3">
       <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-2 border-t-accent" /> {label}
+    </div>
+  );
+}
+
+/**
+ * What a page shows while its file or its data loads: the outline of a page header and a few cards, inside the content
+ * area only (the app header stays). Like Spinner it appears after a short wait, so quick loads show nothing at all.
+ */
+export function PageSkeleton() {
+  const bar = "rounded-md bg-ink/[0.06] motion-safe:animate-pulse";
+  return (
+    <div role="status" className="rk-delayed page">
+      <span className="sr-only">{t("Cargando…")}</span>
+      <div aria-hidden>
+        <div className={cx(bar, "h-3 w-28")} />
+        <div className={cx(bar, "mt-3 h-8 w-72 max-w-full")} />
+        <div className={cx(bar, "mt-3 h-4 w-96 max-w-full")} />
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => <div key={i} className={cx(bar, "h-32 rounded-xl")} />)}
+        </div>
+      </div>
     </div>
   );
 }
@@ -176,16 +198,28 @@ export function Stat({ label, value, sub, tone, note }: { label: string; value: 
 
 export interface TabItem<T extends string> { id: T; label: string; count?: number; group?: string }
 
+/** Extra width of the "Más" button over the tab it names (its gap and chevron) when it shows the active section. */
+const MORE_CHEVRON = 24;
+
 /**
- * Which tabs fit in the row and which go into "Más": the first `fit` tabs, with the active one always kept
- * visible (it takes the last visible slot when it would otherwise overflow).
+ * How many tabs fit in `avail` pixels, given each tab's width: all of them when they fit, otherwise as many as fit next to
+ * the "Más" button (at least one). The split never depends on which tab is active, so opening a section from "Más"
+ * doesn't reorder the row: the room kept for "Más" is wide enough for the button to show any of its tabs' names instead.
  */
-export function splitTabs(count: number, fit: number, active: number): { visible: number[]; overflow: number[] } {
-  if (fit >= count) return { visible: [...Array(count).keys()], overflow: [] };
-  const n = Math.max(1, fit);
-  const visible = [...Array(n).keys()];
-  if (active >= n) visible[n - 1] = active;
-  return { visible, overflow: [...Array(count).keys()].filter((i) => !visible.includes(i)) };
+export function splitTabs(widths: number[], avail: number): { visible: number[]; overflow: number[] } {
+  const all = widths.map((_, i) => i);
+  if (widths.reduce((a, b) => a + b, 0) <= avail) return { visible: all, overflow: [] };
+  let n = widths.length;
+  for (;;) {
+    // Each pass can only move more tabs into "Más", so this settles within a few rounds.
+    const reserve = Math.max(MORE_WIDTH, ...widths.slice(n).map((w) => w + MORE_CHEVRON));
+    let used = reserve, fit = 0;
+    while (fit < widths.length && used + widths[fit] <= avail) { used += widths[fit]; fit++; }
+    fit = Math.max(1, Math.min(fit, n));
+    if (fit === n) break;
+    n = fit;
+  }
+  return { visible: all.slice(0, n), overflow: all.slice(n) };
 }
 
 const tabClass = (on: boolean) => cx(
@@ -206,19 +240,17 @@ export function Tabs<T extends string>({ value, onChange, items, label }: { valu
     if (!el || !m) return;
     const calc = () => {
       const widths = [...m.children].map((c) => (c as HTMLElement).getBoundingClientRect().width);
-      const avail = el.clientWidth;
-      if (widths.reduce((a, w) => a + w, 0) <= avail) { setFit(widths.length); return; }
-      let used = 0, n = 0;
-      while (n < widths.length && used + widths[n] + MORE_WIDTH <= avail) used += widths[n++];
-      setFit(n);
+      setFit(splitTabs(widths, el.clientWidth).visible.length);
     };
     calc();
     const ro = new ResizeObserver(calc);
     ro.observe(el);
     return () => ro.disconnect();
   }, [sig]);
-  const activeIndex = items.findIndex((it) => it.id === value);
-  const { visible, overflow } = splitTabs(items.length, fit, activeIndex);
+  // The row keeps its order whichever tab is open; an open tab inside "Más" names the button instead.
+  const visible = items.slice(0, Math.max(1, fit)).map((_, i) => i);
+  const overflow = items.map((_, i) => i).slice(visible.length);
+  const current = overflow.map((i) => items[i]).find((it) => it.id === value);
   const badge = (it: TabItem<T>, on: boolean) => !!it.count && <span className={cx("min-w-5 rounded-full px-1.5 text-center text-[11px] leading-[18px] font-semibold tabular-nums transition", on ? "bg-accent-soft text-accent-ink" : "bg-ink/5 text-ink-3")}>{it.count}</span>;
   return (
     <div role={label ? "navigation" : undefined} aria-label={label} className="relative">
@@ -253,13 +285,14 @@ export function Tabs<T extends string>({ value, onChange, items, label }: { valu
         })}
         {overflow.length > 0 && (
           <Menu label={t("Más secciones")} width={240} button={(props, open) => (
-            <button {...props} className={cx(tabClass(false), open && "text-ink")}>
-              {t("Más")} <ChevronDown size={14} aria-hidden />
+            <button {...props} aria-current={current ? "page" : undefined} className={cx(tabClass(!!current), open && "text-ink")}>
+              {current ? <>{current.label}{badge(current, true)}</> : t("Más")} <ChevronDown size={14} aria-hidden />
+              <span aria-hidden className={cx("absolute inset-x-2 -bottom-px h-0.5 rounded-full transition", current ? "bg-accent" : "bg-transparent group-hover:bg-line-2")} />
               {overflow.some((i) => items[i].count) && <span className="sr-only">{t("({a} con contenido)", { a: overflow.filter((i) => items[i].count).length })}</span>}
             </button>
           )}>
             {(close) => overflow.map((i) => (
-              <MenuItem key={items[i].id} onSelect={() => { close(false); onChange(items[i].id); }}>
+              <MenuItem key={items[i].id} checked={items[i].id === value} onSelect={() => { close(false); onChange(items[i].id); }}>
                 <span className="flex-1">{items[i].label}</span>{badge(items[i], false)}
               </MenuItem>
             ))}
