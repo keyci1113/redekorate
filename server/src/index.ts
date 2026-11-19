@@ -33,6 +33,7 @@ import { linkPreview } from "./lib/linkPreview.js";
 import { connectApi, oauthServer, openCors } from "./routes/apiAccess.js";
 import { mcpRouter } from "./mcp/server.js";
 import { TOOLS_PATH, toolsApi } from "./mcp/rest.js";
+import { API_V1_PATH, apiErrors, apiV1 } from "./api/v1.js";
 import { mcpLimiter } from "./lib/security.js";
 import { getMaintenance, maintenanceGate } from "./lib/maintenance.js";
 
@@ -60,6 +61,11 @@ app.use("/api", (_req, res, next) => { res.set("Cache-Control", "no-store"); nex
 app.use("/api/widget", widgetPublic);
 // The MCP tools over plain HTTP (bearer tokens only, so no cookie and nothing to forge), under the same per-account limit as /mcp.
 app.use(TOOLS_PATH, openCors, mcpLimiter, toolsApi({ apiBase: `http://127.0.0.1:${port}/api`, baseUrl }));
+// The public REST API (bearer tokens only), after the AI operations so /api/v1/tools keeps its own router. The same
+// limiter instance as /mcp and /api/v1/tools: one allowance per account across all three.
+app.use(API_V1_PATH, mcpLimiter, apiV1({ baseUrl }));
+// Errors raised before the router runs (a body that isn't JSON) get the API's shape and language too.
+app.use(API_V1_PATH, apiErrors);
 app.use("/api", csrfGuard);
 // The web app's maintenance screen polls this until the app is back (after a deploy) or maintenance is off.
 app.get("/api/health", async (_req, res) => {

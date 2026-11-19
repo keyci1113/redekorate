@@ -2,6 +2,8 @@
 const EN: Record<string, string> = {
   "Milestone no encontrado": "Milestone not found",
   "Adjunto no encontrado": "Attachment not found",
+  "Imagen no encontrado": "Image not found",
+  "Grabación no encontrado": "Recording not found",
   "Uno de los dominios no es válido. Escribe solo el dominio, por ejemplo app.acme.com o *.acme.com": "One of the domains is not valid. Enter only the domain, for example app.acme.com or *.acme.com",
   "Formato no permitido": "File type not allowed",
   "Roadmap no encontrado": "Roadmap not found",
