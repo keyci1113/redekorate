@@ -4,7 +4,7 @@ import { Check, Copy, FlaskConical, Link2, MessageSquare, Save, Shapes, Trash2 }
 import { api } from "../lib/api";
 import { useNamedTitle } from "../lib/pageTitle";
 import { timeAgo } from "../lib/hooks";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 import type { Project } from "../lib/types";
 import { canEdit } from "../lib/roles";
 import { BackLink, Button, Modal } from "../components/ui";
@@ -143,7 +143,7 @@ export function SitemapEditor({ outline, lang, title, readOnly, onChange }: { ou
         <textarea ref={box} value={outline} readOnly={readOnly} onChange={(e) => onChange?.(e.target.value)} onKeyDown={readOnly ? undefined : onKeyDown} spellCheck={false}
           aria-label={t("Esquema del sitio")} placeholder={t("Inicio\n  Productos\n    Detalle\n  Contacto")}
           className="min-h-40 flex-1 resize-none bg-transparent px-4 py-3 font-mono text-[13px] leading-6 outline-none placeholder:text-ink-3" />
-        <p className="border-t border-line px-4 py-2 text-xs text-ink-3">{t("{a} páginas · {b} niveles", { a: stats.pages, b: stats.depth })}</p>
+        <p className="border-t border-line px-4 py-2 text-xs text-ink-3">{`${plural(stats.pages, { one: "{n} página", other: "{n} páginas" })} · ${plural(stats.depth, { one: "{n} nivel", other: "{n} niveles" })}`}</p>
       </aside>
       <div className="min-h-0 flex-1">
         <DiagramCanvas data={diagram} readOnly title={title} fitKey={fitKey} />

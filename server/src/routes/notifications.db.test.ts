@@ -137,3 +137,24 @@ test("each notification is emailed once, and not at all to someone who turned em
   assert.ok((await bell("luis")).unread > 0);
   assert.equal(await flush("https://app.test"), 0);
 });
+
+test("emails can be turned off per kind: those kinds are not emailed, the rest are, and the bell keeps them all", { skip }, async () => {
+  await settled();
+  assert.equal((await call("ana", "PUT", "/api/notifications/settings", { email_off: ["comment", "status", "comment"] })).status, 200);
+  const me = (await call("ana", "GET", "/api/notifications")).body;
+  assert.equal(me.email, true, "the master switch is untouched");
+  assert.deepEqual([...me.email_off].sort(), ["comment", "status"]);
+  assert.equal((await call("ana", "PUT", "/api/notifications/settings", { email_off: ["nonsense"] })).status, 400);
+  assert.equal((await call("ana", "PUT", "/api/notifications/settings", {})).status, 400);
+
+  const t = (await db.query("select id from tickets where project_id = $1 limit 1", [project])).rows[0];
+  const before = (await bell("ana")).unread;
+  for (const kind of ["comment", "status", "assigned"]) await db.query("insert into notifications(user_id, actor_id, project_id, ticket_id, kind) values ($1,$2,$3,$4,$5)", [ids.ana, ids.owner, project, t.id, kind]);
+  assert.equal(await flush("https://app.test"), 1, "only the assignment is emailed");
+  assert.equal((await bell("ana")).unread, before + 3);
+
+  // Turning everything back on emails comments again.
+  assert.deepEqual((await call("ana", "PUT", "/api/notifications/settings", { email_off: [] })).body, { email: true, email_off: [] });
+  await db.query("insert into notifications(user_id, actor_id, project_id, ticket_id, kind) values ($1,$2,$3,$4,'comment')", [ids.ana, ids.owner, project, t.id]);
+  assert.equal(await flush("https://app.test"), 1);
+});

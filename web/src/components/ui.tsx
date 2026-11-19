@@ -41,12 +41,15 @@ export function Card({ className, children }: { className?: string; children: Re
 
 /** Campo con etiqueta. Usa group para controles complejos (imágenes, botones):
  *  un <label> reenvía los clics al primer botón interno. */
-export function Field({ label, hint, children, group }: { label: string; hint?: string; children: ReactNode; group?: boolean }) {
+/** A labeled field. `required` adds the asterisk the other forms use; `error` shows the app's own message under it
+ *  (forms that pass it use noValidate, so the browser's bubble, in the browser's language, never shows). */
+export function Field({ label, hint, children, group, required, error, errorId }: { label: string; hint?: string; children: ReactNode; group?: boolean; required?: boolean; error?: string | null; errorId?: string }) {
   const Tag = group ? "div" : "label";
   return (
     <Tag className="block space-y-1.5" {...(group ? { role: "group", "aria-label": label } : {})}>
-      <span className="block text-[13px] font-medium text-ink-2">{label}</span>
+      <span className="block text-[13px] font-medium text-ink-2">{label}{required && <span aria-hidden className="text-bad"> *</span>}</span>
       {children}
+      {error && <span id={errorId} className="block text-sm text-bad">{error}</span>}
       {hint && <span className="block text-xs text-ink-3">{hint}</span>}
     </Tag>
   );

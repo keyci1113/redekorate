@@ -7,7 +7,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { copy, useLoad } from "../lib/hooks";
 import { canComment, canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
-import { relTime, t } from "../lib/i18n";
+import { plural, relTime, t } from "../lib/i18n";
 import type { ProjectRole, Severity, Study } from "../lib/types";
 import type { DocRecord } from "../docs/types";
 import { Avatar } from "../components/Avatar";
@@ -301,12 +301,12 @@ function PeopleSection({ ctx, people }: { ctx: Ctx; people: Person[] }) {
                       className="focus-ring relative inline-flex min-h-8 items-center gap-1 rounded-lg border border-line-2 px-2 text-xs font-semibold text-ink-2 before:absolute before:-inset-1.5 hover:bg-ink/5"><Copy size={13} aria-hidden />{copied ? t("Copiado") : t("Copiar")}</button>
                   </span>
                 )}
-                <span className="text-xs text-ink-3">{t("Reportado el {a}", { a: fmtMoment(r.metadata.sent_at ?? r.created_at) })}{r.metadata.page_url ? ` ${t("desde {a}", { a: hostOf(r.metadata.page_url) })}` : ""} · {t("{n} reportes en total", { n: r.reports_count })}</span>
+                <span className="text-xs text-ink-3">{t("Reportado el {a}", { a: fmtMoment(r.metadata.sent_at ?? r.created_at) })}{r.metadata.page_url ? ` ${t("desde {a}", { a: hostOf(r.metadata.page_url) })}` : ""} · {plural(r.reports_count, { one: "{n} reporte en total", other: "{n} reportes en total" })}</span>
                 {r.email && canEdit && <div className="pt-1.5"><a href="#ticket-reply" className="focus-ring inline-flex min-h-11 items-center rounded-lg border border-line bg-surface px-3.5 text-sm font-medium hover:border-line-2">{t("Responder a {a}", { a: firstName(r.name) })}</a></div>}
               </div>
             </div>
           )}
-          {ctx.ticket.reporters.length > 1 && <p className="mt-2 text-xs text-ink-3">{t("+{n} personas más reportaron lo mismo (tickets fusionados).", { n: ctx.ticket.reporters.length - 1 })}</p>}
+          {ctx.ticket.reporters.length > 1 && <p className="mt-2 text-xs text-ink-3">{plural(ctx.ticket.reporters.length - 1, { one: "+{n} persona más reportó lo mismo (tickets fusionados).", other: "+{n} personas más reportaron lo mismo (tickets fusionados)." })}</p>}
         </Block>
       )}
       <Block label={t("Asignado a")}>
@@ -461,7 +461,7 @@ function Evidence({ ctx, always }: { ctx: Ctx; always?: boolean }) {
             {l.severity && <SeverityBadge severity={l.severity} />}
             <Link to={`/projects/${ctx.projectId}?tab=insights`} className="focus-ring min-w-0 flex-1 rounded">
               <span className="block text-sm font-semibold">{l.title}</span>
-              <span className="block text-xs text-ink-3">{t("Insight")}{l.study_title ? ` · ${t("de {a}", { a: l.study_title })}` : ""}{l.evidence_count ? ` · ${t("{n} citas", { n: l.evidence_count })}` : ""}</span>
+              <span className="block text-xs text-ink-3">{t("Insight")}{l.study_title ? ` · ${t("de {a}", { a: l.study_title })}` : ""}{l.evidence_count ? ` · ${plural(l.evidence_count, { one: "{n} cita", other: "{n} citas" })}` : ""}</span>
             </Link>
             {ctx.canEdit && <button type="button" onClick={() => void ctx.api.unlink(l.id)} aria-label={t("Quitar vínculo con {a}", { a: l.title })} className="focus-ring flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-3 hover:bg-ink/5 hover:text-ink"><X size={15} /></button>}
           </div>

@@ -12,7 +12,7 @@ import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
 import { AccessEditor, AccessTags } from "../components/AccessEditor";
 import { DEFAULT_ACCESS, accessProblem, type MemberAccess } from "../lib/access";
-import { getLang, t } from "../lib/i18n";
+import { getLang, plural, t } from "../lib/i18n";
 import { NoAccessNote } from "../components/AccessNotice";
 
 export const orgRoleLabel = (r: OrgRole) => (r === "owner" ? t("Dueño/a") : r === "admin" ? t("Admin") : t("Miembro"));
@@ -45,7 +45,7 @@ export function OrgsPage() {
                   <OrgLogo name={o.name} logo={o.logo} color={o.color} size={48} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-[19px] font-bold tracking-[-0.02em]">{o.name}</span>
-                    <span className="mt-0.5 block text-[13px] text-ink-2 tabular-nums">{t("{a} proyectos · {b} personas", { a: o.project_count, b: o.member_count })}</span>
+                    <span className="mt-0.5 block text-[13px] text-ink-2 tabular-nums">{plural(o.project_count, { one: "{n} proyecto", other: "{n} proyectos" })} · {plural(o.member_count, { one: "{n} persona", other: "{n} personas" })}</span>
                     <span className="mt-1.5 inline-block"><Tag>{orgRoleLabel(o.role)}</Tag></span>
                   </span>
                   <ArrowRight size={16} aria-hidden className="shrink-0 text-ink-3 transition group-hover:translate-x-0.5 group-hover:text-ink motion-reduce:transform-none" />
@@ -86,7 +86,7 @@ export function OrgPage() {
         <OrgLogo name={o.name} logo={o.logo} color={o.color} size={64} />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3"><h1 className="page-title">{o.name}</h1><Tag>{orgRoleLabel(o.role)}</Tag></div>
-          <p className="mt-1 text-sm text-ink-2 tabular-nums">{t("{a} proyectos · {b} personas", { a: o.project_count, b: o.member_count })}</p>
+          <p className="mt-1 text-sm text-ink-2 tabular-nums">{plural(o.project_count, { one: "{n} proyecto", other: "{n} proyectos" })} · {plural(o.member_count, { one: "{n} persona", other: "{n} personas" })}</p>
         </div>
       </div>
       <div className="mt-8">
@@ -108,7 +108,7 @@ export function OrgPage() {
                   <span className="h-3 w-3 shrink-0 rounded" style={{ background: p.color }} aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{p.name}{p.archived && <span className="ml-2 text-xs font-normal text-ink-3">· {t("archivado")}</span>}</span>
-                    <span className="block text-xs text-ink-3">{t("{a} estudios · dueño/a {b} · actualizado {c}", { a: p.study_count ?? 0, b: p.owner_name ?? "", c: timeAgo(p.updated_at) })}</span>
+                    <span className="block text-xs text-ink-3">{plural(p.study_count ?? 0, { one: "{n} estudio · dueño/a {b} · actualizado {c}", other: "{n} estudios · dueño/a {b} · actualizado {c}" }, { b: p.owner_name ?? "", c: timeAgo(p.updated_at) })}</span>
                   </span>
                   <ArrowRight size={15} aria-hidden className="shrink-0 text-ink-3" />
                 </Link>
@@ -124,7 +124,7 @@ export function OrgPage() {
 }
 
 /** "Todos los proyectos" or "2 proyectos": where a member's access applies. */
-const scopeLabel = (all: boolean, n: number) => (all ? t("Todos los proyectos") : n === 1 ? t("1 proyecto") : t("{a} proyectos", { a: n }));
+const scopeLabel = (all: boolean, n: number) => (all ? t("Todos los proyectos") : plural(n, { one: "{n} proyecto", other: "{n} proyectos" }));
 const accessOf = (m: OrgMember): MemberAccess => ({ all_projects: m.all_projects, project_role: m.project_role, areas: m.areas, project_ids: m.projects.map((p) => p.id) });
 
 function People({ org, members, projects, onChange }: { org: Organization; members: OrgMember[]; projects: Project[]; onChange: () => void }) {
@@ -156,19 +156,20 @@ function People({ org, members, projects, onChange }: { org: Organization; membe
     <div className="space-y-5">
       <Card className="p-4">
         <p className="font-semibold">{t("Personas")}</p>
-        <p className="mt-1 text-sm text-ink-2">{t("A cada miembro le eliges qué proyectos ve, qué secciones abre y qué puede hacer. Admins ven todo y además cambian ajustes y personas. Solo quien es dueño elimina la organización.")}</p>
+        <p className="mt-1 text-sm text-ink-2">{t("Cada persona tiene dos cosas: su rol en la organización y su acceso a los proyectos. Rol: Admin ve todo y además cambia ajustes y personas; Miembro solo entra a lo que le des. Acceso a los proyectos: qué proyectos ve, qué secciones abre y qué puede hacer en ellas. Solo quien es dueño elimina la organización.")}</p>
         {!manage && <NoAccessNote className="mt-3">{t("No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.")}</NoAccessNote>}
         {manage && (
           <form className="mt-4 space-y-4" onSubmit={add}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
-            <Field label={t("Rol")}>
-              <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as OrgRole })}>
-                {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
-              </select>
-            </Field>
-            <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy || blocked}>{t("Agregar")}</Button>
-            <Button type="button" icon={<Mail size={15} />} disabled={busy || blocked || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
+              <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
+              <div className="sm:w-48"><Field label={t("Rol en la organización")}>
+                <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as OrgRole })}>
+                  {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
+                </select>
+              </Field></div>
+              {/* Same place as on a project's Collaborators: next to the email and the role. */}
+              <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy || blocked}>{t("Agregar")}</Button>
+              <Button type="button" icon={<Mail size={15} />} disabled={busy || blocked || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
             </div>
             {form.role === "member"
               ? <div className="rounded-xl border border-line p-4"><AccessEditor name="new-member" value={access} onChange={setAccess} projects={projects} />{blocked && <p role="alert" className="mt-3 text-sm text-bad">{t("Elige al menos un proyecto.")}</p>}</div>
@@ -206,7 +207,7 @@ function People({ org, members, projects, onChange }: { org: Organization; membe
                 </span>
               ) : <span className="text-xs text-ink-3">{t("Todo, en todos los proyectos")}</span>}
               {editable ? (
-                <select className="field h-8 w-32 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/orgs/${org.id}/members/${m.user_id}`, { role: e.target.value }))}>
+                <select className="field h-8 w-32 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol en la organización de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/orgs/${org.id}/members/${m.user_id}`, { role: e.target.value }))}>
                   {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
                 </select>
               ) : <Tag><span className="flex items-center gap-1">{m.role === "owner" && <Crown size={11} />} {orgRoleLabel(m.role)}</span></Tag>}
@@ -240,7 +241,7 @@ function People({ org, members, projects, onChange }: { org: Organization; membe
           <form onSubmit={(e) => { e.preventDefault(); const { member, access: a } = editing; void act(async () => { await api.patch(`/orgs/${org.id}/members/${member.user_id}`, a.all_projects ? { all_projects: true, project_role: a.project_role, areas: a.areas } : a); setEditing(null); }); }}>
             <AccessEditor name="edit-member" value={editing.access} onChange={(a) => setEditing({ ...editing, access: a })} projects={projects} />
             {accessProblem(editing.access) && <p role="alert" className="mt-3 text-sm text-bad">{t("Elige al menos un proyecto.")}</p>}
-            {editing.access.all_projects && editing.member.projects.length > 0 && <p className="mt-3 text-xs text-ink-3">{t("También es colaborador/a directo de {a} proyectos; eso se cambia en la pestaña Colaboradores de cada proyecto.", { a: editing.member.projects.length })}</p>}
+            {editing.access.all_projects && editing.member.projects.length > 0 && <p className="mt-3 text-xs text-ink-3">{plural(editing.member.projects.length, { one: "También es colaborador/a directo de {n} proyecto; eso se cambia en la pestaña Colaboradores de ese proyecto.", other: "También es colaborador/a directo de {n} proyectos; eso se cambia en la pestaña Colaboradores de cada proyecto." })}</p>}
             <div className="mt-5 flex justify-end gap-2">
               <Button type="button" variant="ghost" onClick={() => setEditing(null)}>{t("Cancelar")}</Button>
               <Button variant="primary" disabled={busy || accessProblem(editing.access) !== null}>{t("Guardar acceso")}</Button>

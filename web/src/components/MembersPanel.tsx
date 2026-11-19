@@ -4,7 +4,7 @@ import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import type { OrgAccessMember, ProjectMember, ProjectRole } from "../lib/types";
 import type { Area } from "../lib/access";
-import { AccessPreview, AccessTags, ProfilePicker, ProfileSelect } from "./AccessEditor";
+import { AccessPreview, AccessTags, ProfilePicker, ProfileSelect, levelsHint } from "./AccessEditor";
 import { ASSIGNABLE_PROJECT_ROLES } from "../lib/roles";
 import { Button, Card, ErrorNote, Field, Tag } from "./ui";
 import { Avatar } from "./Avatar";
@@ -19,11 +19,13 @@ export const sharedLabel = (r: ProjectRole, owner?: string | null) => owner ? `$
 export function MembersPanel({ projectId, myRole, members, viaOrg = [], onChange }: { projectId: string; myRole: ProjectRole; members: ProjectMember[]; viaOrg?: OrgAccessMember[]; onChange: () => void }) {
   const { user: me } = useAuth();
   const owner = myRole === "owner";
-  const [form, setForm] = useState<{ email: string; role: ProjectRole; areas: Area[] }>({ email: "", role: "editor", areas: ["research", "tickets"] });
+  // Commenter, the least privilege that still takes part: the same default as an organization's members (and the database's).
+  const blank = (): { email: string; role: ProjectRole; areas: Area[] } => ({ email: "", role: "commenter", areas: ["research", "tickets"] });
+  const [form, setForm] = useState(blank);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); setError(null); try { await fn(); onChange(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } };
-  const add = (e: FormEvent) => { e.preventDefault(); return act(async () => { await api.post(`/projects/${projectId}/members`, form); setForm({ email: "", role: "editor", areas: ["research", "tickets"] }); }); };
+  const add = (e: FormEvent) => { e.preventDefault(); return act(async () => { await api.post(`/projects/${projectId}/members`, form); setForm(blank()); }); };
 
   return (
     <div className="space-y-5">
@@ -35,13 +37,14 @@ export function MembersPanel({ projectId, myRole, members, viaOrg = [], onChange
           <form className="mt-4 space-y-4" onSubmit={add}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1"><Field label={t("Correo de una cuenta existente")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
-              <Field label={t("Rol")}>
+              <Field label={t("Acceso al proyecto")}>
                 <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as ProjectRole })}>
                   {ASSIGNABLE_PROJECT_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                 </select>
               </Field>
               <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy}>{t("Agregar")}</Button>
             </div>
+            <p className="-mt-2 text-xs text-ink-3">{levelsHint()}</p>
             <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
               <div className="space-y-1.5"><p className="text-sm font-medium">{t("¿Qué secciones puede abrir?")}</p><ProfilePicker name="member-profile" value={form.areas} onChange={(areas) => setForm({ ...form, areas })} /></div>
               <div className="space-y-1.5"><p className="text-sm font-medium">{t("Así queda su acceso")}</p><AccessPreview areas={form.areas} /></div>
@@ -65,7 +68,7 @@ export function MembersPanel({ projectId, myRole, members, viaOrg = [], onChange
                 : <AccessTags areas={m.areas ?? ["research", "tickets"]} />)}
               {m.role === "owner" ? <Tag><span className="flex items-center gap-1"><Crown size={11} /> {roleLabel(m.role)}</span></Tag>
                 : owner ? (
-                  <select className="field h-8 w-36 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/projects/${projectId}/members/${m.user_id}`, { role: e.target.value }))}>
+                  <select className="field h-8 w-36 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Acceso de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/projects/${projectId}/members/${m.user_id}`, { role: e.target.value }))}>
                     {ASSIGNABLE_PROJECT_ROLES.map((r) => <option key={r} value={r}>{roleLabel(r)}</option>)}
                   </select>
                 ) : <Tag>{roleLabel(m.role)}</Tag>}

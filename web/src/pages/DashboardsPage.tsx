@@ -147,7 +147,7 @@ function Studies({ d, q, project, open }: { d: StudiesDash; q: string; project: 
           onOpen={() => open({ kind: "rows", title: t("Estudios activos"), rows: liveRows("all"), empty: t("No hay estudios activos."), note: t("Primero los que necesitan atención.") })} />
         <Tile label={t("Completado promedio")} value={x.started ? fmtPct(x.finished / x.started) : "—"} sub={t("{a} de {b} sesiones terminaron, en los estudios activos desde su lanzamiento", { a: fmtNum(x.finished), b: fmtNum(x.started) })}
           onOpen={() => open({ kind: "rows", title: t("Completado por estudio activo"), rows: liveRows("by_completion"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto.") })} />
-        <Tile label={t("Insights nuevos")} value={fmtNum(x.insights)} sub={t("{a} críticos · {b} altos", { a: x.insights_critical, b: x.insights_high })}
+        <Tile label={t("Insights nuevos")} value={fmtNum(x.insights)} sub={`${plural(x.insights_critical, { one: "{n} crítico", other: "{n} críticos" })} · ${plural(x.insights_high, { one: "{n} alto", other: "{n} altos" })}`}
           onOpen={() => open({ kind: "studies", title: t("Insights nuevos"), by: "insights" })} />
         <Tile label={t("Participantes")} value={fmtNum(x.participants)} tone={x.participants >= x.participants_prev ? "good" : "bad"}
           onOpen={() => open({ kind: "studies", title: t("Participantes por estudio"), by: "participants" })}
@@ -346,7 +346,7 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
           onOpen={() => open({ kind: "studies", title: t("Estudios activos"), by: "live" })} />
         <Tile label={t("Tickets abiertos")} value={fmtNum(openTickets)} sub={plural(overdue, { one: "{n} vencido", other: "{n} vencidos" })}
           onOpen={() => open({ kind: "tickets", title: t("Tickets abiertos"), by: "open" })} />
-        <Tile label={t("Hitos")} value={fmtNum(d.milestones.length)} sub={t("{a} atrasados · {b} en riesgo · {c} en curso · {d} terminados", { a: count("behind"), b: count("at_risk"), c: count("on_track") + count("planned"), d: count("done") })}
+        <Tile label={t("Hitos")} value={fmtNum(d.milestones.length)} sub={[plural(count("behind"), { one: "{n} atrasado", other: "{n} atrasados" }), t("{a} en riesgo", { a: count("at_risk") }), t("{a} en curso", { a: count("on_track") + count("planned") }), plural(count("done"), { one: "{n} terminado", other: "{n} terminados" })].join(" · ")}
           onOpen={() => open({ kind: "rows", title: t("Hitos"), rows: milestonesFor(d.milestones, "all").map((m) => milestoneRow(m)), empty: t("No hay hitos abiertos."), note: t("Primero los atrasados y en riesgo.") })} />
       </Tiles>
 

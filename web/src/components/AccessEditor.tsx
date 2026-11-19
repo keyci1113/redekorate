@@ -20,6 +20,9 @@ const levelText = (r: MemberLevel) =>
   : r === "commenter" ? t("Ve todo en sus secciones y deja comentarios.")
   : t("Ve todo en sus secciones sin cambiar nada.");
 
+/** One line that explains the three access levels; the same line on Collaborators and on the organization's People. */
+export const levelsHint = () => t("Editor crea y cambia; Comentarista ve y comenta; Solo lectura ve sin cambiar nada.");
+
 const areaTitle = (a: Area) => (a === "research" ? t("Investigación UX") : t("Gestión de proyecto"));
 const areaItems = (a: Area) => (a === "research" ? t("Estudios · Documentos · Insights · Participantes · Reportes") : t("Tickets · Hitos · Hoja de ruta"));
 
@@ -101,7 +104,8 @@ export function AccessEditor({ value, onChange, projects, name }: {
         <ProfilePicker name={`${name}-profile`} value={value.areas} onChange={(areas) => onChange({ ...value, areas })} />
       </fieldset>
       <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">{t("¿Qué puede hacer ahí?")}</legend>
+        <legend className="text-sm font-medium">{t("Acceso a los proyectos")}</legend>
+        <p className="text-xs text-ink-3">{levelsHint()}</p>
         <div className="grid gap-2 sm:grid-cols-3">
           {ASSIGNABLE_PROJECT_ROLES.map((r) => (
             <label key={r} className={cx("focus-within:ring-accent/40 flex cursor-pointer flex-col gap-1 rounded-xl border p-3 transition focus-within:ring-2", value.project_role === r ? "border-accent bg-accent-soft" : "border-line hover:border-line-2")}>
