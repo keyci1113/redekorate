@@ -16,8 +16,8 @@ import { validateStudy, type Issue } from "../blocks/validate";
 import { estimateMinutes } from "../blocks/review";
 import { Menu, MenuItem } from "../components/Menu";
 import { BackLink, Button, ErrorNote, Field, Modal, Spinner, StatusBadge, cx } from "../components/ui";
-import { ImageDrop, PaneHandle, Segmented, Toggle, useSortable } from "../components/editing";
-import { BRAND_COLORS, defaultConsent, brandStyle, voiceOn, type StudySettings } from "../lib/settings";
+import { ColorPicker, ImageDrop, PaneHandle, Segmented, Toggle, useSortable } from "../components/editing";
+import { BRAND_COLORS, LOGO_SIZE, defaultConsent, brandStyle, logoHeight, voiceOn, type StudySettings } from "../lib/settings";
 import { templateByKey } from "../templates/catalog";
 import { getLang, setContentLang, tc } from "../lib/i18n";
 import { PrototypeEditor, newPrototype } from "../components/PrototypeEditor";
@@ -250,10 +250,10 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
               <div className={cx("mx-auto transition-all", device === "mobile" ? "w-[390px] max-w-[85%]" : cx("w-full", isWide(current) ? "max-w-4xl" : "max-w-2xl"))}>
                 <div style={brandStyle(settings) as CSSProperties}
                   className={cx("border border-line bg-paper shadow-xl shadow-ink/5", device === "mobile" ? "rounded-[2rem] px-5 py-10" : "rounded-2xl px-6 py-12 sm:px-12")}>
-                  {settings.brand?.logo && <img src={settings.brand.logo} alt="" className="mx-auto mb-8 h-8 object-contain" />}
+                  {settings.brand?.logo && <img src={settings.brand.logo} alt="" className="mx-auto mb-8 max-w-[80%] object-contain" style={{ height: logoHeight(settings) }} />}
                   <BlockView key={current.id + device} block={current} preview settings={settings} value={previewValue[current.id]} onChange={(v) => setPreviewValue((s) => ({ ...s, [current.id]: v }))} />
                   <div className={cx("mt-8 flex", current.type === "welcome" ? "justify-center" : "justify-end")}>
-                    {current.type !== "thank_you" && current.type !== "prototype_task" && <span className="inline-flex h-11 items-center rounded-lg bg-accent px-5 text-[15px] font-medium text-on-accent">{current.type === "welcome" ? current.buttonLabel : t("Siguiente")}</span>}
+                    {current.type !== "thank_you" && current.type !== "prototype_task" && <span className="inline-flex h-11 items-center rounded-lg bg-[var(--rk-btn,var(--color-accent))] px-5 text-[15px] font-medium text-[var(--rk-on-btn,var(--color-on-accent))]">{current.type === "welcome" ? current.buttonLabel : t("Siguiente")}</span>}
                   </div>
                 </div>
                 {issuesFor(current.id).length > 0 && (
@@ -379,18 +379,40 @@ function DesignModal({ open, onClose, settings, onChange }: { open: boolean; onC
           <Field group label={t("Idioma del estudio")} hint={t("Idioma de los botones e instrucciones que ven los participantes, y de los bloques nuevos.")}>
             <Segmented value={s.language ?? getLang()} onChange={(language) => onChange({ ...s, language })} options={[{ id: "es", label: "Español" }, { id: "en", label: "English" }]} />
           </Field>
-          <Field group label={t("Color de marca")} hint={t("Se aplica a botones, selección y barra de progreso.")}>
+          <Field group label={t("Color de marca")} hint={t("Se aplica a la selección, la barra de progreso y, si no eliges otro, a los botones.")}>
             <div className="flex flex-wrap items-center gap-2">
               {BRAND_COLORS.map((c) => (
                 <button key={c} type="button" onClick={() => onChange({ ...s, brand: { ...brand, color: c } })} aria-label={c}
                   className={cx("h-7 w-7 rounded-lg transition", (brand.color ?? "#5902A1") === c && "ring-2 ring-ink ring-offset-2")} style={{ background: c }} />
               ))}
-              <input type="color" value={brand.color ?? "#5902A1"} onChange={(e) => onChange({ ...s, brand: { ...brand, color: e.target.value } })} className="h-7 w-9 cursor-pointer rounded border border-line" title={t("Color personalizado")} />
+            </div>
+            <div className="mt-2.5"><ColorPicker value={brand.color ?? "#5902A1"} onChange={(color) => onChange({ ...s, brand: { ...brand, color } })} /></div>
+          </Field>
+          <Field group label={t("Color de los botones")} hint={t("Para Comenzar, Siguiente y Continuar. Si no eliges uno, usan el color de marca.")}>
+            <div className="flex flex-wrap items-center gap-2">
+              <ColorPicker label={t("Elegir color")} value={brand.button ?? brand.color ?? "#5902A1"} onChange={(button) => onChange({ ...s, brand: { ...brand, button } })} />
+              <span className="inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-medium" style={{ ...(brandStyle(s) as CSSProperties), background: "var(--rk-btn,var(--color-accent))", color: "var(--rk-on-btn,var(--color-on-accent))" }}>{t("Siguiente")}</span>
+              {brand.button && <button type="button" className="focus-ring rounded-md px-2 py-1 text-[13px] text-ink-3 hover:text-ink" onClick={() => onChange({ ...s, brand: { ...brand, button: undefined } })}>{t("Usar el color de marca")}</button>}
+            </div>
+            <div className="mt-3">
+              <Segmented value={brand.buttonText ?? "auto"} onChange={(buttonText) => onChange({ ...s, brand: { ...brand, buttonText } })}
+                options={[{ id: "auto", label: t("Texto automático") }, { id: "light", label: t("Texto claro") }, { id: "dark", label: t("Texto oscuro") }]} />
             </div>
           </Field>
           <Field group label={t("Logo")} hint={t("Aparece arriba en cada pantalla. PNG con fondo transparente funciona mejor.")}>
             <ImageDrop compact value={brand.logo} onChange={(logo) => onChange({ ...s, brand: { ...brand, logo } })} label={t("Subir logo")} />
           </Field>
+          {brand.logo && (
+            <Field group label={t("Tamaño del logo")} hint={t("Así se ve arriba de cada pantalla del estudio.")}>
+              <div className="flex items-center gap-3">
+                <input type="range" className="flex-1 accent-[var(--color-accent)]" min={LOGO_SIZE.min} max={LOGO_SIZE.max} step={2} value={logoHeight(s)} aria-label={t("Tamaño del logo")}
+                  onChange={(e) => onChange({ ...s, brand: { ...brand, logoSize: Number(e.target.value) } })} />
+                <span className="w-12 text-right text-[13px] tabular-nums text-ink-2">{logoHeight(s)} px</span>
+                {brand.logoSize !== undefined && logoHeight(s) !== LOGO_SIZE.default && <button type="button" className="focus-ring rounded-md px-2 py-1 text-[13px] text-ink-3 hover:text-ink" onClick={() => onChange({ ...s, brand: { ...brand, logoSize: undefined } })}>{t("Restablecer")}</button>}
+              </div>
+              <div className="mt-2 flex min-h-[136px] items-center justify-center rounded-lg border border-line bg-paper p-2"><img src={brand.logo} alt="" className="max-w-[80%] object-contain" style={{ height: logoHeight(s) }} /></div>
+            </Field>
+          )}
         </div>
         <div className="space-y-1">
           <Toggle label={t("Mostrar barra de progreso")} checked={s.showProgress !== false} onChange={(v) => onChange({ ...s, showProgress: v })} />

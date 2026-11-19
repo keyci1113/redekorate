@@ -9,7 +9,7 @@ import { nextIndex } from "../blocks/logic";
 import { nextHint } from "../blocks/nextHint";
 import { Button, ErrorNote, Spinner, cx } from "../components/ui";
 import { LogoMark, Wordmark } from "../components/Logo";
-import { brandStyle, type StudySettings } from "../lib/settings";
+import { brandStyle, logoHeight, type StudySettings } from "../lib/settings";
 import { getLang, useLang } from "../lib/i18n";
 
 import { t } from "../lib/i18n";
@@ -127,7 +127,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
     <div className="flex min-h-full flex-col" style={brandStyle(settings) as CSSProperties}>
       {preview && <div className="bg-ink py-1.5 text-center text-xs text-paper">{t("Vista previa · las respuestas no se guardan")}</div>}
       {showProgress && <div className="h-1 bg-line"><div className="h-1 bg-accent transition-all duration-500" style={{ width: `${progress * 100}%` }} /></div>}
-      {settings.brand?.logo && <div className="flex justify-center pt-6"><img src={settings.brand.logo} alt="" className="h-9 object-contain" /></div>}
+      {settings.brand?.logo && <div className="flex justify-center pt-6"><img src={settings.brand.logo} alt="" className="max-w-[80%] object-contain" style={{ height: logoHeight(settings) }} /></div>}
 
       {/* Top-aligned: content that grows (a new group, a help text) pushes down instead of making the screen jump. */}
       <main className="flex flex-1 items-start justify-center px-5 pt-10 pb-12 sm:pt-16">
@@ -140,7 +140,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
               <span className="text-[15px]">{t("He leído la información y acepto participar de forma voluntaria.")}</span>
             </label>
-            <div className="mt-6 flex justify-end"><Button variant="primary" size="lg" className="!bg-accent" disabled={!agree} onClick={() => setConsented(true)}>{t("Continuar")} <ArrowRight size={16} /></Button></div>
+            <div className="mt-6 flex justify-end"><Button variant="primary" size="lg" disabled={!agree} onClick={() => setConsented(true)}>{t("Continuar")} <ArrowRight size={16} /></Button></div>
           </div>
         ) : (
           <div key={i} className={cx("w-full animate-[fadeUp_.35s_ease-out]", block && isWide(block) ? "max-w-4xl" : "max-w-xl")}>
@@ -162,7 +162,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
                       {block.type !== "welcome" && !block.required && !isAnswered(block, values[block.id]) && <span className="text-xs text-ink-3">{t("Opcional")}</span>}
                       {/* Why the button is disabled, so nobody is stuck guessing. */}
                       {!canNext && hint && <span id={hintId} className="text-right text-[13px] text-ink-2" aria-live="polite">{hint}</span>}
-                      <Button variant="primary" size="lg" className="!bg-accent hover:!opacity-90" onClick={() => next()} disabled={!canNext || busy} aria-describedby={!canNext && hint ? hintId : undefined}>
+                      <Button variant="primary" size="lg" onClick={() => next()} disabled={!canNext || busy} aria-describedby={!canNext && hint ? hintId : undefined}>
                         {block.type === "welcome" ? block.buttonLabel : t("Siguiente")} {block.type !== "welcome" && <ArrowRight size={16} />}
                       </Button>
                     </div>

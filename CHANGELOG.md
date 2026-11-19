@@ -4,6 +4,7 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Study styling.** A study can set its own button color and text (automatic by contrast, light or dark); without one the buttons follow the brand color. The color pickers take a hex code or the browser pipette, and the study logo size is adjustable. Brand-tinted selections stay readable in dark mode.
 - **UI review fixes.** The findings of the November UI review (a Spanish reviewer's spreadsheet) that apply to this edition; ticket, *My work*, milestone and roadmap items don't exist here.
   - **Study editor.** The top bar never scrolls sideways: the title keeps a usable width and truncates, and *Prototypes*, *Design*, *Try it*, *Results* and *Close study* move into a ⋯ menu as the window narrows. Below 1024px the three panes become one at a time, picked with a *Blocks / Edit / Preview* switch (the properties pane used to vanish there). The mobile preview is a fixed 390px frame. *Close* is now *Close study* and asks first (participants can no longer answer; responses are kept).
   - **Pre-publish review.** New warnings for a card sort with fewer than 30 cards and for logic that changes nothing (a rule going where the flow already goes, or *otherwise* pointing at the next block). The time estimate is per block type (a card sort is about a minute per five cards, open questions 45 s, choices 10 s; `blocks/review.ts`). A new rule now defaults to the block after the next one, or the end.

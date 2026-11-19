@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Button, ErrorNote, Field, cx } from "./ui";
-import { ImageDrop } from "./editing";
+import { ColorPicker, ImageDrop } from "./editing";
 import { OrgLogo } from "./OrgLogo";
 import { BRAND_COLORS } from "../lib/settings";
 import { t } from "../lib/i18n";
@@ -33,8 +33,8 @@ export function OrgForm({ initial, onSubmit, submitLabel, compact }: {
             <button key={c} type="button" onClick={() => setV({ ...v, color: c })} aria-label={c}
               className={cx("focus-ring h-7 w-7 rounded-lg transition", v.color === c && "ring-2 ring-ink ring-offset-2")} style={{ background: c }} />
           ))}
-          <input type="color" value={v.color} onChange={(e) => setV({ ...v, color: e.target.value })} className="h-7 w-9 cursor-pointer rounded border border-line" title={t("Color personalizado")} aria-label={t("Color personalizado")} />
         </div>
+        <div className="mt-2.5"><ColorPicker value={v.color} onChange={(color) => setV({ ...v, color })} /></div>
       </Field>
       {error && <ErrorNote>{error}</ErrorNote>}
       <div className="flex justify-end pt-2"><Button variant="primary" disabled={busy || !v.name.trim()}>{submitLabel}</Button></div>
