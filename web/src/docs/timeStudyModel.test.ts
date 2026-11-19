@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defaultLists, duration, emptyTimeStudy, logTable, nextRow, normalize, summarize, today, type TimeStudyData, type TSRow } from "./timeStudyModel";
+import { addRound, compare, defaultLists, duration, emptyTimeStudy, logTable, nextRow, normalize, roundInUse, roundOf, summarize, today, type TimeStudyData, type TSRow } from "./timeStudyModel";
 
 const row = (p: Partial<TSRow>): TSRow => ({ id: Math.random().toString(36), person: "a", date: "2026-11-02", start: "", end: "", bucket: "", tool: "", other: "", ref: "", notes: "", ...p });
 
@@ -8,7 +8,7 @@ const study = (rows: TSRow[]): TimeStudyData => ({
   workdays: 5, keyLabel: "Product",
   buckets: [{ id: "call", name: "On a call", what: "" }, { id: "mail", name: "Email", what: "" }],
   tools: [{ id: "app", name: "Our app", key: true }, { id: "gm", name: "Gmail", key: false }],
-  schedule: [], rows,
+  schedule: [], rows, rounds: [],
 });
 
 describe("duration", () => {
@@ -106,5 +106,76 @@ describe("helpers", () => {
       ["Ana", "2026-11-02", "10:00", "10:05", "5", "On a call", "Our app", "", "", ""],
       ["Ana", "2026-11-03", "09:00", "09:30", "30", "Email", "Gmail", "", "", "late"],
     ]);
+  });
+});
+
+describe("rounds (before and after)", () => {
+  const names = { first: "Before", next: "After" };
+  const base = study([
+    row({ person: "a", date: "2026-11-02", start: "09:00", end: "11:00", bucket: "mail", tool: "gm" }),
+    row({ person: "a", date: "2026-11-02", start: "11:00", end: "12:00", bucket: "call", tool: "app" }),
+  ]);
+
+  it("the first new round keeps everything logged so far as the baseline", () => {
+    const { data, round } = addRound(base, names);
+    expect(data.rounds.map((r) => r.name)).toEqual(["Before", "After"]);
+    expect(round).toBe(data.rounds[1].id);
+    expect(data.rows.every((r) => roundOf(data, r) === data.rounds[0].id)).toBe(true);
+    expect(roundInUse(data, data.rounds[0].id)).toBe(true);
+    expect(roundInUse(data, round)).toBe(false);
+    // a third round only appends
+    const third = addRound(data, { first: "x", next: "Round 3" });
+    expect(third.data.rounds.map((r) => r.name)).toEqual(["Before", "After", "Round 3"]);
+  });
+
+  it("rows with no round, or a removed one, count in the first round", () => {
+    const { data } = addRound(base, names);
+    const stray = { ...data, rows: [...data.rows, row({ start: "13:00", end: "14:00", round: "gone" })] };
+    expect(roundOf(stray, stray.rows[2])).toBe(data.rounds[0].id);
+    expect(roundOf(base, base.rows[0])).toBe("");
+  });
+
+  it("a summary can be limited to one round, and new rows follow the round being logged", () => {
+    const { data, round } = addRound(base, names);
+    const after = { ...data, rows: [...data.rows, row({ person: "a", date: "2026-12-01", start: "09:00", end: "10:00", bucket: "mail", tool: "app", round })] };
+    expect(summarize(after, data.rounds[0].id).total.hours).toBe(3);
+    expect(summarize(after, round).total.hours).toBe(1);
+    expect(summarize(after).total.hours).toBe(4);
+    expect(nextRow(after, round)).toMatchObject({ round, date: "2026-12-01", start: "10:00" });
+    expect(nextRow(after, data.rounds[0].id)).toMatchObject({ round: data.rounds[0].id, start: "12:00" });
+  });
+
+  it("compares hours per person per week, so rounds of different lengths line up", () => {
+    const { data, round } = addRound(base, names);
+    // After: two days observed, an hour of email each day and two hours in the app
+    const after = { ...data, rows: [...data.rows,
+      row({ person: "a", date: "2026-12-01", start: "09:00", end: "10:00", bucket: "mail", tool: "gm", round }),
+      row({ person: "a", date: "2026-12-01", start: "10:00", end: "12:00", bucket: "call", tool: "app", round }),
+      row({ person: "a", date: "2026-12-02", start: "09:00", end: "10:00", bucket: "mail", tool: "gm", round }),
+      row({ person: "a", date: "2026-12-02", start: "10:00", end: "12:00", bucket: "call", tool: "app", round }),
+    ] };
+    const c = compare(after, data.rounds[0].id, round);
+    const mail = c.byBucket.find((l) => l.id === "mail")!.delta;
+    // before: 2 h on one day = 10 h/week; after: 1 h a day = 5 h/week
+    expect(mail).toMatchObject({ before: 10, after: 5, change: -5, ratio: -0.5 });
+    expect(c.keyPerWeek).toMatchObject({ before: 5, after: 10, change: 5, ratio: 1 });
+    expect(c.perDay.change).toBe(0);
+    expect(c.biggest?.id).toMatch(/mail|call/);
+    expect(c.people).toEqual([{ person: { id: "a", name: "Ana" }, before: 5, after: 10 }]);
+  });
+
+  it("a bucket that starts from zero has no percentage change", () => {
+    const { data, round } = addRound(base, names);
+    const after = { ...data, rows: [...data.rows, row({ person: "a", date: "2026-12-01", start: "09:00", end: "10:00", bucket: "", tool: "app", round })] };
+    const none = compare(after, data.rounds[0].id, round).byBucket.find((l) => l.id === "")!;
+    expect(none.delta.before).toBe(0);
+    expect(none.delta.ratio).toBeNull();
+  });
+
+  it("the log gets a round column only once there are two rounds", () => {
+    expect(logTable(base)[0]).toHaveLength(10);
+    const { data } = addRound(base, names);
+    expect(logTable(data)[0]).toHaveLength(11);
+    expect(logTable(data)[0][10]).toBe("Before");
   });
 });
