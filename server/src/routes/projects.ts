@@ -4,123 +4,33 @@ import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { ORG_COLS, accessJoins, accessWhere, atLeast, requireProject, roleSql, type ProjectRole } from "../lib/access.js";
-import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
+import { AREAS, atLeast, documentAccess, requireProject, type Area, type ProjectRole } from "../lib/access.js";
+import * as svc from "../services/projects.js";
+import { actorOf } from "../services/actor.js";
 
 export const projects = Router();
 projects.use(requireAuth);
 
 const tokenId = customAlphabet("abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", 24);
 
-const ProjectInput = z.object({
-  name: z.string().trim().min(1).max(160),
-  description: z.string().max(4000).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  category: z.enum(PROJECT_CATEGORIES).optional(),
-  archived: z.boolean().optional(),
-  organization_id: z.string().uuid().nullable().optional(),   // null = personal project
-});
-
-/** The caller must belong to the organization a project is placed in. */
-async function requireOrgMember(orgId: string | null | undefined, userId: string) {
-  if (!orgId) return;
-  if (!(await one("select 1 from organization_members where organization_id = $1 and user_id = $2", [orgId, userId]))) throw new HttpError(403, "No perteneces a esa organización");
-}
-
 /** Proyecto accesible con al menos `min` (viewer < commenter < editor < owner). Lanza 404/403. */
-export const ownProject = (id: string, userId: string, min: ProjectRole = "viewer") => requireProject(id, userId, min);
+export const ownProject = (id: string, userId: string, min: ProjectRole = "viewer", area?: Area) => requireProject(id, userId, min, area);
+const AreasInput = z.array(z.enum(["research", "tickets"])).min(1).max(2).transform((v) => AREAS.filter((a) => v.includes(a)));
 
-const ProjectListQuery = z.object({ category: z.enum(PROJECT_CATEGORIES).optional() });
-
-/** Every project the person can open; `?category=` narrows the list to one kind of work. */
-projects.get("/", async (req, res) => {
-  const filter = parse(ProjectListQuery, req.query);
-  const rows = await query(
-    `select p.*, ${roleSql("$1")} as role, u.name as owner_name, ${ORG_COLS},
-       (select count(*)::int from studies s where s.project_id = p.id) as study_count,
-       (select count(*)::int from studies s where s.project_id = p.id and s.status = 'live') as live_count,
-       (select count(*)::int from sessions se join studies s on s.id = se.study_id
-          where s.project_id = p.id and se.completed_at is not null) as response_count,
-       (select count(*)::int from sessions se join studies s on s.id = se.study_id where s.project_id = p.id) as started_count,
-       (select count(*)::int from participants pa where pa.project_id = p.id) as participant_count,
-       (select count(*)::int from report_shares rs where rs.project_id = p.id and rs.revoked_at is null) as share_count,
-       (select count(*)::int from insights i where i.project_id = p.id) as insight_count,
-       (select count(*)::int from documents d where d.project_id = p.id) as document_count
-     ${accessJoins("$1")}
-       join users u on u.id = p.owner_id
-     where ${accessWhere("$1")} and ($2::text is null or p.category = $2) order by p.updated_at desc`,
-    [req.user!.id, filter.category ?? null],
-  );
-  res.json({ projects: rows });
-});
-
-projects.post("/", async (req, res) => {
-  const b = parse(ProjectInput, req.body);
-  await requireOrgMember(b.organization_id, req.user!.id);
-  const p = await one(
-    "insert into projects(owner_id, name, description, color, organization_id, category) values ($1,$2,$3,coalesce($4,'#5B5BD6'),$5,coalesce($6,'ux_research')) returning *",
-    [req.user!.id, b.name, b.description ?? "", b.color ?? null, b.organization_id ?? null, b.category ?? null],
-  );
-  res.status(201).json({ project: p });
-});
-
-projects.get("/:id", async (req, res) => {
-  res.json({ project: await ownProject(req.params.id, req.user!.id) });
-});
-
-projects.patch("/:id", async (req, res) => {
-  const b = parse(ProjectInput.partial(), req.body);
-  // Name, description, color and category: editors. Archiving, unarchiving or moving it to another space: the owner only.
-  const moves = b.organization_id !== undefined;
-  const cur = await ownProject(req.params.id, req.user!.id, b.archived === undefined && !moves ? "editor" : "owner");
-  if (moves && cur.owner_id !== req.user!.id) throw new HttpError(403, "Solo quien es dueño del proyecto puede moverlo de espacio");
-  if (moves) await requireOrgMember(b.organization_id, req.user!.id);
-  const p = await one(
-    `update projects set
-       name = coalesce($2, name), description = coalesce($3, description),
-       color = coalesce($4, color), archived = coalesce($5, archived),
-       organization_id = case when $6::boolean then $7 else organization_id end,
-       category = coalesce($8, category), updated_at = now()
-     where id = $1 returning *`,
-    [req.params.id, b.name ?? null, b.description ?? null, b.color ?? null, b.archived ?? null, moves, b.organization_id ?? null, b.category ?? null],
-  );
-  res.json({ project: p });
-});
-
-projects.delete("/:id", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "owner");
-  await query("delete from projects where id = $1", [req.params.id]);
-  res.json({ ok: true });
-});
-
-projects.get("/:id/studies", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
-  const rows = await query(
-    `select s.id, s.title, s.method, s.status, s.public_slug, s.created_at, s.updated_at, s.published_at,
-       jsonb_array_length(s.blocks) as block_count,
-       (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as response_count,
-       (select count(*)::int from sessions se where se.study_id = s.id) as started_count
-     from studies s where s.project_id = $1 order by s.updated_at desc`,
-    [req.params.id],
-  );
-  res.json({ studies: rows });
-});
-
-projects.get("/:id/insights", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
-  const rows = await query(
-    `select i.*, s.title as study_title from insights i left join studies s on s.id = i.study_id
-     where i.project_id = $1 order by i.created_at desc`,
-    [req.params.id],
-  );
-  res.json({ insights: rows });
-});
+// The project itself: services/projects.ts.
+projects.get("/", async (req, res) => { res.json(await svc.listProjects(actorOf(req), req.query)); });
+projects.post("/", async (req, res) => { res.status(201).json(await svc.createProject(actorOf(req), req.body)); });
+projects.get("/:id", async (req, res) => { res.json(await svc.getProject(actorOf(req), req.params.id)); });
+projects.patch("/:id", async (req, res) => { res.json(await svc.updateProject(actorOf(req), req.params.id, req.body)); });
+projects.delete("/:id", async (req, res) => { res.json(await svc.deleteProject(actorOf(req), req.params.id)); });
+projects.get("/:id/studies", async (req, res) => { res.json(await svc.listProjectStudies(actorOf(req), req.params.id)); });
+projects.get("/:id/insights", async (req, res) => { res.json(await svc.listProjectInsights(actorOf(req), req.params.id)); });
 
 // Project report: one link with the studies, documents and project-wide parts you pick.
 /** What a report link may hold besides studies and documents. */
-const REPORT_SECTIONS = ["overview", "insights"] as const;
+const REPORT_SECTIONS = ["overview", "insights", "milestones"] as const;
 projects.get("/:id/shares", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
+  await ownProject(req.params.id, req.user!.id, "viewer", "research");
   const rows = await query(
     `select rs.*, coalesce(
        (select jsonb_agg(s.title order by s.updated_at desc) from studies s where s.id = any(rs.study_ids)), '[]'::jsonb
@@ -140,13 +50,15 @@ const ReportShareInput = z.object({
 }).refine((v) => v.study_ids.length + v.document_ids.length + v.sections.length > 0, "Elige al menos una parte del proyecto");
 
 projects.post("/:id/shares", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "editor");
+  await ownProject(req.params.id, req.user!.id, "editor", "research");
   const b = parse(ReportShareInput, req.body);
   const studyIds = [...new Set(b.study_ids)], docIds = [...new Set(b.document_ids)], sections = REPORT_SECTIONS.filter((x) => b.sections.includes(x));
   const owned = await query("select id from studies where project_id = $1 and id = any($2)", [req.params.id, studyIds]);
   if (owned.length !== studyIds.length) throw new HttpError(400, "Alguno de los estudios no pertenece a este proyecto");
   const docs = await query("select id from documents where project_id = $1 and id = any($2)", [req.params.id, docIds]);
   if (docs.length !== docIds.length) throw new HttpError(400, "Alguno de los documentos no pertenece a este proyecto");
+  // Milestones live in the tickets area: only someone who can see them may publish them.
+  if (sections.includes("milestones")) await ownProject(req.params.id, req.user!.id, "viewer", "tickets");
   const share = await one(
     "insert into report_shares(project_id, study_ids, document_ids, sections, token) values ($1,$2,$3,$4,$5) returning *",
     [req.params.id, studyIds, docIds, sections, tokenId()],
@@ -155,7 +67,7 @@ projects.post("/:id/shares", async (req, res) => {
 });
 
 projects.delete("/:id/shares/:shareId", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "editor");
+  await ownProject(req.params.id, req.user!.id, "editor", "research");
   await query("update report_shares set revoked_at = now() where id = $1 and project_id = $2", [req.params.shareId, req.params.id]);
   res.json({ ok: true });
 });
@@ -164,34 +76,44 @@ projects.delete("/:id/shares/:shareId", async (req, res) => {
 const MemberRole = z.enum(["editor", "commenter", "viewer"]);
 const MEMBERS_SQL = `
   select x.* from (
-    select u.id as user_id, u.name, u.email, u.avatar, 'owner'::text as role, p.created_at from projects p join users u on u.id = p.owner_id where p.id = $1
+    select u.id as user_id, u.name, u.email, u.avatar, 'owner'::text as role, array['research','tickets'] as areas, p.created_at from projects p join users u on u.id = p.owner_id where p.id = $1
     union all
-    select u.id, u.name, u.email, u.avatar, m.role, m.created_at from project_members m join users u on u.id = m.user_id where m.project_id = $1
+    select u.id, u.name, u.email, u.avatar, m.role, m.areas, m.created_at from project_members m join users u on u.id = m.user_id where m.project_id = $1
   ) x order by (x.role = 'owner') desc, x.created_at`;
+
+/** People who reach the project through its organization, without being collaborators: shown read-only next to the collaborators. */
+const VIA_ORG_SQL = `
+  select u.id as user_id, u.name, u.email, u.avatar, om.role as org_role,
+    case when om.role = 'member' then om.project_role else 'owner' end as role,
+    case when om.role = 'member' then om.areas else array['research','tickets'] end as areas
+  from projects p join organization_members om on om.organization_id = p.organization_id join users u on u.id = om.user_id
+  where p.id = $1 and u.id <> p.owner_id and (om.role in ('owner','admin') or om.all_projects)
+    and not exists(select 1 from project_members m where m.project_id = p.id and m.user_id = u.id)
+  order by array_position(array['owner','admin','member'], om.role), lower(u.name)`;
 
 projects.get("/:id/members", async (req, res) => {
   await ownProject(req.params.id, req.user!.id);
-  res.json({ members: await query(MEMBERS_SQL, [req.params.id]) });
+  res.json({ members: await query(MEMBERS_SQL, [req.params.id]), via_org: await query(VIA_ORG_SQL, [req.params.id]) });
 });
 
 /** Agrega (o cambia el rol de) una persona que ya tiene cuenta. Solo el dueño. */
 projects.post("/:id/members", async (req, res) => {
   const p = await ownProject(req.params.id, req.user!.id, "owner");
-  const b = parse(z.object({ email: z.string().trim().toLowerCase().email().max(254), role: MemberRole }), req.body);
+  const b = parse(z.object({ email: z.string().trim().toLowerCase().email().max(254), role: MemberRole, areas: AreasInput.optional() }), req.body);
   const u = await one<{ id: string }>("select id from users where email = $1 and disabled_at is null", [b.email]);
   if (!u) throw new HttpError(404, "No hay una cuenta activa con ese correo. Pídele que se registre o invítala desde Usuarios.");
   if (u.id === p.owner_id) throw new HttpError(400, "Esa persona ya es dueña del proyecto");
   await query(
-    `insert into project_members(project_id, user_id, role, added_by) values ($1,$2,$3,$4)
-     on conflict (project_id, user_id) do update set role = excluded.role`,
-    [req.params.id, u.id, b.role, req.user!.id]);
+    `insert into project_members(project_id, user_id, role, added_by, areas) values ($1,$2,$3,$4, coalesce($5::text[], '{research,tickets}'))
+     on conflict (project_id, user_id) do update set role = excluded.role, areas = coalesce($5::text[], project_members.areas)`,
+    [req.params.id, u.id, b.role, req.user!.id, b.areas ?? null]);
   res.status(201).json({ members: await query(MEMBERS_SQL, [req.params.id]) });
 });
 
 projects.patch("/:id/members/:userId", async (req, res) => {
   await ownProject(req.params.id, req.user!.id, "owner");
-  const b = parse(z.object({ role: MemberRole }), req.body);
-  await query("update project_members set role = $3 where project_id = $1 and user_id = $2", [req.params.id, req.params.userId, b.role]);
+  const b = parse(z.object({ role: MemberRole.optional(), areas: AreasInput.optional() }), req.body);
+  await query("update project_members set role = coalesce($3, role), areas = coalesce($4::text[], areas) where project_id = $1 and user_id = $2", [req.params.id, req.params.userId, b.role ?? null, b.areas ?? null]);
   res.json({ members: await query(MEMBERS_SQL, [req.params.id]) });
 });
 
@@ -209,24 +131,34 @@ const CommentTarget = z.object({ study_id: z.string().uuid().optional(), documen
   .refine((v) => !(v.study_id && v.document_id), "Un comentario tiene un solo destino");
 const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.user_id, u.name, u.avatar
   from comments c left join users u on u.id = c.user_id
-  where c.project_id = $1 and c.study_id is not distinct from $2 and c.document_id is not distinct from $3 order by c.created_at`;
+  where c.project_id = $1 and c.ticket_id is null and c.study_id is not distinct from $2 and c.document_id is not distinct from $3 order by c.created_at`;
 const comments = (projectId: string, t: { study_id?: string; document_id?: string }) => query(COMMENTS_SQL, [projectId, t.study_id ?? null, t.document_id ?? null]);
 
 /** The target must live in this project, otherwise a comment could be attached to someone else's study. */
+/** Comments on a study or a document belong to the research section; comments on the project itself are open to everyone in it. */
+const targetArea = (t: { study_id?: string; document_id?: string }): Area | undefined => (t.study_id || t.document_id ? "research" : undefined);
+
 async function requireTarget(projectId: string, t: { study_id?: string; document_id?: string }) {
   if (t.study_id && !(await one("select 1 from studies where id = $1 and project_id = $2", [t.study_id, projectId]))) throw new HttpError(400, "El estudio o documento no pertenece a este proyecto");
   if (t.document_id && !(await one("select 1 from documents where id = $1 and project_id = $2", [t.document_id, projectId]))) throw new HttpError(400, "El estudio o documento no pertenece a este proyecto");
 }
 
+/** Comments on a document go by the person's role on that document, so someone it was shared with can read or write them. */
+async function canComment(projectId: string, userId: string, t: { study_id?: string; document_id?: string }, min: ProjectRole) {
+  if (!t.document_id) return ownProject(projectId, userId, min, targetArea(t));
+  const a = await documentAccess(t.document_id, userId, min);
+  if (a.doc.project_id !== projectId) throw new HttpError(400, "El estudio o documento no pertenece a este proyecto");
+}
+
 projects.get("/:id/comments", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id);
   const target = parse(CommentTarget, { study_id: req.query.study_id, document_id: req.query.document_id });
+  await canComment(req.params.id, req.user!.id, target, "viewer");
   res.json({ comments: await comments(req.params.id, target) });
 });
 
 projects.post("/:id/comments", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "commenter");
   const b = parse(CommentTarget.and(z.object({ body: z.string().trim().min(1).max(4000) })), req.body);
+  await canComment(req.params.id, req.user!.id, b, "commenter");
   await requireTarget(req.params.id, b);
   await query("insert into comments(project_id, study_id, document_id, user_id, body) values ($1,$2,$3,$4,$5)",
     [req.params.id, b.study_id ?? null, b.document_id ?? null, req.user!.id, b.body]);
@@ -234,11 +166,12 @@ projects.post("/:id/comments", async (req, res) => {
 });
 
 projects.delete("/:id/comments/:commentId", async (req, res) => {
-  const p = await ownProject(req.params.id, req.user!.id);
   const c = await one<{ user_id: string | null; study_id: string | null; document_id: string | null }>(
     "select user_id, study_id, document_id from comments where id = $1 and project_id = $2", [req.params.commentId, req.params.id]);
+  // Someone a document was shared with reaches its comments without the project; the project owner still moderates.
+  const role = c?.document_id ? (await documentAccess(c.document_id, req.user!.id)).projectRole : (await ownProject(req.params.id, req.user!.id)).role;
   if (!c) throw notFound("Comentario");
-  if (c.user_id !== req.user!.id && !atLeast(p.role, "owner")) throw new HttpError(403, "Solo puedes borrar tus propios comentarios");
+  if (c.user_id !== req.user!.id && !atLeast(role, "owner")) throw new HttpError(403, "Solo puedes borrar tus propios comentarios");
   await query("delete from comments where id = $1", [req.params.commentId]);
   res.json({ comments: await comments(req.params.id, { study_id: c.study_id ?? undefined, document_id: c.document_id ?? undefined }) });
 });

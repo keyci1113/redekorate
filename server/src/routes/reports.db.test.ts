@@ -57,11 +57,11 @@ test("project report links hold studies, documents, diagrams and project-wide pa
 
   assert.equal((await call("POST", `/projects/${project}/shares`, {})).status, 400);
   assert.equal((await call("POST", `/projects/${project}/shares`, { document_ids: [foreign.id] })).status, 400);
-  assert.equal((await call("POST", `/projects/${project}/shares`, { sections: ["milestones"] })).status, 400);
+  assert.equal((await call("POST", `/projects/${project}/shares`, { sections: ["timeline"] })).status, 400, "an unknown section is refused");
 
-  const made = await call("POST", `/projects/${project}/shares`, { study_ids: [s.id], document_ids: [flow.id, guide.id], sections: ["insights", "overview"] });
+  const made = await call("POST", `/projects/${project}/shares`, { study_ids: [s.id], document_ids: [flow.id, guide.id], sections: ["insights", "overview", "milestones"] });
   assert.equal(made.status, 201);
-  assert.deepEqual(made.body.share.sections, ["overview", "insights"]);
+  assert.deepEqual(made.body.share.sections, ["overview", "insights", "milestones"]);
   assert.deepEqual((await call("GET", `/projects/${project}/shares`)).body.shares[0].document_titles, ["Flow", "Guide"]);
 
   const r = (await pub(made.body.share.token)).body;
@@ -69,12 +69,13 @@ test("project report links hold studies, documents, diagrams and project-wide pa
   assert.deepEqual(r.reports.map((x: any) => x.study.title), ["Survey"]);
   assert.deepEqual(r.documents.map((d: any) => [d.title, d.kind]), [["Flow", "diagram"], ["Guide", "interview_guide"]]);
   assert.ok(r.insights.some((i: any) => i.title === "Loose insight" && i.study_title === null));
+  assert.deepEqual(r.milestones, []);
 
-  // Only what was picked travels: a studies-only link has no description, documents or insights.
+  // Only what was picked travels: a studies-only link has no description, documents, insights or milestones.
   const plain = await call("POST", `/projects/${project}/shares`, { study_ids: [s.id] });
   const only = (await pub(plain.body.share.token)).body;
   assert.equal(only.project.description, null);
-  assert.deepEqual([only.documents, only.insights], [[], null]);
+  assert.deepEqual([only.documents, only.insights, only.milestones], [[], null, null]);
 
   await call("DELETE", `/documents/${guide.id}`);
   assert.deepEqual((await pub(made.body.share.token)).body.documents.map((d: any) => d.title), ["Flow"]);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronRight, CornerDownLeft, GripVertical, Maximize2, Plus, Star, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import type {
   Block, CardSortBlock, CardSortValue, ChoiceBlock, ChoiceValue, DropdownBlock, FirstClickBlock, FirstClickValue, FiveSecondBlock,
@@ -8,6 +8,7 @@ import { TimedTaskView } from "./TimedTaskRunner";
 import { parseTree } from "./types";
 import { scaleRange } from "./scale";
 import { imageSize, imageStyle } from "./image";
+import { rankSlot, rankTarget } from "./ranking";
 import { SUS_ITEMS } from "./registry";
 import { cx } from "../components/ui";
 import { uid } from "../lib/hooks";
@@ -232,27 +233,92 @@ function SusView({ product, value, onChange }: { product: string; value: (number
 }
 
 // ── Ranking ─────────────────────────────────────────────────────
+const RANK_GAP = 8;
+const RANK_EASE = "cubic-bezier(0.2, 0, 0, 1)";
+type RankDrag = { from: number; to: number; dy: number; startY: number; scroll: number; tops: number[]; heights: number[] };
+
 function RankingView({ block, value, onChange }: { block: RankingBlock; value?: string[]; onChange: (v: unknown) => void }) {
   const initial = useMemo(() => (block.randomize ? shuffle(block.items) : block.items).map((i) => i.id), [block.items, block.randomize]);
   const order = value && value.length === block.items.length ? value : initial;
   useEffect(() => { if (!value || value.length !== block.items.length) onChange(initial); /* eslint-disable-next-line */ }, [initial]);
-  const [drag, setDrag] = useState<number | null>(null);
-  const move = (from: number, to: number) => { if (to < 0 || to >= order.length) return; const n = [...order]; const [m] = n.splice(from, 1); n.splice(to, 0, m); onChange(n); };
+  const [drag, setDrag] = useState<RankDrag | null>(null);
+  const [settling, setSettling] = useState<string | null>(null);
+  const rows = useRef(new Map<string, HTMLLIElement>());
+  const before = useRef<Map<string, number> | null>(null);
   const label = (id: string) => block.items.find((i) => i.id === id)?.label ?? "";
+
+  // Rows glide from where they were on screen to their new place (drag drop and arrow moves alike).
+  const remember = () => { before.current = new Map([...rows.current].map(([id, el]) => [id, el.getBoundingClientRect().top])); };
+  useLayoutEffect(() => {
+    const was = before.current; before.current = null;
+    if (!was || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setSettling(null); return; }
+    for (const [id, el] of rows.current) {
+      const dy = (was.get(id) ?? 0) - el.getBoundingClientRect().top;
+      if (!was.has(id) || Math.abs(dy) < 1) continue;
+      const a = el.animate([{ transform: `translateY(${dy}px)` }, { transform: "none" }], { duration: 220, easing: RANK_EASE });
+      if (id === settling) a.onfinish = a.oncancel = () => setSettling(null);
+    }
+    if (settling && !rows.current.get(settling)?.getAnimations().length) setSettling(null);
+    /* eslint-disable-next-line */
+  }, [order.join("|"), drag === null]);
+
+  const move = (from: number, to: number) => {
+    if (to < 0 || to >= order.length || from === to) return;
+    remember();
+    const n = [...order]; const [m] = n.splice(from, 1); n.splice(to, 0, m); onChange(n);
+  };
+
+  const start = (e: React.PointerEvent<HTMLLIElement>, i: number) => {
+    const target = e.target as HTMLElement;
+    if (e.button !== 0 || target.closest("button")) return;
+    if (e.pointerType !== "mouse" && !target.closest("[data-grip]")) return; // touch drags by the handle so the page still scrolls
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rects = order.map((id) => rows.current.get(id)!.getBoundingClientRect());
+    setDrag({ from: i, to: i, dy: 0, startY: e.clientY, scroll: window.scrollY, tops: rects.map((r) => r.top), heights: rects.map((r) => r.height) });
+  };
+  const track = (e: React.PointerEvent) => {
+    if (!drag) return;
+    const last = drag.tops.length - 1;
+    const min = drag.tops[0] - drag.tops[drag.from];
+    const max = drag.tops[last] + drag.heights[last] - drag.heights[drag.from] - drag.tops[drag.from];
+    const dy = Math.min(max, Math.max(min, e.clientY - drag.startY + window.scrollY - drag.scroll));
+    setDrag({ ...drag, dy, to: rankTarget({ ...drag, dy }) });
+  };
+  const finish = (commit: boolean) => {
+    if (!drag) return;
+    remember();
+    setSettling(order[drag.from]);
+    setDrag(null);
+    if (commit && drag.to !== drag.from) { const n = [...order]; const [m] = n.splice(drag.from, 1); n.splice(drag.to, 0, m); onChange(n); }
+  };
+
   return (
     <div>
       <p className="label mb-3">{t("Arrastra o usa las flechas · 1 = más importante")}</p>
       <ol className="space-y-2">
-        {order.map((id, i) => (
-          <li key={id} draggable onDragStart={() => setDrag(i)} onDragOver={(e) => { e.preventDefault(); if (drag !== null && drag !== i) { move(drag, i); setDrag(i); } }} onDragEnd={() => setDrag(null)}
-            className={cx("flex items-center gap-3 rounded-xl border border-line bg-surface px-3 py-2.5 transition", drag === i && "border-accent shadow-lg")}>
-            <GripVertical size={16} className="cursor-grab text-ink-3" />
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-[13px] font-semibold text-accent-ink tabular-nums">{i + 1}</span>
-            <span className="flex-1 text-[15px]">{label(id)}</span>
-            <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} className="focus-ring rounded-md p-1.5 text-ink-3 hover:bg-ink/5 disabled:opacity-30" aria-label={t("Subir")}><ArrowUp size={15} /></button>
-            <button type="button" onClick={() => move(i, i + 1)} disabled={i === order.length - 1} className="focus-ring rounded-md p-1.5 text-ink-3 hover:bg-ink/5 disabled:opacity-30" aria-label={t("Bajar")}><ArrowDown size={15} /></button>
-          </li>
-        ))}
+        {order.map((id, i) => {
+          const held = drag?.from === i;
+          const slot = drag ? rankSlot(i, drag.from, drag.to) : i;
+          const shift = drag && !held ? (slot - i) * (drag.heights[drag.from] + RANK_GAP) : 0;
+          return (
+            <li key={id} ref={(el) => { if (el) rows.current.set(id, el); else rows.current.delete(id); }}
+              onPointerDown={(e) => start(e, i)} onPointerMove={track} onPointerUp={() => finish(true)} onPointerCancel={() => finish(false)}
+              onKeyDown={(e) => { if (e.key === "Escape") finish(false); }}
+              style={{
+                transform: held ? `translateY(${drag.dy}px) scale(1.02)` : shift ? `translateY(${shift}px)` : undefined,
+                transition: held ? "box-shadow 160ms, border-color 160ms" : drag ? `transform 200ms ${RANK_EASE}` : "box-shadow 160ms, border-color 160ms",
+              }}
+              className={cx("relative flex select-none items-center gap-3 rounded-xl border bg-surface px-3 py-2.5",
+                held ? "z-10 cursor-grabbing border-accent shadow-xl" : "cursor-grab border-line", settling === id && "z-10")}>
+              <span data-grip className="-m-2 touch-none p-2 text-ink-3"><GripVertical size={16} /></span>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-soft text-[13px] font-semibold text-accent-ink tabular-nums">{slot + 1}</span>
+              <span className="flex-1 text-[15px]">{label(id)}</span>
+              <button type="button" onClick={() => move(i, i - 1)} disabled={i === 0} className="focus-ring rounded-md p-1.5 text-ink-3 hover:bg-ink/5 disabled:opacity-30" aria-label={t("Subir")}><ArrowUp size={15} /></button>
+              <button type="button" onClick={() => move(i, i + 1)} disabled={i === order.length - 1} className="focus-ring rounded-md p-1.5 text-ink-3 hover:bg-ink/5 disabled:opacity-30" aria-label={t("Bajar")}><ArrowDown size={15} /></button>
+            </li>
+          );
+        })}
       </ol>
     </div>
   );

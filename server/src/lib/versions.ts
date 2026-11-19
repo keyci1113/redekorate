@@ -1,17 +1,23 @@
 /**
- * Earlier versions of what AI apps (the MCP server) overwrite: a study's blocks and settings and a document's
- * content. Each overwrite saves what was there first, so a bad write can be put back. The web app saves as people
+ * Earlier versions of what outside callers (the REST API and AI apps through MCP) overwrite: a study's blocks and
+ * settings, a document's content and a ticket's description. Each overwrite saves what was there first, so a bad write can be put back. The web app saves as people
  * type, so its own edits don't save versions.
  */
 import { one, query } from "./db.js";
 import { HttpError } from "./http.js";
 
-export type Target = "study" | "document";
+export type Target = "study" | "document" | "ticket";
 export const KEEP_VERSIONS = 30;
-const COLUMN: Record<Target, string> = { study: "study_id", document: "document_id" };
+const COLUMN: Record<Target, string> = { study: "study_id", document: "document_id", ticket: "ticket_id" };
 
 const contentOf = (target: Target, row: Record<string, any>) =>
-  target === "study" ? { title: row.title, blocks: row.blocks, settings: row.settings } : { title: row.title, language: row.language, data: row.data };
+  target === "study" ? { title: row.title, blocks: row.blocks, settings: row.settings }
+  : target === "ticket" ? { title: row.title, description: row.description }
+  : { title: row.title, language: row.language, data: row.data };
+const summaryOf = (target: Target, c: Record<string, any>) =>
+  target === "study" ? `${c.title} · ${(c.blocks ?? []).length} blocks`
+  : target === "ticket" ? `${c.title} · ${String(c.description ?? "").length} characters of description`
+  : `${c.title} · ${Object.keys(c.data ?? {}).length} sections filled`;
 
 /** True when there is something in it: a non-empty list, text, or an object with something inside. */
 export const filled = (v: unknown): boolean => Array.isArray(v) ? v.length > 0 : typeof v === "string" ? v.trim() !== "" : !!v && typeof v === "object" && Object.values(v).some(filled);
@@ -44,7 +50,7 @@ export async function listVersions(target: Target, rowId: string) {
      where v.${COLUMN[target]} = $1 order by v.created_at desc, v.id desc`, [rowId]);
   return rows.map(({ content: c, ...v }) => ({
     ...v,
-    summary: target === "study" ? `${c.title} · ${(c.blocks ?? []).length} blocks` : `${c.title} · ${Object.keys(c.data ?? {}).length} sections filled`,
+    summary: summaryOf(target, c),
   }));
 }
 
@@ -55,6 +61,7 @@ export async function restoreVersion(target: Target, row: Record<string, any>, v
   await saveVersion(target, row, userId, "restore");
   const c = v.content;
   if (target === "study") await query("update studies set title = $2, blocks = $3, settings = $4, updated_at = now() where id = $1", [row.id, c.title, JSON.stringify(c.blocks ?? []), JSON.stringify(c.settings ?? {})]);
+  else if (target === "ticket") await query("update tickets set description = $2, updated_at = now() where id = $1", [row.id, c.description ?? ""]);   // the title stays: only descriptions are versioned
   else await query("update documents set title = $2, language = $3, data = $4, updated_at = now() where id = $1", [row.id, c.title, c.language, JSON.stringify(c.data ?? {})]);
   return { restored: versionId };
 }

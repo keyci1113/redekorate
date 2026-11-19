@@ -28,3 +28,8 @@ export function categoryCounts(projects: { category?: string | null }[]): { cate
   for (const p of projects) n.set(categoryOf(p), (n.get(categoryOf(p)) ?? 0) + 1);
   return PROJECT_CATEGORIES.filter((c) => n.has(c)).map((c) => ({ category: c, n: n.get(c)! }));
 }
+
+export type StartChoice = "study" | "tickets" | "milestones";
+/** The order of the "what to set up first" choices after creating a project: research and design start with a study, the rest with the board. */
+export const startOrder = (c: ProjectCategory): StartChoice[] =>
+  c === "ux_research" || c === "design" ? ["study", "tickets", "milestones"] : ["tickets", "milestones", "study"];

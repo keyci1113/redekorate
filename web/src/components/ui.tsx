@@ -10,7 +10,7 @@ export { cx };
 
 type Variant = "primary" | "secondary" | "ghost" | "danger";
 const variants: Record<Variant, string> = {
-  primary: "bg-accent text-on-accent hover:bg-accent/90 hover:-translate-y-px active:translate-y-0 motion-reduce:transform-none shadow-sm",
+  primary: "bg-[var(--rk-btn,var(--color-accent))] text-[var(--rk-on-btn,var(--color-on-accent))] hover:opacity-90 hover:-translate-y-px active:translate-y-0 motion-reduce:transform-none shadow-sm",
   secondary: "bg-surface text-ink border border-line hover:border-line-2 hover:bg-paper/60",
   ghost: "text-ink-2 hover:bg-ink/5 hover:text-ink",
   danger: "bg-bad text-white hover:bg-bad/90",
@@ -52,7 +52,8 @@ export function Field({ label, hint, children, group }: { label: string; hint?: 
   );
 }
 
-export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
+/** `width` (px) overrides `wide` for content that needs more room, such as a session replay. */
+export function Modal({ open, onClose, title, children, wide, width }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean; width?: number }) {
   const titleId = useId();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -71,7 +72,7 @@ export function Modal({ open, onClose, title, children, wide }: { open: boolean;
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/30 p-4 pt-[10vh] backdrop-blur-[2px]" onMouseDown={onClose}>
-      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cx("w-full rounded-2xl border border-line bg-surface shadow-xl outline-none", wide ? "max-w-2xl" : "max-w-md")} onMouseDown={(e) => e.stopPropagation()}>
+      <div ref={box} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={cx("w-full rounded-2xl border border-line bg-surface shadow-xl outline-none", !width && (wide ? "max-w-2xl" : "max-w-md"))} style={width ? { maxWidth: width } : undefined} onMouseDown={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-line px-5 py-4">
           <h2 id={titleId} className="text-[15px] font-semibold">{title}</h2>
           <button onClick={onClose} className="focus-ring rounded-md p-1 text-ink-3 hover:bg-ink/5 hover:text-ink" aria-label={t("Cerrar")}><X size={18} /></button>

@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { GripVertical, ImagePlus, Loader2, Plus, Trash2, X } from "lucide-react";
+import { GripVertical, ImagePlus, Loader2, Pipette, Plus, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import { optimizeImage } from "../lib/image";
 import { uid, type usePaneWidth } from "../lib/hooks";
@@ -186,3 +186,26 @@ export function PaneHandle({ label, className, ...props }: { label: string; clas
   );
 }
 
+
+/** A color picker that looks like one: a swatch with a pipette, the words "Custom color" and the code, which can also be typed. */
+export function ColorPicker({ value, onChange, label = t("Color personalizado") }: { value: string; onChange: (hex: string) => void; label?: string }) {
+  const [typed, setTyped] = useState<string | null>(null);
+  const commit = (raw: string) => {
+    const v = raw.trim().replace(/^#?/, "#");
+    if (/^#[0-9a-fA-F]{6}$/.test(v)) onChange(v.toUpperCase());
+    setTyped(null);
+  };
+  return (
+    <span className="inline-flex h-9 items-stretch overflow-hidden rounded-lg border border-line-2 bg-surface text-[13px] focus-within:ring-2 focus-within:ring-accent/40">
+      <label className="relative flex cursor-pointer items-center gap-2 pr-2.5 pl-1.5 font-medium text-ink-2 hover:bg-ink/5 hover:text-ink" title={label}>
+        <input type="color" value={value} onChange={(e) => onChange(e.target.value.toUpperCase())} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label={label} />
+        <span className="h-6 w-6 rounded-md ring-1 ring-ink/15" style={{ background: value }} aria-hidden />
+        <Pipette size={14} aria-hidden />
+        <span>{label}</span>
+      </label>
+      <input className="w-[86px] border-l border-line-2 bg-transparent px-2 font-mono text-[12px] uppercase outline-none" spellCheck={false} maxLength={7}
+        aria-label={t("Código de color")} value={typed ?? value.toUpperCase()} onChange={(e) => setTyped(e.target.value)} onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commit((e.target as HTMLInputElement).value); } }} />
+    </span>
+  );
+}

@@ -28,16 +28,44 @@ function checkPassword(pw: string) {
 
 const inviteToken = z.string().min(20).max(200);
 /** Invitación vigente para un token; la usan el registro con contraseña y el inicio con Google/Microsoft. */
-export const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null; organization_id: string | null; org_role: "admin" | "member" | null; organization: string | null }>(
-  `select i.id, i.email, i.role, u.name as invited_by, i.organization_id, i.org_role, o.name as organization
+export const pendingInvite = (token: string) => one<{ id: string; email: string; role: Role; invited_by: string | null; organization_id: string | null; org_role: "admin" | "member" | null; organization: string | null; document_id: string | null; document: string | null; doc_role: string | null }>(
+  `select i.id, i.email, i.role, u.name as invited_by, i.organization_id, i.org_role, o.name as organization,
+          i.document_id, d.title as document, i.doc_role
    from invites i left join users u on u.id = i.invited_by left join organizations o on o.id = i.organization_id
+   left join documents d on d.id = i.document_id
    where i.token_hash = $1 and i.accepted_at is null and i.expires_at > now()`, [sha256(token)]);
+
+/** Marks the invitation as used and gives what it carried: a document shared with the person, or an organization
+ *  joined with the access chosen by whoever invited (the role, the sections and, when limited to some projects,
+ *  a collaborator row on each of them). */
+export async function acceptInvite(inviteId: string, userId: string) {
+  const inv = await one<{ organization_id: string | null; org_role: string | null; org_all_projects: boolean; org_project_role: string; org_areas: string[]; org_project_ids: string[]; invited_by: string | null; document_id: string | null; doc_role: string | null }>(
+    "update invites set accepted_at = now() where id = $1 returning organization_id, org_role, org_all_projects, org_project_role, org_areas, org_project_ids, invited_by, document_id, doc_role", [inviteId]);
+  if (inv?.document_id && inv.doc_role) {
+    await query(
+      `insert into document_shares(document_id, user_id, role, added_by) values ($1,$2,$3,$4) on conflict (document_id, user_id) do update set role = excluded.role`,
+      [inv.document_id, userId, inv.doc_role, inv.invited_by]);
+    // Someone invited to one document came to open it, not to set up a workspace: no welcome wizard.
+    await query("update users set onboarded_at = coalesce(onboarded_at, now()) where id = $1", [userId]);
+  }
+  if (!inv?.organization_id) return;
+  await query(
+    `insert into organization_members(organization_id, user_id, role, all_projects, project_role, areas) values ($1,$2,$3,$4,$5,$6) on conflict do nothing`,
+    [inv.organization_id, userId, inv.org_role ?? "member", inv.org_all_projects, inv.org_project_role, inv.org_areas]);
+  if (inv.org_all_projects || !inv.org_project_ids.length) return;
+  // Only projects still in that organization: one may have been moved or deleted since the invitation was sent.
+  await query(
+    `insert into project_members(project_id, user_id, role, areas, added_by)
+     select p.id, $2::uuid, $3, $4::text[], $5::uuid from projects p where p.organization_id = $1 and p.id = any($6) on conflict do nothing`,
+    [inv.organization_id, userId, inv.org_project_role, inv.org_areas, inv.invited_by, inv.org_project_ids]);
+}
 
 /** Datos públicos de una invitación, para prellenar el formulario. */
 auth.get("/invite/:token", resetLimiter, async (req, res) => {
   const inv = await pendingInvite(parse(inviteToken, req.params.token));
   if (!inv) throw new HttpError(404, "La invitación no es válida o ya venció.");
-  res.json({ invite: { email: inv.email, role: inv.role, invited_by: inv.invited_by, organization: inv.organization } });
+  res.json({ invite: { email: inv.email, role: inv.role, invited_by: inv.invited_by, organization: inv.organization,
+    document: inv.document_id ? { id: inv.document_id, title: inv.document, role: inv.doc_role } : null } });
 });
 
 auth.post("/register", authLimiter, async (req, res) => {
@@ -45,13 +73,11 @@ auth.post("/register", authLimiter, async (req, res) => {
   const anyUser = !!(await one("select 1 from users limit 1"));
   let role: Role = anyUser ? "member" : "admin";   // la primera cuenta administra la instancia
   let inviteId: string | null = null;
-  let org: { id: string; role: "admin" | "member" } | null = null;   // an organization invite also joins the organization
   if (body.invite) {
     const inv = await pendingInvite(body.invite);
     if (!inv) throw new HttpError(400, "La invitación no es válida o ya venció.");
     if (inv.email !== body.email) throw new HttpError(400, "Usa el correo al que se envió la invitación.");
     role = inv.role; inviteId = inv.id;
-    if (inv.organization_id) org = { id: inv.organization_id, role: inv.org_role ?? "member" };
   } else if (process.env.ALLOW_REGISTRATION === "false" && anyUser) {
     throw new HttpError(403, "El registro está cerrado. Pide acceso a la administradora.");
   }
@@ -63,8 +89,10 @@ auth.post("/register", authLimiter, async (req, res) => {
     "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,$3,$4,now()) returning id, email, name, role, avatar, onboarded_at",
     [body.name, body.email, hash, role],
   );
-  if (inviteId) await query("update invites set accepted_at = now() where id = $1", [inviteId]);
-  if (org) await query("insert into organization_members(organization_id, user_id, role) values ($1,$2,$3) on conflict do nothing", [org.id, user!.id, org.role]);
+  if (inviteId) {
+    await acceptInvite(inviteId, user!.id);
+    user!.onboarded_at = (await one<{ onboarded_at: string | null }>("select onboarded_at from users where id = $1", [user!.id]))!.onboarded_at;
+  }
   signSession(res, user!, 0);
   res.status(201).json({ user });
 });

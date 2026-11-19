@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { flowToTask, isDirect, matchStep, resolveTask, stepsComplete, type Prototype, type PrototypeTaskValue } from "./prototype";
+import { flowToTask, isDirect, matchStep, resolveTask, stepsComplete, taskInstructions, type Prototype, type PrototypeTaskValue } from "./prototype";
 import type { PrototypeTaskBlock } from "./types";
 
 const proto = (flow?: Prototype["flow"]): Prototype => ({ id: "p", name: "P", device: "mobile", showHints: true, screens: [], kind: "html", flow });
@@ -19,11 +19,23 @@ describe("flowToTask", () => {
     expect(flowToTask(proto({ items: [S("a", "h:Opp"), T("b", "Order Checklist"), T("c", "Edit configuration")], goalId: "c" })))
       .toMatchObject({ goalScreens: [], expectedPath: [], steps: [{ label: "Order Checklist" }], goalClick: { label: "Edit configuration" } });
   });
-  it("accepts the legacy shape and a tap as the start (it becomes the first step)", () => {
+  it("accepts the legacy shape and a tap as the start", () => {
     expect(flowToTask(proto({ start: "h:A", goal: "h:B", path: [], steps: [{ label: "Tab" }] } as unknown as Prototype["flow"])))
       .toMatchObject({ goalScreens: ["h:B"], expectedPath: ["h:A", "h:B"], steps: [{ label: "Tab" }] });
     expect(flowToTask(proto({ items: [T("a", "Open menu"), S("b", "h:Settings")], startId: "a", goalId: "b" })))
-      .toMatchObject({ startScreen: "", goalScreens: ["h:Settings"], expectedPath: [], steps: [{ label: "Open menu" }] });
+      .toMatchObject({ startScreen: "", startTap: { label: "Open menu" }, goalScreens: ["h:Settings"], expectedPath: [], steps: [] });
+  });
+  it("a tap as the start is done for the participant: start on its screen with the tap made, and do not require it again", () => {
+    const p = proto({ items: [T("a", "Order Checklist", "h:Lease"), T("b", "Upload"), T("c", "Submit")], startId: "a", goalId: "c" });
+    expect(flowToTask(p)).toMatchObject({ startScreen: "h:Lease", startTap: { label: "Order Checklist", screen: "h:Lease" }, steps: [{ label: "Upload" }], goalClick: { label: "Submit" } });
+    expect(flowToTask(proto({ items: [S("a", "h:Home"), T("b", "Upload")], startId: "a" }))?.startTap).toBeUndefined();
+  });
+  it("the participant reads the task description plus the prototype's own instructions, without repeating them", () => {
+    const p = proto({ items: [], instructions: " Open the lease " });
+    expect(taskInstructions("Find it", p)).toBe("Find it\n\nOpen the lease");
+    expect(taskInstructions("Open the lease", p)).toBe("Open the lease");
+    expect(taskInstructions("", p)).toBe("Open the lease");
+    expect(taskInstructions("Find it", { ...p, kind: "screens" })).toBe("Find it");
   });
 });
 

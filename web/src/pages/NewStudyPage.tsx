@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Clock, Plus, Search, Sparkles, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { ArrowRight, CheckCircle2, Clock, Plus, Search, Sparkles, Ticket as TicketIcon, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import type { Project, Study } from "../lib/types";
@@ -36,6 +36,9 @@ export function NewStudyPage() {
   const [pick, setPick] = useState<Template | null>(null);
   const counts = catalogCounts();
   const firstTime = params.get("nuevo") === "1";
+  // Arriving from a ticket ("Create study"): the study takes the ticket's title and stays linked to it.
+  const ticketNumber = Number(params.get("ticket")) || null;
+  const ticket = useLoad(() => (ticketNumber ? api.get<{ ticket: { number: number; title: string } }>(`/projects/${id}/tickets/${ticketNumber}`).then((r) => r.ticket) : Promise.resolve(null)), [id, ticketNumber]);
 
   const filtered = useMemo(() => TEMPLATES.filter((tpl) =>
     (cat === "all" || tpl.category === cat) &&
@@ -47,6 +50,13 @@ export function NewStudyPage() {
     <div className="page">
       <BackLink to={`/projects/${id}`} color={project.data?.project.color} label={project.data?.project.name ?? t("Proyecto")} section={t("Estudios")} />
 
+      {ticket.data && (
+        <div className="mt-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-accent/20 bg-accent-soft px-4 py-3 text-sm text-accent-ink">
+          <TicketIcon size={16} aria-hidden />{t("Este estudio quedará vinculado al ticket")}
+          <Link to={`/projects/${id}/tickets/${ticket.data.number}`} className="focus-ring rounded font-semibold underline"><span className="tabular-nums">#{ticket.data.number}</span> {ticket.data.title}</Link>
+        </div>
+      )}
+      {ticketNumber && ticket.error && <div className="mt-4"><ErrorNote>{t("No encontramos ese ticket en este proyecto. El estudio se creará sin vínculo.")}</ErrorNote></div>}
       {firstTime && (
         <div className="mt-4 flex items-center gap-3 rounded-xl border border-good/20 bg-good-soft px-4 py-3 text-sm text-good">
           <CheckCircle2 size={18} /> {t("Proyecto")} <b>{project.data?.project.name}</b> {t("creado. Ahora elige qué tipo de investigación quieres hacer.")}
@@ -114,7 +124,7 @@ export function NewStudyPage() {
       ))}
       {shown.length === 0 && <p className="mt-10 text-center text-sm text-ink-3">{t("Ningún método coincide con tu búsqueda.")}</p>}
 
-      <TemplateModal tpl={pick} projectId={id!} project={project.data?.project} onClose={() => setPick(null)} onCreated={(sid) => nav(`/studies/${sid}/edit`)} />
+      <TemplateModal tpl={pick} projectId={id!} project={project.data?.project} ticket={ticket.data} onClose={() => setPick(null)} onCreated={(sid) => nav(`/studies/${sid}/edit`)} />
     </div>
   );
 }
@@ -144,8 +154,11 @@ function TemplateCard({ tpl, onPick }: { tpl: Template; onPick: () => void }) {
   );
 }
 
-function TemplateModal({ tpl, projectId, project, onClose, onCreated }: { tpl: Template | null; projectId: string; project?: Project | null; onClose: () => void; onCreated: (id: string) => void }) {
+function TemplateModal({ tpl, projectId, project, ticket, onClose, onCreated }: { tpl: Template | null; projectId: string; project?: Project | null; ticket?: { number: number; title: string } | null; onClose: () => void; onCreated: (id: string) => void }) {
   const [title, setTitle] = useState("");
+  // A study that comes from a ticket starts with the ticket's title; the person can still rename it.
+  const from = ticket?.title;
+  useEffect(() => { if (from) setTitle((cur) => cur || from.slice(0, 200)); }, [from, tpl]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lang, setLangChoice] = useState<Lang>(getLang());
@@ -156,7 +169,7 @@ function TemplateModal({ tpl, projectId, project, onClose, onCreated }: { tpl: T
     try {
       // A study in an organization project starts with the organization's logo and color as its brand.
       const brand = project?.organization_id ? { color: project.org_color ?? undefined, logo: project.org_logo ?? undefined } : undefined;
-      const { study } = await api.post<{ study: Study }>("/studies", { project_id: projectId, title: title.trim() || (tpl!.key === "blank" ? t("Estudio sin título") : tpl!.name), method: tpl!.key, blocks, settings: { language: lang, ...(brand ? { brand } : {}) } });
+      const { study } = await api.post<{ study: Study }>("/studies", { project_id: projectId, title: title.trim() || (tpl!.key === "blank" ? t("Estudio sin título") : tpl!.name), method: tpl!.key, blocks, settings: { language: lang, ...(brand ? { brand } : {}) }, ...(ticket ? { ticket_number: ticket.number } : {}) });
       onCreated(study.id);
     } catch (e) { setError((e as Error).message); setBusy(false); }
   }

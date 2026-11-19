@@ -16,7 +16,9 @@ export const getLang = () => current;
 
 /** Traduce al idioma indicado, con variables {nombre}. */
 export function tr(key: string, lang: Lang, vars?: Record<string, string | number | null | undefined>): string {
-  let s = lang === "en" ? EN[key] ?? key : key;
+  // A key may end in "|context" when the same Spanish word needs two English translations
+  // ("Etiquetas" is "Tags" on insights and "Labels" on tickets). The context never reaches the screen.
+  let s = (lang === "en" ? EN[key] ?? key : key).replace(/\|[a-z]+$/, "");
   if (vars) s = s.replace(/\{(\w+)\}/g, (_, k) => String(vars[k] ?? ""));
   return s;
 }

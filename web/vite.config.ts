@@ -8,5 +8,6 @@ export default defineConfig({
     "/api": { target: "http://localhost:4000", changeOrigin: false },
     "/uploads": { target: "http://localhost:4000", changeOrigin: false },  // imágenes subidas
     "/proto-tracker.js": { target: "http://localhost:4000", changeOrigin: false },  // script que cargan los prototipos HTML
+    "/widget.js": { target: "http://localhost:4000", changeOrigin: false },  // feedback widget script (settings preview)
   } },
 });

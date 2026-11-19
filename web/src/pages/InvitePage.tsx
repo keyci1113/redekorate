@@ -9,12 +9,14 @@ import { AuthShell, PasswordInput } from "./LoginPage";
 import { SsoButtons, SsoDivider, ssoErrorMessage, useSsoProviders } from "../components/SsoButtons";
 import { t } from "../lib/i18n";
 
+const DOC_VERB = { viewer: "a ver el documento «{a}»", commenter: "a comentar el documento «{a}»", editor: "a editar el documento «{a}»" } as const;
+
 /** Crear cuenta a partir de una invitación: funciona aunque el registro esté cerrado. */
 export function InvitePage() {
   const [params] = useSearchParams();
   const token = params.get("token") ?? "";
   const { user, register } = useAuth();
-  const [inv, setInv] = useState<{ email: string; role: Role; invited_by: string | null; organization?: string | null } | null>(null);
+  const [inv, setInv] = useState<{ email: string; role: Role; invited_by: string | null; organization?: string | null; document?: { id: string; title: string; role: "viewer" | "commenter" | "editor" } | null } | null>(null);
   const [loading, setLoading] = useState(!!token);
   const providers = useSsoProviders();
   const [error, setError] = useState<string | null>(() => ssoErrorMessage(params.get("error")));
@@ -27,7 +29,9 @@ export function InvitePage() {
       .then((r) => setInv(r.invite)).catch((e) => setError((e as Error).message)).finally(() => setLoading(false));
   }, [token]);
 
-  if (user) return <Navigate to="/" replace />;
+  // An invitation to one document opens that document once the account exists.
+  const after = inv?.document ? `/docs/${inv.document.id}` : "/";
+  if (user) return <Navigate to={after} replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -48,10 +52,10 @@ export function InvitePage() {
       ) : (
         <form onSubmit={submit} className="mt-8 space-y-5">
           <p className="text-base text-ink-2">
-            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.organization ? ` ${t("a la organización")} ${inv.organization}` : ""}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {providers.length ? t("Entra con tu cuenta de {a} o crea una contraseña.", { a: inv.email }) : t("Crea tu contraseña para entrar.")}
+            {inv.invited_by ? t("{a} te invitó", { a: inv.invited_by }) : t("Tienes una invitación")}{inv.organization ? ` ${t("a la organización")} ${inv.organization}` : ""}{inv.document ? ` ${t(DOC_VERB[inv.document.role], { a: inv.document.title })}` : ""}{inv.role === "admin" ? ` · ${t("como administradora")}` : ""}. {providers.length ? t("Entra con tu cuenta de {a} o crea una contraseña.", { a: inv.email }) : t("Crea tu contraseña para entrar.")}
           </p>
           {providers.length > 0 && <>
-            <SsoButtons providers={providers} query={{ invite: token, next: "/" }} />
+            <SsoButtons providers={providers} query={{ invite: token, next: after }} />
             <SsoDivider>{t("o crea una contraseña")}</SsoDivider>
           </>}
           <Field label={t("Correo")}><input className="field h-13 bg-paper text-base" value={inv.email} disabled /></Field>

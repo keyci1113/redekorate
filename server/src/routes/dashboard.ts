@@ -1,7 +1,10 @@
 import { Router } from "express";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
-import { ACC_CTE } from "../lib/access.js";
+import { accCte, accessJoins, accessWhere } from "../lib/access.js";
+
+// Everything on the home page is research; projects without that section open do not count.
+const ACC_CTE = accCte("research");
 
 export const dashboard = Router();
 dashboard.use(requireAuth);
@@ -11,7 +14,7 @@ dashboard.get("/", async (req, res) => {
   const totalsQ = one(
     `with ${ACC_CTE}
      select
-       (select count(*)::int from projects where id in (select id from acc) and not archived) as projects,
+       (select count(*)::int ${accessJoins("$1")} where ${accessWhere("$1")} and not p.archived) as projects,
        (select count(*)::int from studies where project_id in (select id from acc)) as studies,
        (select count(*)::int from studies where project_id in (select id from acc) and status = 'live') as live,
        (select count(distinct project_id)::int from studies where project_id in (select id from acc) and status = 'live') as projects_live,

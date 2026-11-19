@@ -29,8 +29,16 @@ const PublicDocPage = lazy(() => import("./pages/PublicDocPage").then((m) => ({ 
 const OrgsPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgsPage })));
 const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.OrgPage })));
 const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
+const TicketPage = lazy(() => import("./pages/TicketPage").then((m) => ({ default: m.TicketPage })));
+const MyWorkPage = lazy(() => import("./pages/MyWorkPage").then((m) => ({ default: m.MyWorkPage })));
+const PublicRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.PublicRoadmapPage })));
+const OrgRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.OrgRoadmapPage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
+const DashboardsPage = lazy(() => import("./pages/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
+const WidgetSettingsPage = lazy(() => import("./pages/WidgetSettingsPage").then((m) => ({ default: m.WidgetSettingsPage })));
+const ProjectStartPage = lazy(() => import("./pages/ProjectStartPage").then((m) => ({ default: m.ProjectStartPage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
+const ConnectPage = lazy(() => import("./pages/ConnectPage").then((m) => ({ default: m.ConnectPage })));
 
 function Private({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -66,19 +74,30 @@ export function App() {
       <Route path="/r/:token" element={<ReportPage />} />
       <Route path="/pr/:token" element={<ProjectReportPage />} />
       <Route path="/d/:token" element={<PublicDocPage />} />
+      <Route path="/rm/:token" element={<PublicRoadmapPage />} />
 
       {/* Privado */}
       <Route element={<Private><Layout /></Private>}>
         <Route path="/" element={<DashboardPage />} />
+        {/* Each dashboard has its own data shape: the key remounts the page so one never renders with another's data. */}
+        <Route path="/dashboards" element={<DashboardsPage key="studies" tab="studies" />} />
+        <Route path="/dashboards/tickets" element={<DashboardsPage key="tickets" tab="tickets" />} />
+        <Route path="/dashboards/projects" element={<DashboardsPage key="projects" tab="projects" />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
+        <Route path="/projects/:id/start" element={<ProjectStartPage />} />
         <Route path="/projects/:id/new" element={<NewStudyPage />} />
+        <Route path="/projects/:id/tickets/:number" element={<TicketPage />} />
+        <Route path="/projects/:id/widget" element={<WidgetSettingsPage />} />
         <Route path="/studies" element={<LiveStudiesPage />} />
         <Route path="/studies/:id/results" element={<ResultsPage />} />
         <Route path="/account" element={<AccountPage />} />
         <Route path="/orgs" element={<OrgsPage />} />
         <Route path="/orgs/:id" element={<OrgPage />} />
+        <Route path="/orgs/:id/roadmap" element={<OrgRoadmapPage />} />
+        <Route path="/my-work" element={<MyWorkPage />} />
         <Route path="/help" element={<HelpPage />} />
+        <Route path="/connect" element={<ConnectPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
       <Route path="/welcome" element={<Private><WelcomePage /></Private>} />

@@ -89,7 +89,7 @@ Tip: read an existing study with get_study to copy its exact shape.`;
 /** The shapes the Architecture canvas draws (web/src/architecture/model.ts SHAPES); reference.test.ts keeps the two lists equal. */
 export const DIAGRAM_SHAPES = [
   "rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder",
-  "page", "pages", "note", "text", "frame", "image", "swatch", "link",
+  "page", "pages", "note", "text", "frame", "card", "image", "swatch", "link",
 ] as const;
 
 export const DIAGRAM_REFERENCE = `The Architecture section holds three document kinds; create them with create_document and edit them with update_document.
@@ -102,6 +102,8 @@ kind "diagram": a canvas of shapes joined by arrows (flowcharts, user flows, sys
         rounded = process step, diamond = decision, parallelogram = input/output, cylinder = database,
         page / pages = a page / a group of pages (information architecture), note = sticky note,
         text = free text with no outline, frame = a labelled area drawn behind the shapes inside it,
+        card = a titled card: the first line of text is its bold title, the next lines its details
+        (end with a line like "Who: Sales, Finance" to say who uses that part).
         image = a picture (src), swatch = a color sample (hex), link = a web page (url); they belong on mood boards.
   color none | gray | yellow | orange | pink | purple | blue | green
   Text settings (all optional): size "s"|"m"|"l"|"xl", align "left"|"center"|"right", valign "top"|"middle"|"bottom",

@@ -14,6 +14,8 @@ import type { DocData } from "../docs/types";
 import { DocumentView } from "../docs/DocumentView";
 import { docTemplate } from "../docs/templates";
 import { isDiagramKind, normalizeDiagram } from "../architecture/model";
+import { StateChip } from "../roadmap/parts";
+import type { MilestoneState } from "../roadmap/model";
 import type { Lang } from "../lib/i18n";
 // The canvas (React Flow) is only downloaded when the report holds a diagram or sitemap.
 const DiagramCanvas = lazy(() => import("../architecture/DiagramCanvas").then((m) => ({ default: m.DiagramCanvas })));
@@ -26,13 +28,15 @@ interface StudyReport {
   sessions: Session[]; answers: Answer[]; insights: Insight[];
 }
 interface ReportDoc { id: string; kind: string; title: string; language: Lang; data: DocData; updated_at: string }
+interface ReportMilestone { id: string; name: string; begin_date: string | null; end_date: string | null; state: MilestoneState; progress: number; total: number; done: number }
 interface Report {
   project: { name: string; color: string; description?: string | null; org_name?: string | null; org_logo?: string | null };
   reports: StudyReport[];
   /** Older links hold only studies, so everything below may be missing. */
-  documents?: ReportDoc[]; insights?: (Insight & { study_title?: string | null })[] | null;
+  documents?: ReportDoc[]; insights?: (Insight & { study_title?: string | null })[] | null; milestones?: ReportMilestone[] | null;
 }
 
+const fmtDay = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString(locale(), { dateStyle: "medium" }) : "—");
 
 export function ProjectReportPage() {
   const { token } = useParams();
@@ -43,6 +47,7 @@ export function ProjectReportPage() {
   const docs = (data.documents ?? []).filter((d) => !isDiagramKind(d.kind) && docTemplate(d.kind));
   const diagrams = (data.documents ?? []).filter((d) => isDiagramKind(d.kind));
   const insights = data.insights ?? [];
+  const milestones = data.milestones ?? [];
   // The parts of the report, in reading order; the contents list links to each.
   const parts = [
     project.description ? { id: "overview", label: t("Resumen") } : null,
@@ -50,6 +55,7 @@ export function ProjectReportPage() {
     insights.length ? { id: "insights", label: t("Insights ({a})", { a: insights.length }) } : null,
     docs.length ? { id: "documents", label: t("Documentos UX ({a})", { a: docs.length }) } : null,
     diagrams.length ? { id: "architecture", label: t("Arquitectura ({a})", { a: diagrams.length }) } : null,
+    milestones.length ? { id: "milestones", label: t("Hitos ({a})", { a: milestones.length }) } : null,
   ].filter((x): x is { id: string; label: string } => !!x);
   const sectionHead = (id: string, title: string, first: boolean) => (
     <h2 id={id} className={cx("display scroll-mt-6 text-4xl leading-tight", first ? "mt-14" : "mt-20 border-t border-line pt-14")}>{title}</h2>
@@ -145,6 +151,26 @@ export function ProjectReportPage() {
                 </div>
               </article>
             ))}
+          </section>
+        )}
+
+        {milestones.length > 0 && (
+          <section>
+            {sectionHead("milestones", t("Hitos"), first === "milestones")}
+            <ul className="mt-6 space-y-3">
+              {milestones.map((m) => (
+                <li key={m.id} className="rounded-2xl border border-line bg-surface p-5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold">{m.name}</span>
+                    <StateChip state={m.state} />
+                  </div>
+                  <p className="mt-1 text-sm text-ink-3 tabular-nums">{fmtDay(m.begin_date)} – {fmtDay(m.end_date)} · {t("{a} de {b} tickets hechos", { a: m.done, b: m.total })}</p>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink/10" role="progressbar" aria-valuenow={m.progress} aria-valuemin={0} aria-valuemax={100} aria-label={t("Avance de {a}", { a: m.name })}>
+                    <div className="h-full rounded-full bg-accent" style={{ width: `${m.progress}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

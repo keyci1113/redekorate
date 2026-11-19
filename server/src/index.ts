@@ -11,11 +11,18 @@ import { studies } from "./routes/studies.js";
 import { insights } from "./routes/insights.js";
 import { participants } from "./routes/participants.js";
 import { publicApi } from "./routes/public.js";
+import { purgeOldRecordings } from "./lib/recordings.js";
 import { dashboard } from "./routes/dashboard.js";
+import { dashboards } from "./routes/dashboards.js";
 import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
+import { files } from "./routes/files.js";
 import { admin } from "./routes/admin.js";
 import { orgs } from "./routes/orgs.js";
+import { tickets } from "./routes/tickets.js";
+import { milestones, myWork, roadmap } from "./routes/roadmap.js";
+import { notifications } from "./routes/notifications.js";
+import { widget, widgetPublic } from "./routes/widget.js";
 import { errorHandler } from "./lib/http.js";
 import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
@@ -25,6 +32,8 @@ import { indexingEnabled, publicBaseUrl, renderIndexHtml, robotsDirective, robot
 import { linkPreview } from "./lib/linkPreview.js";
 import { connectApi, oauthServer, openCors } from "./routes/apiAccess.js";
 import { mcpRouter } from "./mcp/server.js";
+import { TOOLS_PATH, toolsApi } from "./mcp/rest.js";
+import { API_V1_PATH, apiErrors, apiV1 } from "./api/v1.js";
 import { mcpLimiter } from "./lib/security.js";
 import { getMaintenance, maintenanceGate } from "./lib/maintenance.js";
 
@@ -48,6 +57,15 @@ app.use("/mcp", openCors, mcpLimiter, mcpRouter({ apiBase: `http://127.0.0.1:${p
 
 // API
 app.use("/api", (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
+// The feedback widget is called from other sites: it has its own origin rules (allowed domains) instead of the same-origin guard, and uses no cookies.
+app.use("/api/widget", widgetPublic);
+// The MCP tools over plain HTTP (bearer tokens only, so no cookie and nothing to forge), under the same per-account limit as /mcp.
+app.use(TOOLS_PATH, openCors, mcpLimiter, toolsApi({ apiBase: `http://127.0.0.1:${port}/api`, baseUrl }));
+// The public REST API (bearer tokens only), after the AI operations so /api/v1/tools keeps its own router. The same
+// limiter instance as /mcp and /api/v1/tools: one allowance per account across all three.
+app.use(API_V1_PATH, mcpLimiter, apiV1({ baseUrl }));
+// Errors raised before the router runs (a body that isn't JSON) get the API's shape and language too.
+app.use(API_V1_PATH, apiErrors);
 app.use("/api", csrfGuard);
 // The web app's maintenance screen polls this until the app is back (after a deploy) or maintenance is off.
 app.get("/api/health", async (_req, res) => {
@@ -57,6 +75,14 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth/oauth", oauth);
 app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);
+app.use("/api/dashboards", dashboards);
+app.use("/api/projects/:id/tickets", tickets);
+app.use("/api/projects/:id/milestones", milestones);
+app.use("/api/projects/:id/widget", widget);
+app.use("/api/projects/:id/roadmap", roadmap);
+app.use("/api/my-work", myWork);
+app.use("/api/notifications", notifications);
+app.use("/api/projects/:id/files", files);
 app.use("/api/projects", projects);
 app.use("/api/studies", studies);
 app.use("/api/insights", insights);
@@ -68,6 +94,12 @@ app.use("/api/orgs", orgs);
 app.use("/api/connect", connectApi(baseUrl));
 app.use("/api/public", publicLimiter, publicApi);
 app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no encontrada", req.get("x-lang")) }));
+
+// The feedback widget script other sites load with one <script> tag. Short cache: a setting or a fix reaches every site within minutes.
+const WIDGET_JS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../widget/widget.js");
+app.get("/widget.js", (_req, res) => {
+  res.type("application/javascript").set({ "Cache-Control": "public, max-age=300", "Cross-Origin-Resource-Policy": "cross-origin", "Access-Control-Allow-Origin": "*" }).sendFile(WIDGET_JS, { dotfiles: "allow" });   // the path is fixed; allow installs under a dot folder
+});
 
 // Script de seguimiento de los prototipos HTML (lo cargan desde su sandbox). Sin caché larga: cambia con cada deploy.
 app.get(TRACKER_PATH, (_req, res) => {
@@ -123,5 +155,10 @@ if (existsSync(webDist)) {
 app.use(errorHandler);
 
 migrate()
+  .then(() => {
+    // Old session recordings are deleted once a day (and at start).
+    const purge = () => purgeOldRecordings().then((n) => { if (n) console.log(`Deleted ${n} session recordings past their retention time`); }).catch((e) => console.warn("[recordings] purge failed:", e.message));
+    void purge(); setInterval(purge, 24 * 3600 * 1000).unref();
+  })
   .then(() => app.listen(port, () => console.log(`Redekorate en http://localhost:${port}`)))
   .catch((e) => { console.error("No se pudo migrar la base de datos", e); process.exit(1); });

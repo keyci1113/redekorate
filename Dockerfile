@@ -21,6 +21,7 @@ RUN npm config set fetch-retries 6 fetch-retry-mintimeout 20000 fetch-retry-maxt
  && npm ci --omit=dev -w server --no-audit --no-fund && npm cache clean --force
 COPY --from=build /app/server/dist server/dist
 COPY --from=build /app/server/migrations server/migrations
+COPY --from=build /app/server/widget server/widget
 COPY --from=build /app/web/dist web/dist
 # Se ejecuta sin privilegios de root
 RUN mkdir -p /app/uploads && chown -R node:node /app/uploads

@@ -1,22 +1,26 @@
 import { useState } from "react";
-import { BarChart3, CalendarDays, ListChecks, Plus, Table2, Trash2 } from "lucide-react";
+import { ArrowLeftRight, BarChart3, CalendarDays, ListChecks, Plus, Table2, Trash2 } from "lucide-react";
 import { uid } from "../lib/hooks";
 import { cx } from "../components/ui";
 import { AutoText, useDoc } from "./Sections";
-import { duration, logTable, nextRow, normalize, summarize, today, type TimeStudyData, type TSCell, type TSLine, type TSRow } from "./timeStudyModel";
+import { addRound, compare, duration, logTable, nextRow, normalize, roundInUse, roundOf, summarize, today, type TimeStudyData, type TSCell, type TSDelta, type TSLine, type TSRow } from "./timeStudyModel";
 
 export type { TimeStudyData };
 
-type Tab = "log" | "summary" | "schedule" | "lists";
+type Tab = "log" | "summary" | "compare" | "schedule" | "lists";
 const TABS: { id: Tab; label: string; icon: typeof Table2 }[] = [
   { id: "log", label: "Registro de tiempo", icon: Table2 },
   { id: "summary", label: "Resumen", icon: BarChart3 },
+  { id: "compare", label: "Antes y después", icon: ArrowLeftRight },
   { id: "schedule", label: "Calendario", icon: CalendarDays },
   { id: "lists", label: "Categorías y herramientas", icon: ListChecks },
 ];
 
 const h = (x: number) => x.toFixed(1);
 const pct = (x: number) => `${Math.round(x * 100)}%`;
+/** A change with its sign spelled out, so a drop never reads as a positive number. */
+const signed = (x: number) => (Math.abs(x) < 0.05 ? "0.0" : `${x > 0 ? "+" : "−"}${Math.abs(x).toFixed(1)}`);
+const signedPct = (x: number | null) => (x === null ? "—" : Math.abs(x) < 0.005 ? "0%" : `${x > 0 ? "+" : "−"}${Math.round(Math.abs(x) * 100)}%`);
 const input = "w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-[13px] outline-none hover:border-line focus:border-accent";
 const th = "p-2 text-left text-[12px] font-semibold whitespace-nowrap";
 const addBtn = "flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[13px] font-medium hover:border-accent print:hidden";
@@ -29,39 +33,62 @@ export function TimeStudy({ data, set, ex }: { data: TimeStudyData; set: (d: Tim
   const { T, readOnly } = useDoc();
   const d = normalize(data);
   const [tab, setTab] = useState<Tab>(d.rows.length || readOnly ? (readOnly ? "summary" : "log") : "lists");
+  const [picked, setRound] = useState(d.rounds.at(-1)?.id ?? "");
   const upd = (p: Partial<TimeStudyData>) => set({ ...d, ...p });
+  // Two or more rounds: the log and the summary show one round at a time, and the comparison opens up.
+  const multi = d.rounds.length > 1;
+  const round = multi ? (d.rounds.some((r) => r.id === picked) ? picked : d.rounds.at(-1)!.id) : undefined;
+  const observeAgain = () => {
+    const r = addRound(d, { first: T("Antes|ronda"), next: d.rounds.length ? T("Ronda {a}", { a: d.rounds.length + 1 }) : T("Después|ronda") });
+    set(r.data); setRound(r.round); setTab("log");
+  };
 
   // Read-only (shared link, PDF): everything one after the other, no tabs.
   if (readOnly) return (
     <div className="space-y-8">
-      <Summary d={d} />
+      {multi && <Compare d={d} />}
+      {multi ? d.rounds.map((r) => <Summary key={r.id} d={d} round={r.id} />) : <Summary d={d} />}
       <Log d={d} upd={upd} ex={ex} />
       <Schedule d={d} upd={upd} />
-      <Lists d={d} upd={upd} />
+      <Lists d={d} upd={upd} onObserveAgain={observeAgain} />
     </div>
   );
 
   return (
     <div className="space-y-5">
       <div role="tablist" className="flex flex-wrap gap-1 border-b border-line">
-        {TABS.map(({ id, label, icon: Icon }) => (
+        {TABS.filter((x) => x.id !== "compare" || multi).map(({ id, label, icon: Icon }) => (
           <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
             className={cx("-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-[13px] font-semibold", tab === id ? "border-accent text-ink" : "border-transparent text-ink-3 hover:text-ink-2")}>
             <Icon size={14} /> {T(label)}{id === "log" && d.rows.length > 0 && <span className="rounded-full bg-ink/5 px-1.5 text-[10px] text-ink-2 tabular-nums">{d.rows.length}</span>}
           </button>
         ))}
       </div>
-      {tab === "log" ? <Log d={d} upd={upd} ex={ex} /> : tab === "summary" ? <Summary d={d} /> : tab === "schedule" ? <Schedule d={d} upd={upd} /> : <Lists d={d} upd={upd} />}
+      {multi && (tab === "log" || tab === "summary") && (
+        <div className="flex flex-wrap items-center gap-1.5 print:hidden" role="group" aria-label={T("Ronda de observación")}>
+          <span className="mr-1 text-[12px] font-medium text-ink-3">{T("Ronda")}</span>
+          {d.rounds.map((r, i) => (
+            <button key={r.id} type="button" aria-pressed={round === r.id} onClick={() => setRound(r.id)}
+              className={cx("rounded-full border px-2.5 py-0.5 text-[12px]", round === r.id ? "border-accent bg-accent-soft text-accent-ink" : "border-line text-ink-2")}>{r.name || `${T("Ronda")} ${i + 1}`}</button>
+          ))}
+        </div>
+      )}
+      {tab === "log" ? <Log d={d} upd={upd} ex={ex} round={round} />
+        : tab === "summary" ? <Summary d={d} round={round} onObserveAgain={observeAgain} />
+        : tab === "compare" && multi ? <Compare d={d} />
+        : tab === "schedule" ? <Schedule d={d} upd={upd} /> : <Lists d={d} upd={upd} onObserveAgain={observeAgain} />}
     </div>
   );
 }
 
 type Props = { d: TimeStudyData; upd: (p: Partial<TimeStudyData>) => void };
 
-function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
+function Log({ d, upd, ex, round }: Props & { ex?: TimeStudyData; round?: string }) {
   const { T, readOnly } = useDoc();
   const [who, setWho] = useState("");
-  const rows = who ? d.rows.filter((r) => r.person === who) : d.rows;
+  const multi = d.rounds.length > 1;
+  const rows = d.rows.filter((r) => (!who || r.person === who) && (round === undefined || roundOf(d, r) === round));
+  const roundName = (r: TSRow) => d.rounds.find((x) => x.id === roundOf(d, r))?.name ?? "";
   const setRow = (id: string, p: Partial<TSRow>) => upd({ rows: d.rows.map((r) => (r.id === id ? { ...r, ...p } : r)) });
   const name = (id: string) => d.people.find((p) => p.id === id)?.name || "";
   const examples = !readOnly && d.rows.length === 0 && ex ? logTable(ex) : [];
@@ -86,6 +113,7 @@ function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
               <th className={th}>{T("Persona")}</th><th className={th}>{T("Fecha")}</th><th className={th}>{T("Hora de inicio")}</th><th className={th}>{T("Hora de fin")}</th>
               <th className={cx(th, "text-right")}>{T("Duración (min)")}</th><th className={th}>{T("Categoría de actividad")}</th><th className={th}>{T("Herramienta principal")}</th>
               <th className={th}>{T("Otras herramientas")}</th><th className={th}>{T("Asunto / referencia")}</th><th className={cx(th, "min-w-64")}>{T("Notas del observador")}</th>
+              {multi && <th className={th}>{T("Ronda")}</th>}
               {!readOnly && <th className="w-8" />}
             </tr>
           </thead>
@@ -103,6 +131,7 @@ function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
                   <td className="p-2 text-right tabular-nums">{min ?? ""}</td>
                   <td className="p-2">{d.buckets.find((b) => b.id === r.bucket)?.name}</td><td className="p-2">{d.tools.find((t) => t.id === r.tool)?.name}</td>
                   <td className="p-2">{r.other}</td><td className="p-2">{r.ref}</td><td className="p-2 text-ink-2">{r.notes}</td>
+                  {multi && <td className="p-2">{roundName(r)}</td>}
                 </tr>
               ) : (
                 <tr key={r.id} className="group border-t border-line align-top">
@@ -122,6 +151,9 @@ function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
                   <td className="p-1"><input aria-label={T("Otras herramientas")} value={r.other} onChange={(e) => setRow(r.id, { other: e.target.value })} className={cx(input, "w-28")} /></td>
                   <td className="p-1"><input aria-label={T("Asunto / referencia")} value={r.ref} onChange={(e) => setRow(r.id, { ref: e.target.value })} className={cx(input, "w-32")} /></td>
                   <td className="p-1"><AutoText value={r.notes} minRows={1} placeholder={T("¿Qué hizo? ¿Lo interrumpieron?")} onChange={(v) => setRow(r.id, { notes: v })} className="text-[13px]" /></td>
+                  {multi && <td className="p-1"><select aria-label={T("Ronda")} value={roundOf(d, r)} onChange={(e) => setRow(r.id, { round: e.target.value })} className={cx(input, "w-32")}>
+                    {d.rounds.map((x, i) => <option key={x.id} value={x.id}>{x.name || `${T("Ronda")} ${i + 1}`}</option>)}
+                  </select></td>}
                   <td className="p-1"><button type="button" onClick={() => upd({ rows: d.rows.filter((x) => x.id !== r.id) })} className="mt-1 text-ink-3 opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-bad" aria-label={T("Eliminar fila")}><Trash2 size={13} /></button></td>
                 </tr>
               );
@@ -131,7 +163,7 @@ function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
       </div>
       {!readOnly && (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className={addBtn} onClick={() => { const r = nextRow(d); upd({ rows: [...d.rows, who ? { ...r, person: who } : r] }); }}><Plus size={14} /> {T("Actividad")}</button>
+          <button type="button" className={addBtn} onClick={() => { const r = nextRow(d, round); upd({ rows: [...d.rows, who ? { ...r, person: who } : r] }); }}><Plus size={14} /> {T("Actividad")}</button>
           {!ready && <p className="text-[12px] text-ink-3">{T("Primero agrega a las personas y las categorías en la pestaña Categorías y herramientas.")}</p>}
           {examples.length > 0 && <p className="text-[12px] text-ink-3">{T("Las filas de ejemplo solo son una guía: no se guardan ni cuentan en el resumen.")}</p>}
         </div>
@@ -140,9 +172,10 @@ function Log({ d, upd, ex }: Props & { ex?: TimeStudyData }) {
   );
 }
 
-function Summary({ d }: { d: TimeStudyData }) {
+function Summary({ d, round, onObserveAgain }: { d: TimeStudyData; round?: string; onObserveAgain?: () => void }) {
   const { T, readOnly } = useDoc();
-  const s = summarize(d);
+  const s = summarize(d, round);
+  const roundName = round ? d.rounds.find((r) => r.id === round)?.name : undefined;
   const key = d.keyLabel.trim() || T("herramientas clave");
   const who = (i: number) => s.people[i].person.name || `${T("Persona")} ${i + 1}`;
   const many = s.people.length > 1;
@@ -187,7 +220,7 @@ function Summary({ d }: { d: TimeStudyData }) {
 
   return (
     <div className="space-y-6">
-      {readOnly && <p className="text-[15px] font-semibold">{T("Resumen")}</p>}
+      {readOnly && <p className="text-[15px] font-semibold">{roundName ? `${T("Resumen")}: ${roundName}` : T("Resumen")}</p>}
       {s.people.length === 0 ? <p className="rounded-xl bg-paper p-4 text-sm text-ink-3">{T("Agrega a las personas que vas a observar en Categorías y herramientas.")}</p> : <>
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full min-w-max text-[13px]">
@@ -205,6 +238,99 @@ function Summary({ d }: { d: TimeStudyData }) {
         </p>
         {table(T("Tiempo por actividad"), T("Actividad"), s.byBucket, T("Sin categoría"))}
         {table(T("Tiempo por herramienta principal"), T("Herramienta"), s.byTool, T("Sin herramienta"))}
+        {!readOnly && onObserveAgain && d.rounds.length < 2 && s.rowsCounted > 0 && (
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-line p-4 print:hidden">
+            <div className="min-w-60 flex-1">
+              <p className="text-[13px] font-semibold">{T("¿Cambió algo? Mide de nuevo")}</p>
+              <p className="text-[12px] text-ink-2">{T("Después de un cambio (una herramienta nueva, IA, otro proceso), observa a las mismas personas otra vez. Lo registrado hasta ahora queda como «Antes» y Antes y después compara las horas por semana con las mismas categorías y herramientas.")}</p>
+            </div>
+            <button type="button" className={addBtn} onClick={onObserveAgain}><Plus size={14} /> {T("Ronda «Después»")}</button>
+          </div>
+        )}
+      </>}
+    </div>
+  );
+}
+
+/** Before and after: the same buckets and tools in two rounds, on hours per person per week. */
+function Compare({ d }: { d: TimeStudyData }) {
+  const { T, readOnly } = useDoc();
+  const [a, setA] = useState(d.rounds[0].id);
+  const [b, setB] = useState(d.rounds.at(-1)!.id);
+  const ok = (id: string) => d.rounds.some((r) => r.id === id);
+  const before = ok(a) ? a : d.rounds[0].id, after = ok(b) ? b : d.rounds.at(-1)!.id;
+  const c = compare(d, before, after);
+  const key = d.keyLabel.trim() || T("herramientas clave");
+  const name = (id: string) => { const i = d.rounds.findIndex((r) => r.id === id); return d.rounds[i]?.name || `${T("Ronda")} ${i + 1}`; };
+  const [nb, na] = [name(before), name(after)];
+  const empty = c.before.rowsCounted === 0 || c.after.rowsCounted === 0;
+
+  const head = (first: string) => (
+    <thead className="bg-paper"><tr>
+      <th className={th}>{first}</th><th className={cx(th, "text-right")}>{nb}</th><th className={cx(th, "text-right")}>{na}</th>
+      <th className={cx(th, "text-right")}>{T("Cambio")}</th><th className={cx(th, "text-right")}>{T("Cambio %")}</th>
+    </tr></thead>
+  );
+  const cells = (x: TSDelta, fmt: (n: number) => string = h) => <>
+    <td className="p-2 text-right tabular-nums">{fmt(x.before)}</td><td className="p-2 text-right tabular-nums">{fmt(x.after)}</td>
+    <td className="p-2 text-right font-semibold tabular-nums">{signed(x.change)}</td><td className="p-2 text-right tabular-nums text-ink-2">{signedPct(x.ratio)}</td>
+  </>;
+  const table = (title: string, first: string, lines: ReturnType<typeof compare>["byBucket"], none: string) => (
+    <div className="space-y-2">
+      <p className="text-[14px] font-semibold">{title}</p>
+      <div className="overflow-x-auto rounded-xl border border-line">
+        <table className="w-full min-w-max text-[13px]">
+          {head(first)}
+          <tbody>
+            {lines.map((l) => (
+              <tr key={l.id || "none"} className={cx("border-t border-line", l.delta.before === 0 && l.delta.after === 0 && "text-ink-3")}>
+                <td className="p-2">{l.id ? l.name : <span className="text-warn">{none}</span>}{l.key && <span className="ml-1.5 rounded-full bg-accent-soft px-1.5 text-[10px] font-semibold text-accent-ink">{key}</span>}</td>
+                {cells(l.delta)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {readOnly ? <p className="text-[15px] font-semibold">{T("Antes y después")}: {nb} → {na}</p> : (
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-[12px] text-ink-2">{T("Antes|ronda")}
+            <select value={before} onChange={(e) => setA(e.target.value)} className="field mt-1 block w-44">{d.rounds.map((r) => <option key={r.id} value={r.id}>{name(r.id)}</option>)}</select></label>
+          <ArrowLeftRight size={14} className="mb-3 text-ink-3" aria-hidden />
+          <label className="text-[12px] text-ink-2">{T("Después|ronda")}
+            <select value={after} onChange={(e) => setB(e.target.value)} className="field mt-1 block w-44">{d.rounds.map((r) => <option key={r.id} value={r.id}>{name(r.id)}</option>)}</select></label>
+        </div>
+      )}
+      {empty ? <p className="rounded-xl bg-paper p-4 text-sm text-ink-3">{T("Las dos rondas necesitan filas completas en el registro para compararlas.")}</p> : <>
+        {c.biggest && (
+          <p className="rounded-xl bg-accent-soft/50 p-4 text-[14px]">
+            {T("El mayor cambio: {a}, {b} h por persona por semana ({c} → {d}).", { a: c.biggest.name || T("Sin categoría"), b: signed(c.biggest.delta.change), c: h(c.biggest.delta.before), d: h(c.biggest.delta.after) })}
+          </p>
+        )}
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full min-w-max text-[13px]">
+            {head(T("Métrica"))}
+            <tbody>
+              <tr className="border-t border-line"><td className="p-2">{T("Días observados")}</td><td className="p-2 text-right tabular-nums">{c.before.total.days}</td><td className="p-2 text-right tabular-nums">{c.after.total.days}</td><td /><td /></tr>
+              <tr className="border-t border-line"><td className="p-2">{T("Promedio de horas registradas por día")}</td>{cells(c.perDay)}</tr>
+              <tr className="border-t border-line"><td className="p-2">{T("{a}, horas por persona por semana (est.)", { a: key })}</td>{cells(c.keyPerWeek)}</tr>
+              {c.people.length > 1 && c.people.map((p, i) => (
+                <tr key={p.person.id} className="border-t border-line text-ink-2">
+                  <td className="p-2 pl-5">{p.person.name || `${T("Persona")} ${i + 1}`}</td>
+                  <td className="p-2 text-right tabular-nums">{p.before === null ? "—" : h(p.before)}</td><td className="p-2 text-right tabular-nums">{p.after === null ? "—" : h(p.after)}</td>
+                  <td className="p-2 text-right tabular-nums">{p.before === null || p.after === null ? "—" : signed(p.after - p.before)}</td><td />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {table(T("Horas por persona por semana, por actividad"), T("Actividad"), c.byBucket, T("Sin categoría"))}
+        {table(T("Horas por persona por semana, por herramienta principal"), T("Herramienta"), c.byTool, T("Sin herramienta"))}
+        <p className="text-[12px] text-ink-3">{T("Las horas por semana son horas ÷ días observados × {a} días de trabajo, promediadas por persona, así que las rondas se comparan aunque duren distinto o observen a otra cantidad de personas.", { a: d.workdays })}</p>
       </>}
     </div>
   );
@@ -241,7 +367,7 @@ function Schedule({ d, upd }: Props) {
   );
 }
 
-function Lists({ d, upd }: Props) {
+function Lists({ d, upd, onObserveAgain }: Props & { onObserveAgain: () => void }) {
   const { T, readOnly } = useDoc();
   const key = d.keyLabel.trim() || T("herramientas clave");
   const box = "space-y-2 rounded-xl border border-line p-4";
@@ -275,6 +401,23 @@ function Lists({ d, upd }: Props) {
           <p className="text-[11px] text-ink-3">{T("El resumen suma por separado el tiempo con estas herramientas como herramienta principal. Márcalas en la lista de herramientas.")}</p>
         </div>
       </div>
+
+      {d.rounds.length > 0 && (
+        <div className={box}>
+          <p className="text-[13px] font-semibold">{T("Rondas de observación")}</p>
+          <p className="text-[11px] text-ink-3">{T("Cada ronda observa a las mismas personas en otro momento, con las mismas categorías y herramientas. Una ronda solo se puede quitar mientras no tenga filas.")}</p>
+          {d.rounds.map((r, i) => {
+            const used = roundInUse(d, r.id);
+            return (
+              <div key={r.id} className="group flex items-center gap-2">
+                {readOnly ? <p className="text-[13px]">{r.name}</p> : <input value={r.name} aria-label={T("Nombre de la ronda")} placeholder={`${T("Ronda")} ${i + 1}`} onChange={(e) => upd({ rounds: d.rounds.map((x) => (x.id === r.id ? { ...x, name: e.target.value } : x)) })} className={cx(input, "max-w-64 border-line")} />}
+                {!readOnly && !used && del(() => upd({ rounds: d.rounds.filter((x) => x.id !== r.id) }))}
+              </div>
+            );
+          })}
+          {!readOnly && <button type="button" className={addBtn} onClick={onObserveAgain}><Plus size={14} /> {T("Ronda")}</button>}
+        </div>
+      )}
 
       <div className={box}>
         <p className="text-[13px] font-semibold">{T("Categorías de actividad")}</p>

@@ -50,13 +50,32 @@ const HOW_TOS = (): HowTo[] => [
     t("Con link: pega la URL de un prototipo publicado (Figma Make, un sitio). Se muestra en un iframe y el participante reporta el resultado."),
     t("En cada tarea define pantalla inicial, meta y ruta esperada; redacta la tarea como un objetivo, sin decir dónde hacer clic."),
   ] },
+  { id: "tickets", title: t("Convertir un hallazgo en trabajo con tickets"), where: t("Proyecto → Tickets"), steps: [
+    t("Crea un ticket con Nuevo ticket, o desde un insight con Crear ticket: el insight y el ticket quedan vinculados entre sí."),
+    t("Elige el tipo (tarea, bug, pedido de investigación o cambio de diseño), la prioridad, a quién se asigna y la fecha límite."),
+    t("En el Tablero arrastra la tarjeta entre columnas para cambiar el estado, o usa el menú de la tarjeta. En la Lista ordena, filtra y edita varios a la vez."),
+    t("Abre un ticket para editarlo, comentar y mencionar a alguien con @; todo cambio queda en su historial de actividad."),
+  ], note: t("Solo quien es dueño del proyecto elimina tickets. Para conservar el historial, muévelos a Hecho.") },
+  { id: "roadmap", title: t("Planear con hitos y hoja de ruta"), where: t("Proyecto → Hitos / Hoja de ruta"), steps: [
+    t("En Hitos crea una entrega con nombre y fechas; asigna tickets a ese hito desde cada ticket o en lote desde la Lista."),
+    t("El avance y el estado salen de los tickets: en riesgo si hay tickets vencidos o sin asignar, hecho cuando todos lo están."),
+    t("En Hoja de ruta ves hitos y estudios en una línea de tiempo por mes o trimestre. Compartir crea un link de solo lectura, sin tickets ni respuestas."),
+    t("Mi trabajo, en la navegación, reúne los tickets asignados a ti en todos los proyectos."),
+  ] },
+  { id: "widget", title: t("Recibir feedback desde tu producto"), where: t("Proyecto → Tickets → Widget de feedback"), steps: [
+    t("Agrega el dominio de tu sitio en Dominios permitidos y guarda."),
+    t("Copia el código de Instalar y pégalo antes de </body> en tu sitio, o en una etiqueta HTML personalizada de Google Tag Manager."),
+    t("Para saber quién escribe, define window.RedekorateUser = { id, name, email } antes del script, o llama a Redekorate.identify({…}) al iniciar sesión."),
+    t("Marca con data-rk-private los campos que nunca deben salir en capturas ni grabaciones."),
+    t("Cada mensaje llega como ticket con la etiqueta feedback; desde el ticket puedes responder por correo a quien lo envió."),
+  ], note: t("Si el botón no aparece en tu sitio: revisa que el dominio esté permitido y que la política de seguridad (CSP) de tu sitio deje cargar scripts y conectarse a tu servidor de Redekorate.") },
   { id: "documents", title: t("Llenar un documento de investigación"), where: t("Proyecto → Documentos"), steps: [
     t("Elige una plantilla: personas, journey map, affinity, guion de usabilidad, evaluación heurística…"),
     t("Los ejemplos aparecen solo como texto guía: nunca se guardan ni se exportan."),
     t("Se guarda solo mientras escribes. Exporta a Word, PDF, Markdown o CSV, o comparte un link de lectura."),
   ] },
   { id: "architecture", title: t("Dibujar un diagrama o un mapa del sitio"), where: t("Proyecto → Arquitectura"), steps: [
-    t("Elige un lienzo en blanco, un mapa del sitio, un flujo de usuario, un diagrama de flujo o una arquitectura del sistema."),
+    t("Elige un lienzo en blanco o un punto de partida: mapa del sitio, flujo de usuario, diagrama de flujo, arquitectura del sistema, vista general de la app, proceso por roles, integración de IA u organigrama."),
     t("En el lienzo, agrega figuras desde la barra de la izquierda, haz doble clic para escribir y arrastra desde uno de sus puntos hasta otra figura para unirlas con una flecha."),
     t("En un mapa del sitio, escribe una página por línea y usa Tab para ponerla dentro de la de arriba: el árbol se dibuja solo. «Abrir como diagrama» lo pasa al lienzo para acomodarlo a mano."),
     t("Se guarda solo. Exporta a PNG o SVG, o comparte un link de lectura."),
@@ -66,6 +85,12 @@ const HOW_TOS = (): HowTo[] => [
     t("Asígnala a estudios y marca si completó, no se presentó o declinó."),
     t("Usa un Screener de reclutamiento para filtrar candidatos antes de invitarlos."),
   ] },
+  { id: "ai-apps", title: t("Conectar Claude, ChatGPT u otras apps de IA"), where: t("Menú de la cuenta → Conectar apps de IA"), steps: [
+    t("Abre Conectar apps de IA y elige tu app en Cómo conectar una app."),
+    t("En Claude o ChatGPT, agrega un conector con la dirección del servidor MCP y entra con tu cuenta."),
+    t("En Claude Code, Cursor, un GPT o un script, crea un token y pega el comando que la guía ya llena con él."),
+    t("Revisa ahí mismo qué herramientas reciben las apps, y quita el acceso o revoca un token cuando quieras."),
+  ], note: t("Las apps actúan como tú, con tus permisos en cada proyecto, y nunca pueden borrar nada.") },
 ];
 
 const CONCEPTS = (): Concept[] => [
@@ -82,7 +107,8 @@ const CONCEPTS = (): Concept[] => [
   { id: "published", term: t("Borrador y versión publicada"), body: t("Un estudio activo tiene dos versiones: el borrador que editas y la publicada que ven los participantes. Publicar cambios copia el borrador a la publicada; cada respuesta recuerda con qué versión empezó."), related: ["study"] },
   { id: "prototype", term: t("Prototipo"), body: t("Lo que se prueba en una tarea: pantallas subidas con zonas clicables, un HTML de un solo archivo con seguimiento de toques, o un link a un prototipo publicado. Las tareas tienen pantalla inicial, meta y ruta esperada."), related: ["method"] },
   { id: "organization", term: t("Organización"), body: t("Un espacio con nombre, logo y color para una empresa, un equipo o un estudio personal. Sus proyectos heredan la marca y todas sus personas los ven y comentan. Un proyecto es personal o pertenece a una organización."), related: ["project", "roles"] },
-  { id: "roles", term: t("Roles"), body: t("En la instancia: admin (gestiona usuarios e invitaciones) y miembro. En un proyecto: dueño/a, editor, comentarista y solo lectura. En una organización: dueño/a, admin y miembro; los miembros son comentaristas en todos sus proyectos. Cuando aplican varios roles, gana el más alto."), related: ["project", "organization"] },
+  { id: "roles", term: t("Roles"), body: t("En la instancia: admin (gestiona usuarios e invitaciones) y miembro. En un proyecto: dueño/a, editor, comentarista y solo lectura. En una organización: dueño/a, admin y miembro; a cada miembro se le elige qué proyectos ve, qué secciones abre (investigación UX, gestión de proyecto o todo) y qué puede hacer. Cuando aplican varios roles, gana el más alto."), related: ["project", "organization"] },
+  { id: "ticket", term: t("Ticket"), body: t("Un trabajo por hacer dentro de un proyecto: tarea, bug, pedido de investigación o cambio de diseño. Tiene número propio (#12), estado, prioridad, personas asignadas y mencionadas, fecha límite, hito y etiquetas, y puede vincularse con insights, estudios, documentos y otros tickets."), related: ["insight", "project", "roles"] },
   { id: "comments", term: t("Comentarios"), body: t("Conversación ligera sobre un proyecto, los resultados de un estudio o un documento. Pueden escribir comentaristas, editores y dueños; borran sus autores y quien es dueño del proyecto."), related: ["roles"] },
 ];
 

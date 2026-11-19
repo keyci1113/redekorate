@@ -12,6 +12,8 @@ describe("pageTitle", () => {
     expect(pageTitle("/projects/abc/new", "en")).toBe("New study · redekorate");
     expect(pageTitle("/projects/abc", "en")).toBe("Project · redekorate");
     expect(pageTitle("/studies/42/results", "es")).toBe("Resultados · redekorate");
+    expect(pageTitle("/projects/abc/tickets/7", "en")).toBe("Ticket · redekorate");
+    expect(pageTitle("/orgs/3/roadmap", "es")).toBe("Hoja de ruta · redekorate");
   });
 
   it("falls back to the home title for / and unknown paths", () => {

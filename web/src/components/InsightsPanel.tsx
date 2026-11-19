@@ -1,17 +1,20 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Check, Lightbulb, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Check, Lightbulb, Pencil, Plus, Search, Ticket as TicketIcon, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import type { Confidence, Insight, Severity, Study } from "../lib/types";
 import { Button, Card, Empty, ErrorNote, Field, Modal, SeverityBadge, Tag, cx } from "./ui";
 
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
+import { NewTicketDialog } from "../tickets/NewTicketDialog";
 const SEVERITIES = (): [Severity, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")], ["critical", t("Crítica")]];
 const CONFIDENCES = (): [Confidence, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")]];
 
-export function InsightsPanel({ projectId, studyId, studies, insights, onChange, canEdit = true }: {
-  projectId: string; studyId?: string; studies?: Pick<Study, "id" | "title">[]; insights: Insight[]; onChange: () => void; canEdit?: boolean;
+export function InsightsPanel({ projectId, projectName, studyId, studies, insights, onChange, canEdit = true }: {
+  projectId: string; projectName?: string; studyId?: string; studies?: Pick<Study, "id" | "title">[]; insights: Insight[]; onChange: () => void; canEdit?: boolean;
 }) {
+  const [ticketFor, setTicketFor] = useState<Insight | null>(null);
   const [editing, setEditing] = useState<Insight | "new" | null>(null);
   const [q, setQ] = useState("");
   const [tag, setTag] = useState<string | null>(null);
@@ -85,12 +88,24 @@ export function InsightsPanel({ projectId, studyId, studies, insights, onChange,
                 {i.tags.map((t) => <Tag key={t}>#{t}</Tag>)}
               </div>
               <p className="mt-2 text-[11px] text-ink-3">{i.study_title && !studyId ? `${i.study_title} · ` : ""}{timeAgo(i.created_at)}</p>
+              {projectName && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3 text-[13px]">
+                  {i.ticket_numbers?.length ? (
+                    <span className="flex flex-wrap items-center gap-x-2 text-ink-2">
+                      <TicketIcon size={14} aria-hidden className="text-ink-3" />{plural(i.ticket_numbers.length, { one: "{n} ticket", other: "{n} tickets" })}
+                      {i.ticket_numbers.map((n) => <Link key={n} to={`/projects/${projectId}/tickets/${n}`} className="focus-ring rounded font-semibold text-accent-ink tabular-nums hover:underline">#{n}</Link>)}
+                    </span>
+                  ) : <span className="text-ink-3">{t("Sin tickets")}</span>}
+                  {canEdit && <Button size="lg" className="h-11" icon={<Plus size={14} />} onClick={() => setTicketFor(i)}>{t("Crear ticket")}</Button>}
+                </div>
+              )}
             </Card>
           ))}
           {list.length === 0 && <p className="text-sm text-ink-3">{t("Ningún insight coincide con el filtro.")}</p>}
         </div>
       )}
 
+      {ticketFor && projectName && <NewTicketDialog projectId={projectId} projectName={projectName} insight={ticketFor} onClose={() => setTicketFor(null)} onCreated={onChange} />}
       <Modal open={!!editing} onClose={() => setEditing(null)} title={editing === "new" ? t("Nuevo insight") : t("Editar insight")} wide>
         {editing && (
           <InsightForm initial={editing === "new" ? undefined : editing} studies={studies} defaultStudy={studyId}

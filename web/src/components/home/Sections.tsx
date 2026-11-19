@@ -9,7 +9,7 @@ import { templateByKey } from "../../templates/catalog";
 import { SeverityBadge, cx } from "../ui";
 import { CompletionBar, LowChip, Section, SectionState, TrendBars, completionSr, fmtDay } from "./bits";
 import type { Dash, Draft, HomeInsight, Load, RecentOpen } from "./types";
-import { responsesByStudy, type Drill, type DrillRow } from "./drill";
+import { responsesByStudy, type Drill, type DrillRow } from "../../dashboards/drill";
 
 const methodName = (m: string) => templateByKey(m)?.name ?? m;
 const longDay = (d: string) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
@@ -118,13 +118,13 @@ function kpiDrills(data: Dash): Record<"responses" | "live" | "completion" | "in
   });
   const rated = data.live.map((s) => ({ s, rate: completion(s.responses, s.started) })).filter((x): x is { s: Dash["live"][number]; rate: number } => x.rate !== null).sort((a, b) => a.rate - b.rate);
   return {
-    responses: { title: t("Respuestas · últimos 7 días"), rows: responses, empty: t("En los últimos 7 días no han llegado respuestas."), note: t("Por estudio activo.") },
-    live: { title: t("Estudios activos"), empty: t("No hay estudios activos."),
+    responses: { kind: "rows", title: t("Respuestas · últimos 7 días"), rows: responses, empty: t("En los últimos 7 días no han llegado respuestas."), note: t("Por estudio activo.") },
+    live: { kind: "rows", title: t("Estudios activos"), empty: t("No hay estudios activos."),
       rows: data.live.map((s) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: s.last_response_at ? relTime(s.last_response_at) : undefined })) },
-    completion: { title: t("Tasa de completado por estudio"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto."),
+    completion: { kind: "rows", title: t("Tasa de completado por estudio"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto."),
       rows: rated.map(({ s, rate }) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: fmtPct(rate), tone: isLowCompletion(rate) ? "warn" as const : undefined })) },
     // The home page loads only the most severe insights; the count says when there are more.
-    insights: { title: t("Insights"), empty: t("Aún no hay insights."), note: t("Primero los más graves."), total: data.insight_counts.total,
+    insights: { kind: "rows", title: t("Insights"), empty: t("Aún no hay insights."), note: t("Primero los más graves."), total: data.insight_counts.total,
       rows: sortInsights(data.insights).map((i) => ({ key: i.id, to: `/projects/${i.project_id}?tab=insights`, title: i.title, sub: [i.project_name, relTime(i.created_at)].join(" · "), severity: i.severity })) },
   };
 }

@@ -24,7 +24,7 @@ export const TRACKER = `(function () {
     for (var j = 0; j < hs.length; j++) if (visible(hs[j]) && text(hs[j].textContent)) return text(hs[j].textContent);
     return text(document.title) || "Inicio";
   }
-  function check() { var s = screen(); if (s && s !== last) { last = s; send({ type: "screen", name: s, route: location.hash || null, trail: trail.slice(-12) }); } }
+  function check() { if (going) return; /* de camino a una pantalla no se anuncian las intermedias */ var s = screen(); if (s && s !== last) { last = s; send({ type: "screen", name: s, route: location.hash || null, trail: trail.length <= 30 ? trail.slice() : [] }); } }
   // El padre puede pedir ir a una pantalla al empezar una tarea: primero por su ruta (#), si no, tocando el elemento con ese nombre.
   function clickByLabel(want) {
     var els = document.querySelectorAll(SEL), i, hitEl = null;
@@ -37,20 +37,55 @@ export const TRACKER = `(function () {
     return false;
   }
   function at(name) { return text(screen()).toLowerCase() === text(name).toLowerCase(); }
-  // Ir a una pantalla, en orden de fiabilidad: su ruta (#), un enlace visible con su nombre, los clics que llevaron a ella
-  // la primera vez (replay), y por último #nombre. Se detiene en cuanto la pantalla actual coincide.
-  function goto(name, route, trail) {
-    var want = text(name).toLowerCase();
-    var steps = [];
-    if (route) steps.push(function () { location.hash = route; });
-    steps.push(function () { clickByLabel(want); });
-    (trail || []).forEach(function (lbl) { steps.push(function () { clickByLabel(text(lbl).toLowerCase()); }); });
-    var slug = want.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    if (slug) { steps.push(function () { location.hash = "#" + slug; }); steps.push(function () { location.hash = "#" + encodeURIComponent(name); }); }
-    var i = 0;
-    (function next() { if (at(name)) { check(); return; } if (i >= steps.length) { check(); return; } steps[i++](); setTimeout(next, 160); })();
+  // Espera a que el prototipo deje de cambiar (220 ms sin mutaciones) o a que pase "max". Un tiempo fijo no sirve:
+  // muchos prototipos (React + Babel) tardan en pintar. cb recibe si hubo algún cambio.
+  function settle(cb, max, stop) {
+    var done = false, q = 0, mo = null, changed = false;
+    function end() { if (done) return; done = true; clearTimeout(q); clearTimeout(cap); if (mo) mo.disconnect(); cb(changed); }
+    function bump() { if (stop && stop()) return end(); clearTimeout(q); q = setTimeout(end, 220); }
+    var cap = setTimeout(end, max);
+    try { mo = new MutationObserver(function () { changed = true; bump(); }); mo.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true }); } catch (e) {}
+    bump();
   }
-  addEventListener("message", function (e) { var d = e.data; if (d && d.rk === 1 && d.type === "goto" && typeof d.name === "string") goto(d.name, typeof d.route === "string" ? d.route : null, Array.isArray(d.trail) ? d.trail.slice(0, 12) : []); });
+  function waitFor(pred, ms, cb) { var t0 = Date.now(); (function poll() { if (pred() || Date.now() - t0 >= ms) return cb(); setTimeout(poll, 100); })(); }
+  // Toca el elemento con ese texto; si todavía no existe (la pantalla anterior sigue cargando), lo espera hasta "wait" ms.
+  function clickWhenThere(want, wait, cb) {
+    var t0 = Date.now();
+    (function poll() { if (clickByLabel(want)) return cb(true); if (Date.now() - t0 >= wait) return cb(false); setTimeout(poll, 120); })();
+  }
+  // Ir a una pantalla, en orden de fiabilidad: su ruta (#), un elemento visible con su nombre, los clics que llevaron a ella
+  // la primera vez (replay), y por último #nombre. Cada paso espera al prototipo en vez de un tiempo fijo y se detiene en
+  // cuanto la pantalla actual coincide. Al terminar avisa al padre si llegó ("goto") y vuelve a anunciar la pantalla actual.
+  var going = 0;
+  // Si además se pide un toque (el flujo empieza con uno), se hace al llegar: la tarea arranca con ese paso ya dado.
+  function goto(name, route, trail, tap) {
+    var run = ++going, want = text(name).toLowerCase(), until = Date.now() + 10000;
+    function here() { return !want || at(name); }
+    // Un # solo vale si el prototipo reacciona: si nada cambia, no usa rutas y dejarlo puesto falsearía la pantalla detectada.
+    function tryHash(h) { return function (cb) { var prev = location.hash; if (prev === h) return cb(); location.hash = h; settle(function (changed) { if (!changed) location.hash = prev; cb(); }, 900, null); }; }
+    var steps = [];
+    if (route) steps.push(tryHash(route));
+    if (want) steps.push(function (cb) { clickWhenThere(want, trail.length ? 600 : 2000, function (hit) { if (hit) waitFor(here, 2500, cb); else cb(); }); });
+    trail.forEach(function (lbl) { steps.push(function (cb) { clickWhenThere(text(lbl).toLowerCase(), 3000, function () { settle(cb, 1200, here); }); }); });
+    if (trail.length) steps.push(function (cb) { waitFor(here, 2500, cb); });
+    var slug = want.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    if (slug) { steps.push(tryHash("#" + slug)); steps.push(tryHash("#" + encodeURIComponent(name))); }
+    var i = 0;
+    function finish(ok) { if (run !== going) return; going = 0; send({ type: "goto", name: text(name), ok: ok }); last = null; check(); }
+    function arrived() {
+      var ok = here();
+      if (!tap || !ok) return finish(ok);
+      clickWhenThere(text(tap).toLowerCase(), 3000, function (hit) {
+        if (!hit) return finish(false);
+        var before = screen();   // el toque puede tardar en surtir efecto: se le da un momento antes de dar por empezada la tarea
+        waitFor(function () { return screen() !== before; }, 800, function () { settle(function () { finish(true); }, 1500, null); });
+      });
+    }
+    function next() { if (run !== going) return; if (here() || i >= steps.length || Date.now() > until) return arrived(); steps[i++](next); }
+    // Primero, que el prototipo termine de pintar: que haya algo visible y que deje de cambiar.
+    waitFor(function () { return !!document.body && text(document.body.innerText).length > 0; }, 4000, function () { settle(next, 3000, null); });
+  }
+  addEventListener("message", function (e) { var d = e.data; if (d && d.rk === 1 && d.type === "goto" && typeof d.name === "string") goto(d.name, typeof d.route === "string" ? d.route : null, Array.isArray(d.trail) ? d.trail.slice(0, 30) : [], typeof d.tap === "string" ? d.tap : null); });
   function soon() { clearTimeout(timer); timer = setTimeout(check, 120); }
   var SEL = "a,button,input,select,textarea,label,summary,[role=button],[role=link],[role=tab],[role=menuitem],[role=checkbox],[role=radio],[role=switch],[onclick],[contenteditable=true]";
   function interactive(el) {
@@ -67,6 +102,7 @@ export const TRACKER = `(function () {
     check();
     var hit = interactive(t), d = document.documentElement;
     if (hit) trail.push(label(hit));
+    if (going || e.isTrusted === false) return;   // clics nuestros al llevar el prototipo a una pantalla: no son del participante
     send({ type: "click", screen: last, x: (e.clientX + scrollX) / Math.max(d.scrollWidth, 1), y: (e.clientY + scrollY) / Math.max(d.scrollHeight, 1), hit: !!hit, label: label(hit || t) });
     setTimeout(check, 60); setTimeout(check, 400);
   }, true);

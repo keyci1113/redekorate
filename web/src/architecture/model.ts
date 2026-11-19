@@ -12,7 +12,7 @@ export const isDiagramKind = (kind: string): kind is DiagramKind => (DIAGRAM_KIN
 /** Every shape the canvas can draw. server/src/mcp/reference.ts describes the same list for outside assistants. */
 export const SHAPES = [
   "rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder",
-  "page", "pages", "note", "text", "frame", "image", "swatch", "link",
+  "page", "pages", "note", "text", "frame", "card", "image", "swatch", "link",
 ] as const;
 export type Shape = (typeof SHAPES)[number];
 /** Mood board items: they hold a picture, a color or a web address instead of a drawn outline. */
@@ -53,7 +53,7 @@ export interface SitemapData { outline: string }
 export const DEFAULT_SIZE: Record<Shape, [number, number]> = {
   rect: [160, 80], rounded: [160, 80], ellipse: [140, 90], diamond: [150, 110], triangle: [130, 110],
   parallelogram: [170, 80], hexagon: [160, 90], cylinder: [120, 110], page: [150, 110], pages: [150, 110],
-  note: [180, 180], text: [180, 40], frame: [480, 320],
+  note: [180, 180], text: [180, 40], frame: [480, 320], card: [220, 120],
   image: [240, 180], swatch: [120, 150], link: [240, 76],
 };
 export const DEFAULT_COLOR: Partial<Record<Shape, ColorId>> = { note: "yellow", frame: "gray" };
@@ -260,7 +260,9 @@ export function outlineStats(roots: OutlineNode[]) {
 
 // ---------- starters for a new diagram, written in the document's language ----------
 
-export type StarterId = "blank" | "moodboard" | "flowchart" | "user_flow" | "system" | "sitemap";
+/** Every starter, in the order the New diagram dialog lists them. */
+export const STARTER_IDS = ["blank", "moodboard", "sitemap", "user_flow", "flowchart", "system", "app_overview", "swimlane", "ai_integration", "org_chart"] as const;
+export type StarterId = (typeof STARTER_IDS)[number];
 
 const n = (id: string, shape: Shape, x: number, y: number, text: string, color: ColorId = "none", w?: number, h?: number): DNode => {
   const [dw, dh] = DEFAULT_SIZE[shape];
@@ -341,6 +343,102 @@ export function starter(id: StarterId, lang: Lang): { kind: DiagramKind; data: D
           e("api", "db", "SQL", { fromSide: "right", toSide: "left" }), e("api", "ext", undefined, { fromSide: "bottom", toSide: "top", line: "dashed", arrow: "both" }),
         ],
       } };
+    case "app_overview": {
+      // Lanes like a FigJam board: the systems outside, the main cycle in order, and what happens all year.
+      const card = (id: string, x: number, y: number, title: string, what: string, who: string) =>
+        n(id, "card", x, y, `${title}\n${what}\n${T("Quién:")} ${who}`, "none");
+      const sys = (id: string, x: number, title: string, what: string) => n(id, "card", x - 15, 8, `${title}\n${what}`, "none", 190, 76);
+      const data = (from: string, to: string, extra: Partial<DEdge> = {}) => e(from, to, T("datos"), { fromSide: "bottom", toSide: "top", line: "dashed", ...extra });
+      return { kind: "diagram", data: {
+        nodes: [
+          { ...n("intro", "text", 0, -100, T("Cómo se conectan las partes de la app y quién usa cada una. Cada parte tiene después su propio flujo detallado."), "none", 1000, 30), size: "s" },
+          n("lane-out", "frame", 0, -40, T("Sistemas externos"), "gray", 1240, 160),
+          sys("sys-a", 390, T("Sistema A"), T("Lo que envía a la app")),
+          sys("sys-b", 690, T("Sistema B"), T("Lo que envía a la app")),
+          sys("sys-c", 990, T("Sistema C"), T("Lo que recibe y devuelve")),
+          n("lane-cycle", "frame", 0, 150, T("Ciclo principal"), "green", 1240, 200),
+          card("c1", 60, 200, T("1. Configurar"), T("Lo que se prepara al inicio del ciclo"), T("Rol A")),
+          card("c2", 360, 200, T("2. Registrar"), T("Los datos que entran todos los días"), T("Rol A, Rol B")),
+          card("c3", 660, 200, T("3. Procesar"), T("Cálculos, aprobaciones y pagos"), T("Rol B")),
+          card("c4", 960, 200, T("4. Reportar"), T("Los reportes y estados que salen"), T("Rol C")),
+          n("lane-year", "frame", 0, 380, T("Todo el año"), "gray", 1240, 200),
+          card("y1", 60, 430, T("Búsqueda"), T("Responder una consulta rápida"), T("Rol A")),
+          card("y2", 360, 430, T("Inicio y reportes"), T("Lo que cada rol ve al entrar"), T("Rol C")),
+          card("y3", 660, 430, T("Tareas recurrentes"), T("Lo que se hace cada semana o mes"), T("Rol A")),
+          card("y4", 960, 430, T("Usuarios y roles"), T("Personas, permisos e historial de cambios"), T("Admin")),
+          { ...n("legend", "text", 0, 600, T("Líneas punteadas: datos que vienen de otro sistema o van hacia él."), "none", 1000, 30), size: "s" },
+        ],
+        edges: [
+          e("c1", "c2", undefined, { fromSide: "right", toSide: "left" }), e("c2", "c3", undefined, { fromSide: "right", toSide: "left" }),
+          e("c3", "c4", undefined, { fromSide: "right", toSide: "left" }),
+          data("sys-a", "c2"), data("sys-b", "c3"), data("sys-c", "c4", { arrow: "both" }),
+        ],
+      } };
+    }
+    case "swimlane":
+      return { kind: "diagram", data: {
+        nodes: [
+          n("lane-1", "frame", 0, 0, T("Cliente"), "blue", 1120, 170),
+          n("lane-2", "frame", 0, 190, T("Ventas"), "gray", 1120, 170),
+          n("lane-3", "frame", 0, 380, T("Operaciones"), "gray", 1120, 170),
+          n("start", "ellipse", 40, 60, T("Necesita algo"), "green", 140, 70),
+          n("order", "rounded", 230, 55, T("Hace el pedido")),
+          n("review", "rounded", 230, 245, T("Revisa el pedido")),
+          n("check", "diamond", 470, 230, T("¿Se puede atender?"), "yellow"),
+          n("ship", "rounded", 465, 435, T("Prepara y envía")),
+          n("tell", "rounded", 720, 245, T("Explica el motivo")),
+          n("done", "ellipse", 930, 60, T("Recibe una respuesta"), "pink", 150, 70),
+        ],
+        edges: [
+          e("start", "order", undefined, { fromSide: "right", toSide: "left" }), e("order", "review", undefined, { fromSide: "bottom", toSide: "top" }),
+          e("review", "check", undefined, { fromSide: "right", toSide: "left" }), e("check", "ship", T("Sí"), { fromSide: "bottom", toSide: "top" }),
+          e("check", "tell", T("No"), { fromSide: "right", toSide: "left" }),
+          e("ship", "done", undefined, { fromSide: "right", toSide: "bottom" }), e("tell", "done", undefined, { fromSide: "top", toSide: "left" }),
+        ],
+      } };
+    case "ai_integration": {
+      const src = (id: string, y: number, text: string) => n(id, "rounded", 40, y, text, "blue", 160, 64);
+      const out = (id: string, y: number, text: string) => n(id, "rounded", 1000, y, text, "green", 160, 64);
+      return { kind: "diagram", data: {
+        nodes: [
+          n("sources", "frame", 0, 0, T("Sistemas de origen"), "gray", 240, 420),
+          src("crm", 50, T("CRM")), src("erp", 140, T("ERP / contabilidad")), src("docs", 230, T("Documentos")), src("db", 320, T("Base de datos")),
+          n("agent", "hexagon", 420, 232, T("Agente de IA\n(busca, fundamenta y responde)"), "purple", 200, 100),
+          n("risk", "diamond", 700, 222, T("¿Decisión de alto impacto?"), "yellow", 170, 120),
+          n("human", "rounded", 705, 420, T("Revisión humana"), "orange"),
+          n("log", "cylinder", 460, 400, T("Registro de cada acción"), "gray", 120, 100),
+          n("outputs", "frame", 960, 0, T("Resultados"), "gray", 240, 420),
+          out("reports", 40, T("Reportes")), out("dash", 130, T("Tableros")), out("actions", 250, T("Acciones")),
+        ],
+        edges: [
+          ...["crm", "erp", "docs", "db"].map((s) => e(s, "agent", undefined, { fromSide: "right", toSide: "left" })),
+          // Reports and dashboards only read; an action changes something, so it passes the high-stakes check first.
+          e("agent", "reports", undefined, { fromSide: "top", toSide: "left" }), e("agent", "dash", undefined, { fromSide: "top", toSide: "left" }),
+          e("agent", "risk", undefined, { fromSide: "right", toSide: "left" }),
+          e("risk", "actions", T("No"), { fromSide: "right", toSide: "left" }),
+          e("risk", "human", T("Sí"), { fromSide: "bottom", toSide: "top" }), e("human", "actions", T("Aprobado"), { fromSide: "right", toSide: "left" }),
+          e("agent", "log", undefined, { fromSide: "bottom", toSide: "top", line: "dashed" }),
+        ],
+      } };
+    }
+    case "org_chart": {
+      const head = (id: string, x: number, text: string) => n(id, "rounded", x, 150, text, "blue", 160, 70);
+      const person = (id: string, x: number, y: number) => n(id, "card", x + 110, y, `${T("Nombre")}\n${T("Rol o puesto")}`, "none", 160, 70);
+      const kids = (parent: string, x: number) => [person(`${parent}-1`, x, 260), person(`${parent}-2`, x, 350)];
+      const down = (to: string) => e("top", to, undefined, { fromSide: "bottom", toSide: "top" });
+      const side = (from: string, to: string) => e(from, to, undefined, { fromSide: "bottom", toSide: "left", arrow: "none" });
+      return { kind: "diagram", data: {
+        nodes: [
+          n("top", "rounded", 400, 0, T("Dirección"), "purple", 160, 70),
+          head("ops", 100, T("Operaciones")), head("fin", 400, T("Finanzas")), head("tech", 700, T("Tecnología")),
+          ...kids("ops", 100), ...kids("fin", 400), ...kids("tech", 700),
+        ],
+        edges: [
+          down("ops"), down("fin"), down("tech"),
+          ...["ops", "fin", "tech"].flatMap((p) => [side(p, `${p}-1`), side(p, `${p}-2`)]),
+        ],
+      } };
+    }
     default:
       return { kind: "diagram", data: { nodes: [], edges: [] } };
   }

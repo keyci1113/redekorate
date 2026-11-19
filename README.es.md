@@ -2,10 +2,12 @@
 
 Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de UX: crea un proyecto, elige el método, configúralo, envía el link a participantes reales y comparte un reporte con insights.
 
+Creado por **Keyci Padilla**.
+
 ## Flujo
 
 1. **Inicio:** un dashboard con estudios activos, respuestas de los últimos 14 días, actividad reciente, borradores e insights.
-2. **Proyecto:** al crearlo, pasas directo a elegir el método. Puedes buscarlo, filtrarlo por categoría o partir de tu pregunta ("¿Las personas pueden usar mi diseño?").
+2. **Proyecto:** al crearlo, eliges con qué empezar: un estudio con usuarios, el tablero de tickets o los hitos, en un orden que sigue el tipo de proyecto. Para un estudio eliges después el método: puedes buscarlo, filtrarlo por categoría o partir de tu pregunta ("¿Las personas pueden usar mi diseño?").
 3. **Template:** cada método muestra sus bloques, una guía paso a paso, la duración y la muestra recomendada antes de crearlo.
 4. **Builder:** reordenas los bloques arrastrando, editas el contenido y la lógica, ves la vista previa en escritorio o móvil, ajustas la marca y pasas una revisión antes de publicar.
 5. **Participantes:** un link público, sin cuenta, que funciona en móvil, con consentimiento informado opcional.
@@ -64,6 +66,14 @@ Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de
 - El servidor no arranca en producción sin un `JWT_SECRET` de al menos 32 caracteres. El contenedor corre sin root y la base de datos no se expone.
 
 **Arquitectura.** Cada proyecto tiene una pestaña *Arquitectura* con dos tipos de diagrama. Un **diagrama** es un lienzo tipo pizarra, como FigJam: rectángulos, pasos de proceso, elipses, decisiones, triángulos, entrada/salida, hexágonos, bases de datos, páginas y grupos de páginas de arquitectura de información, notas adhesivas, texto libre y secciones (marcos que arrastran consigo las figuras que contienen), en ocho colores y tres tamaños de texto. Las figuras se unen arrastrando desde cualquiera de sus cuatro puntos hasta otra figura, o a cualquier parte de ella; soltar en el lienzo vacío crea una figura nueva ya unida. Las flechas pueden ser continuas o punteadas, con punta en un extremo, en los dos o sin punta, en ángulo, curvas o rectas, y llevar etiqueta. Doble clic para escribir, atajos de una tecla (R, O, D, P, S, T, F), deshacer y rehacer, copiar, pegar y duplicar, minimapa y exportación a PNG o SVG. Un **mapa del sitio** es la arquitectura de información escrita como esquema con sangría, una página por línea, que se dibuja como árbol mientras escribes; *Abrir como diagrama* lo pasa al lienzo para acomodarlo a mano. Un diagrama nuevo puede empezar en blanco o desde un mapa del sitio, un flujo de usuario, un diagrama de flujo o una arquitectura del sistema, en español o inglés. Se guardan como documentos: se guardan solos, admiten comentarios, *Guardar como…* y el mismo link de solo lectura revocable.
+
+**Tickets.** Cada proyecto tiene una pestaña *Tickets*, dentro de *Gestión del proyecto*, para convertir hallazgos en trabajo: tareas, bugs, pedidos de investigación y cambios de diseño, numerados por proyecto (#12), con prioridad, personas asignadas y etiquetadas, fecha límite, hito y etiquetas, y vínculos con insights, estudios, documentos y otros tickets. Se ven en un tablero con arrastrar y soltar (con columnas propias de cada proyecto) o en una lista ordenable con edición en lote; los filtros y el ticket abierto viven en la URL. Un ticket se abre en un panel lateral o en una página completa (`/projects/:id/tickets/:number`), con comentarios con @menciones, historial y notificaciones en la campana y por correo.
+
+**Widget de feedback.** Cada proyecto puede poner un botón de feedback en otros sitios y apps (*Tickets → Widget de feedback*). Se instala con una etiqueta script y solo responde a los dominios permitidos. Cada mensaje llega como ticket con la etiqueta `feedback`, con captura marcada, grabación de pantalla o archivos opcionales (pasan por la revisión de seguridad de subidas) y los datos de la página. Los campos marcados con `data-rk-private` se tapan en capturas y grabaciones, y una persona aparece verificada solo si el sitio firma su id con el secreto del widget. Guía completa en [docs/widget.md](docs/widget.md).
+
+**Hitos, hoja de ruta y Mi trabajo.** Cada proyecto tiene una pestaña **Hitos** (fechas, estado y avance calculados a partir de sus tickets) y una **Hoja de ruta** (hitos y estudios en una línea de tiempo por mes o trimestre, con un link de solo lectura que nunca muestra tickets, comentarios ni respuestas). **Mi trabajo**, en la navegación principal, reúne tus tickets de todos los proyectos por vencimiento; Inicio muestra una tarjeta con lo más urgente.
+
+**Dashboards.** `/dashboards`, desde el control *Dashboards* de Inicio, reúne tres vistas de todos tus proyectos, con filtro de proyecto y de periodo en la URL: **Estudios** (respuestas, completado, estudios que necesitan atención, estudios activos, insights por severidad), **Tickets** (abiertos, vencidos, creados vs. cerrados por semana, carga por persona, origen, tipo y páginas del widget) y **Proyectos** (salud, estudios activos, tickets y próximo hito por proyecto, más la actividad reciente). Cada cifra, barra y columna abre los elementos que hay detrás.
 
 **Respuestas por voz.** En las preguntas abiertas y en el "¿por qué elegiste esta opción?", el participante puede pulsar *Responder con voz* y hablar en vez de escribir. El navegador transcribe mientras habla, el texto cae en el mismo campo y se puede corregir. El campo le avisa, antes y mientras habla, que su voz no se graba ni se guarda. No se graba ni se guarda audio: solo el texto, igual que una respuesta escrita. Usa el reconocimiento de voz del navegador (Chrome, Edge y Safari); donde no existe, como en Firefox, el campo aparece sin micrófono. Se desactiva por estudio en *Diseño → Permitir responder con voz*.
 
@@ -147,6 +157,10 @@ No cambies `DB_PASSWORD` después del primer despliegue: PostgreSQL solo la lee 
 
 Después de crear tu cuenta, cambia `ALLOW_REGISTRATION=false` y reinicia. Las imágenes y la base de datos viven en volúmenes de Docker (`uploads`, `pgdata`); inclúyelos en tus respaldos.
 
+### API REST y MCP
+
+Redekorate tiene un servidor MCP en `<APP_URL>/mcp` (Claude, ChatGPT, Cursor), las mismas herramientas como llamadas HTTP en `<APP_URL>/api/v1/tools` y una API REST para scripts e integraciones en `<APP_URL>/api/v1`, con su descripción OpenAPI en `/api/v1/openapi.json`. Leen, crean y editan proyectos, estudios, resultados, insights, documentos, tickets y milestones; nunca borran. Se configuran desde **Conectar apps de IA** (`/connect`). Referencia (en inglés): [docs/api.md](docs/api.md), [docs/mcp.md](docs/mcp.md) y [docs/architecture.md](docs/architecture.md).
+
 ## Desarrollo local
 
 ```bash
@@ -177,7 +191,7 @@ Cada proyecto tiene una pestaña **Documentos** con 12 plantillas que se llenan 
 UX Project Blueprint, Proto-persona, Perfil de persona (canvas), User persona (entregable), User Journey Map (la curva de emociones se dibuja sola),
 Diagrama de afinidad, Guía y notas de entrevistas, Observación AEIOU, Observación conductual, Guion de prueba de usabilidad,
 Resultados de prueba de usabilidad (calcula tasas por tarea y total) y Evaluación heurística (Weinschenk o Nielsen, varios evaluadores, severidad 0–4).
-Se guardan solos en su proyecto, se pueden **Guardar como…** (copia con otro nombre en este u otro proyecto) y se **exportan a Word (.docx), PDF, Markdown y CSV** desde el menú Exportar (también en el link público). La exportación se genera en el navegador y solo incluye lo que se llenó, nunca los textos de ejemplo. También se comparten con un link de solo lectura que se puede revocar. Cada documento tiene su propio idioma (ES/EN).
+Se guardan solos en su proyecto, se pueden **Guardar como…** (copia con otro nombre en este u otro proyecto) y se **exportan a Word (.docx), PDF, Markdown y CSV** desde el menú Exportar (también en el link público). La exportación se genera en el navegador y solo incluye lo que se llenó, nunca los textos de ejemplo. También se comparten con un link de solo lectura que se puede revocar, o con personas por correo para ver, comentar o editar solo ese documento (lo encuentran en *Compartidos conmigo* y nunca ven el resto del proyecto). Cada documento tiene su propio idioma (ES/EN).
 
 ## Idiomas
 

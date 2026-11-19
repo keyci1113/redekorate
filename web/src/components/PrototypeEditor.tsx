@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { optimizeImage } from "../lib/image";
 import { uid, usePaneWidth, usePref } from "../lib/hooks";
 import type { FlowItem, Hotspot, ProtoFlow, Prototype, Screen } from "../blocks/prototype";
-import { HTML_SANDBOX, asTrackerMsg, flowStartScreen, gotoScreen, htmlScreenId, isEmbedded, isHtml, isLink, naturalSort, normalizeFlow } from "../blocks/prototype";
+import { HTML_SANDBOX, asTrackerMsg, flowToTask, gotoScreen, htmlScreenId, isEmbedded, isHtml, isLink, naturalSort, normalizeFlow } from "../blocks/prototype";
 import { Button, cx } from "./ui";
 import { PaneHandle, Toggle, useSortable } from "./editing";
 
@@ -646,8 +646,8 @@ function HtmlCanvas({ proto, onScreen, onClick, recording }: { proto: Prototype;
     const h = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow) return;
       const m = asTrackerMsg(e.data); if (!m) return;
-      if (m.type === "ready") { setReady(true); const start = flowStartScreen(protoRef.current); if (start) gotoScreen(frame.current, protoRef.current, start); }   // el preview arranca en la pantalla de inicio
-      if (m.type === "screen" && typeof m.name === "string" && m.name) { const n = m.name.slice(0, 80); setCur(n); cb.current(n, m.route ?? null, Array.isArray(m.trail) ? m.trail.map(String).slice(0, 12) : undefined); }
+      if (m.type === "ready") { setReady(true); const f = flowToTask(protoRef.current); if (f) gotoScreen(frame.current, protoRef.current, f.startScreen, f.startTap?.label); }   // el preview arranca en el punto de inicio
+      if (m.type === "screen" && typeof m.name === "string" && m.name) { const n = m.name.slice(0, 80); setCur(n); cb.current(n, m.route ?? null, Array.isArray(m.trail) ? m.trail.map(String).slice(0, 30) : undefined); }
       if (m.type === "click") clickCb.current?.(m.screen ? String(m.screen).slice(0, 80) : null, String(m.label ?? "").slice(0, 80));
     };
     window.addEventListener("message", h); return () => window.removeEventListener("message", h);

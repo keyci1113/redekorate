@@ -1,9 +1,9 @@
 import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
-import { Building2, ChevronDown, CircleHelp, LogOut, Plus, Settings, Users } from "lucide-react";
+import { Bell, Building2, ChevronDown, CircleHelp, LogOut, Plug, Plus, Settings, Users } from "lucide-react";
 import { useAuth } from "../lib/auth";
 import { api } from "../lib/api";
-import { useLoad } from "../lib/hooks";
+import { timeAgo, useLoad } from "../lib/hooks";
 import type { Project } from "../lib/types";
 import { Logo } from "./Logo";
 import { Avatar } from "./Avatar";
@@ -17,7 +17,7 @@ import { MaintenanceBanner } from "./MaintenanceScreen";
 import { pickerProjects } from "../lib/projectPicker";
 
 /** Botón con panel desplegable: se cierra con Escape, al hacer clic afuera o al cambiar de página. */
-function Disclosure({ button, buttonClass, label, align = "left", children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; children: ReactNode }) {
+function Disclosure({ button, buttonClass, label, align = "left", wide, onOpen, children }: { button: ReactNode; buttonClass: string; label?: string; align?: "left" | "right"; wide?: boolean; onOpen?: () => void; children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -33,9 +33,11 @@ function Disclosure({ button, buttonClass, label, align = "left", children }: { 
   }, [open]);
   return (
     <div ref={root} className="relative min-w-0 max-w-full">
-      <button ref={trigger} type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={label} className={buttonClass}>{button}</button>
+      <button ref={trigger} type="button" onClick={() => { if (!open) onOpen?.(); setOpen((o) => !o); }} aria-expanded={open} aria-label={label} className={buttonClass}>{button}</button>
       {open && (
-        <div className={cx("absolute top-full z-40 mt-1.5 w-72 rounded-xl border border-line bg-surface p-1.5 shadow-(--shadow-lift)", align === "right" ? "right-0" : "left-0")}>
+        <div className={cx("absolute top-full z-40 mt-1.5 rounded-xl border border-line bg-surface p-1.5 shadow-(--shadow-lift)", align === "right" ? "right-0" : "left-0",
+          // The wide panel would run off a phone's left edge, so there it spans the screen instead.
+          wide ? "w-96 max-sm:fixed max-sm:inset-x-3 max-sm:top-14 max-sm:w-auto" : "w-72")}>
           {children}
         </div>
       )}
@@ -44,6 +46,64 @@ function Disclosure({ button, buttonClass, label, align = "left", children }: { 
 }
 
 const menuItem = "focus-ring flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-ink-2 hover:bg-ink/5 hover:text-ink";
+
+interface Notice { id: string; text: string; title: string; number: number; project_id: string; project_name: string; actor_name: string | null; actor_avatar: string | null; read_at: string | null; created_at: string }
+
+/** The bell: what happened on the tickets you are assigned to or tagged on. Checks again every minute and when you come back to the tab. */
+function NotificationsBell() {
+  const { data, setData, reload } = useLoad(() => api.get<{ notifications: Notice[]; unread: number }>("/notifications"), []);
+  useEffect(() => {
+    const again = () => { if (document.visibilityState === "visible") void reload(); };
+    const timer = window.setInterval(again, 60_000);
+    window.addEventListener("focus", again);
+    return () => { window.clearInterval(timer); window.removeEventListener("focus", again); };
+  }, [reload]);
+  const unread = data?.unread ?? 0, list = data?.notifications ?? [];
+  const markRead = (ids?: string[]) => {
+    const now = new Date().toISOString();
+    setData((d) => d && { unread: ids ? Math.max(0, d.unread - d.notifications.filter((n) => ids.includes(n.id) && !n.read_at).length) : 0,
+      notifications: d.notifications.map((n) => (!ids || ids.includes(n.id) ? { ...n, read_at: n.read_at ?? now } : n)) });
+    void api.post("/notifications/read", ids ? { ids } : {}).catch(() => reload());
+  };
+  const label = unread ? t("Notificaciones: {n} sin leer", { n: unread }) : t("Notificaciones");
+  return (
+    <Disclosure align="right" wide label={label} onOpen={() => void reload()}
+      buttonClass="focus-ring relative flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition hover:border-line-2 hover:text-ink"
+      button={<>
+        <Bell size={18} aria-hidden />
+        {unread > 0 && <span aria-hidden className="absolute -top-1 -right-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-accent px-1 text-[11px] font-semibold text-on-accent">{unread > 9 ? "9+" : unread}</span>}
+      </>}>
+      <div className="flex items-center justify-between gap-3 px-2.5 py-1.5">
+        <p className="text-sm font-medium">{t("Notificaciones")}</p>
+        {unread > 0 && <button type="button" onClick={() => markRead()} className="focus-ring rounded-md text-xs font-medium text-accent hover:underline">{t("Marcar todas como leídas")}</button>}
+      </div>
+      {list.length === 0 ? (
+        <p className="px-2.5 pt-1 pb-3 text-sm text-ink-3">{t("Aquí verás cuando te asignen un ticket, te mencionen, o se mueva o comente un ticket tuyo.")}</p>
+      ) : (
+        <ul className="max-h-[min(26rem,70vh)] overflow-y-auto">
+          {list.map((n) => (
+            <li key={n.id}>
+              <Link to={`/projects/${n.project_id}/tickets/${n.number}`} onClick={() => { if (!n.read_at) markRead([n.id]); }}
+                className="focus-ring flex items-start gap-2.5 rounded-lg px-2.5 py-2 hover:bg-ink/5">
+                <Avatar name={n.actor_name ?? "?"} avatar={n.actor_avatar} size={28} />
+                <span className="min-w-0 flex-1">
+                  <span className={cx("block text-sm", n.read_at ? "text-ink-2" : "font-medium text-ink")}>{n.text}</span>
+                  <span className="block truncate text-xs text-ink-2" title={n.title}>{n.title}</span>
+                  <span className="block text-[11px] text-ink-3">{n.project_name} · {timeAgo(n.created_at)}</span>
+                </span>
+                {!n.read_at && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent"><span className="sr-only">{t("Sin leer")}</span></span>}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1 border-t border-line pt-1">
+        <Link to="/account#notificaciones" className={menuItem}><Settings size={15} /> {t("Avisos por correo")}</Link>
+      </div>
+    </Disclosure>
+  );
+}
+
 
 const primaryAction = "focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-accent px-2.5 text-sm font-medium text-on-accent transition hover:bg-accent/90 sm:px-3.5";
 
@@ -65,6 +125,7 @@ export function Layout() {
             <NavLink to="/" end className={navClass}>{t("Inicio")}</NavLink>
             {/* Not `end`: a project and its sub-pages still count as Projects. */}
             <NavLink to="/projects" className={navClass}>{t("Proyectos")}</NavLink>
+            <NavLink to="/my-work" className={navClass}>{t("Mi trabajo")}</NavLink>
             <div className="ml-1 min-w-0 max-w-52">
               <Disclosure
                 buttonClass="focus-ring flex max-w-full items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm font-medium text-ink-2 transition hover:border-line-2 hover:text-ink"
@@ -113,6 +174,7 @@ export function Layout() {
                 </div>
               </Disclosure>
             )}
+            <NotificationsBell />
             <NavLink to="/help" aria-label={t("Ayuda y conceptos")} title={t("Ayuda y conceptos")}
               className={({ isActive }) => cx("focus-ring flex h-9 w-9 items-center justify-center rounded-full border border-line text-ink-2 transition hover:border-line-2 hover:text-ink", isActive && "bg-ink/5 text-ink")}>
               <CircleHelp size={18} aria-hidden />
@@ -130,6 +192,7 @@ export function Layout() {
               <div className="mt-1 border-t border-line pt-1">
                 <Link to="/account" className={menuItem}><Settings size={15} /> {t("Mi cuenta")}</Link>
                 <Link to="/orgs" className={menuItem}><Building2 size={15} /> {t("Organizaciones")}</Link>
+                <Link to="/connect" className={menuItem}><Plug size={15} /> {t("Conectar apps de IA")}</Link>
                 <Link to="/help" className={menuItem}><CircleHelp size={15} /> {t("Ayuda y conceptos")}</Link>
                 {user?.role === "admin" && <Link to="/admin/users" className={menuItem}><Users size={15} /> {t("Usuarios")}</Link>}
                 <div className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink-2">{t("Idioma")}<LangSwitch /></div>

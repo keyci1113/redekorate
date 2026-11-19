@@ -11,6 +11,11 @@ export const canEdit = (role: ProjectRole | null | undefined) => atLeast(role, "
 /** Write comments on the project, its studies and its documents. */
 export const canComment = (role: ProjectRole | null | undefined) => atLeast(role, "commenter");
 export const isOwner = (role: ProjectRole | null | undefined) => role === "owner";
+/**
+ * Next to a document, `role` is what the person can do on it and `project_role` their role in the project (null when
+ * the document was shared with them by email). Sharing, copying and deleting it need a project editor.
+ */
+export const isDocTeam = (p: { role?: ProjectRole | null; project_role?: ProjectRole | null }) => canEdit(p.project_role === undefined ? p.role : p.project_role);
 
 export const orgAtLeast = (role: OrgRole | null | undefined, min: OrgRole) => !!role && ORG_RANK[role] >= ORG_RANK[min];
 /** Change the organization's settings and people. */

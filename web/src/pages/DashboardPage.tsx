@@ -14,8 +14,10 @@ import { lastStudy } from "../lib/recent";
 import { GettingStarted } from "../components/home/GettingStarted";
 import { Link } from "react-router-dom";
 import { CircleHelp } from "lucide-react";
-import { DrillModal } from "../components/home/DrillModal";
-import type { Drill } from "../components/home/drill";
+import { MyWorkCard } from "./MyWorkPage";
+import { DashboardsNav } from "../dashboards/DashboardsNav";
+import { DrillModal } from "../dashboards/DrillModal";
+import type { Drill } from "../dashboards/drill";
 
 export function DashboardPage() {
   const nav = useNavigate();
@@ -56,10 +58,12 @@ export function DashboardPage() {
   return (
     <div className="page space-y-6">
       <HomeHeader name={user?.name.split(" ")[0] ?? ""} draft={data?.drafts[0]} loading={load.loading} />
+      <DashboardsNav />
       {data && user && <GettingStarted userId={user.id} totals={data.totals} />}
       {(() => { const r = data?.recent ?? lastStudy(); return load.loading ? <div className="h-20 animate-pulse rounded-xl bg-ink/5 motion-reduce:animate-none" aria-hidden /> : r ? <LastOpened recent={r} /> : <DaySummary data={data} load={load} />; })()}
       <KpiRow data={data} load={load} onOpen={setDrill} />
       <DrillModal drill={drill} onClose={() => setDrill(null)} />
+      <MyWorkCard />
       <LiveStudies live={data?.live ?? []} trend={data?.trend ?? []} studyTrend={data?.study_trend ?? []} load={load} view={view} onViewChange={changeView} />
       <div className="grid items-start gap-4 lg:grid-cols-2">
         <RecentInsights insights={data?.insights ?? []} load={load} firstLive={data?.live[0]?.id} onReview={review} />
