@@ -8,6 +8,7 @@ import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { atLeast, projectIn, type ProjectRole } from "../lib/access.js";
 import { sendMail } from "../lib/mail.js";
+import { flushEmails, notify, ticketPeople } from "../lib/notify.js";
 import { MAX_COLUMNS, builtInColumns, builtInName, columnLabel, columnsProblem, fallbackColumn, findColumn, type Column } from "../lib/board.js";
 import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES, cleanLabels, mentionedIds, mostSimilar, reorder, setDiff, severityFromPriority, type TicketPriority, type TicketStatus } from "../lib/tickets.js";
 import { isoDay, patchOf } from "../lib/schemas.js";
@@ -26,6 +27,8 @@ const num = (req: Request) => {
 };
 
 const langOf = (req: Request) => (req.get("x-lang") === "en" ? "en" : "es");
+/** After the response: email whatever this request just notified people about. Never awaited by the request. */
+const emailLater = (req: Request) => { void flushEmails((process.env.APP_URL ?? `${req.protocol}://${req.get("host")}`).replace(/\/$/, "")).catch(() => {}); };
 
 /** Runs `fn` in a transaction and returns its result. */
 export async function tx<T>(fn: (c: PoolClient) => Promise<T>): Promise<T> {
@@ -206,6 +209,7 @@ export async function createTicket(db: Db, projectId: string, actor: string | nu
   for (const u of new Set(b.assignees ?? [])) await db.query("insert into ticket_assignees(ticket_id, user_id) values ($1,$2)", [t.id, u]);
   for (const l of cleanLabels(b.labels ?? [])) await db.query("insert into ticket_labels(ticket_id, label) values ($1,$2)", [t.id, l]);
   await log(db, t.id, actor, "created", null, b.source ?? "manual");
+  await notify(db, { users: b.assignees ?? [], actor, projectId, ticketId: t.id, kind: "assigned", lang });
   return t as { id: string; number: number };
 }
 
@@ -213,6 +217,7 @@ const STATUS_FIELDS = ["type", "priority"] as const;
 
 /** Applies a patch to one ticket and records every change in its activity. */
 async function applyPatch(db: Db, projectId: string, t: Record<string, any>, p: Patch, actor: string, people: Person[], lang = "es") {
+  const tell = (users: (string | null | undefined)[], kind: "assigned" | "tagged" | "status", data?: Record<string, unknown>) => notify(db, { users, actor, projectId, ticketId: t.id, kind, data, lang });
   requirePeople(p.assignees, people);
   requirePeople(p.watchers, people);
   const nameOf = (id: string) => people.find((x) => x.id === id)?.name ?? "";
@@ -234,6 +239,8 @@ async function applyPatch(db: Db, projectId: string, t: Record<string, any>, p: 
       col("status", target.status); col("column_id", target.custom ? target.id : null); col("position", await endOfColumn(db, projectId, target.id));
       const names = { from: from ? columnLabel(from) : t.status, to: columnLabel(target) };
       await log(db, t.id, actor, "status", names.from, names.to);
+      // Everyone on the ticket hears that it moved (people added in this same edit hear "assigned"/"tagged" instead).
+      await tell(await ticketPeople(db, t.id), "status", names);
     }
   }
   if (p.due_date !== undefined && p.due_date !== t.due_date) { col("due_date", p.due_date); await log(db, t.id, actor, "due_date", t.due_date, p.due_date); }
@@ -242,13 +249,13 @@ async function applyPatch(db: Db, projectId: string, t: Record<string, any>, p: 
 
   if (p.assignees) {
     const d = setDiff<string>((t.assignees as { id: string }[]).map((a) => a.id), [...new Set(p.assignees)]);
-    for (const u of d.added) { await db.query("insert into ticket_assignees(ticket_id, user_id) values ($1,$2) on conflict do nothing", [t.id, u]); await log(db, t.id, actor, "assigned", null, nameOf(u)); }
+    for (const u of d.added) { await db.query("insert into ticket_assignees(ticket_id, user_id) values ($1,$2) on conflict do nothing", [t.id, u]); await log(db, t.id, actor, "assigned", null, nameOf(u)); await tell([u], "assigned"); }
     for (const u of d.removed) { await db.query("delete from ticket_assignees where ticket_id = $1 and user_id = $2", [t.id, u]); await log(db, t.id, actor, "unassigned", (t.assignees as { id: string; name: string }[]).find((a) => a.id === u)?.name ?? null); }
   }
   if (p.watchers) {
     const cur = (await db.query("select user_id from ticket_watchers where ticket_id = $1", [t.id])).rows.map((r) => r.user_id as string);
     const d = setDiff<string>(cur, [...new Set(p.watchers)]);
-    for (const u of d.added) { await db.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing", [t.id, u]); await log(db, t.id, actor, "tagged", null, nameOf(u)); }
+    for (const u of d.added) { await db.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing", [t.id, u]); await log(db, t.id, actor, "tagged", null, nameOf(u)); await tell([u], "tagged"); }
     for (const u of d.removed) { await db.query("delete from ticket_watchers where ticket_id = $1 and user_id = $2", [t.id, u]); await log(db, t.id, actor, "untagged", nameOf(u) || null); }
   }
   if (p.labels) {
@@ -283,6 +290,7 @@ tickets.post("/", async (req, res) => {
     }
     return created;
   });
+  emailLater(req);
   res.status(201).json({ ticket: await detail(p.id, t.number) });
 });
 
@@ -296,6 +304,7 @@ tickets.patch("/:number", async (req, res) => {
   const b = parse(patchOf(Fields), req.body);
   const people = await projectPeople(p.id);
   await tx(async (c) => applyPatch(c, p.id, await ticketRow(p.id, num(req), c), b, req.user!.id, people, langOf(req)));
+  emailLater(req);
   res.json({ ticket: await detail(p.id, num(req)) });
 });
 
@@ -317,8 +326,10 @@ tickets.post("/move", async (req, res) => {
       const names = { from: from ? columnLabel(from) : t.status, to: columnLabel(target) };
       await c.query("update tickets set status = $2, column_id = $3, updated_at = now() where id = $1", [t.id, target.status, target.custom ? target.id : null]);
       await log(c, t.id, req.user!.id, "status", names.from, names.to);
+      await notify(c, { users: await ticketPeople(c, t.id), actor: req.user!.id, projectId: p.id, ticketId: t.id, kind: "status", data: names, lang: langOf(req) });
     }
   });
+  emailLater(req);
   res.json({ tickets: await listRows(p.id) });
 });
 
@@ -408,6 +419,7 @@ tickets.post("/bulk", async (req, res) => {
       await applyPatch(c, p.id, t, add_labels ? { ...patch, labels: [...(t.labels as string[]), ...add_labels] } : patch, req.user!.id, people, langOf(req));
     }
   });
+  emailLater(req);
   res.json({ tickets: await listRows(p.id) });
 });
 
@@ -488,14 +500,20 @@ tickets.post("/:number/comments", async (req, res) => {
   const people = await projectPeople(p.id);
   await tx(async (c) => {
     await c.query("insert into comments(project_id, ticket_id, user_id, body, visibility) values ($1,$2,$3,$4,$5)", [p.id, t.id, req.user!.id, b.body, b.visibility]);
+    const before = await ticketPeople(c, t.id);
     const mentioned = b.visibility === "internal" ? mentionedIds(b.body, people) : [];
     // People mentioned with @ start following the ticket.
     for (const u of mentioned) {
       const r = await c.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing returning user_id", [t.id, u]);
       if (r.rows[0]) await log(c, t.id, req.user!.id, "tagged", null, people.find((x) => x.id === u)?.name ?? null);
     }
+    // A mention is its own notice; everyone else already on the ticket hears there is a new comment.
+    const base = { actor: req.user!.id, projectId: p.id, ticketId: t.id, lang: langOf(req) };
+    await notify(c, { ...base, users: mentioned, kind: "tagged" });
+    await notify(c, { ...base, users: before.filter((u) => !mentioned.includes(u)), kind: "comment", data: { excerpt: b.body.replace(/\s+/g, " ").slice(0, 160) } });
     await c.query("update tickets set updated_at = now() where id = $1", [t.id]);
   });
+  emailLater(req);
   res.status(201).json({ ticket: await detail(p.id, t.number) });
 });
 

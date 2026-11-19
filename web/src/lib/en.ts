@@ -3092,4 +3092,12 @@ export const EN: Record<string, string> = {
 "{n} tickets no tienen a nadie asignado": "{n} tickets have no assignee",
 "{n} elemento queda fuera de este periodo o no tiene fechas.": "{n} item is outside this period or has no dates.",
 "{n} elementos quedan fuera de este periodo o no tienen fechas.": "{n} items are outside this period or have no dates.",
+"Notificaciones: {n} sin leer": "Notifications: {n} unread",
+"Marcar todas como leídas": "Mark all as read",
+"Aquí verás cuando te asignen un ticket, te mencionen, o se mueva o comente un ticket tuyo.": "You'll see it here when you're assigned a ticket, tagged, or one of your tickets is moved or commented on.",
+"Sin leer": "Unread",
+"Avisos por correo": "Email notifications",
+"Te avisamos cuando te asignan un ticket, te mencionan, o cuando se mueve o se comenta un ticket en el que estás. Siempre lo ves en la campana de arriba.": "We tell you when you're assigned a ticket, tagged, or when a ticket you're on is moved or commented on. You always see it in the bell at the top.",
+"Avisarme también por correo": "Also email me",
+"Un correo a {a} por cada novedad. Lo que tú mismo haces nunca te genera avisos.": "One email to {a} per update. Your own actions never notify you.",
 };
