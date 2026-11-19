@@ -418,6 +418,7 @@ function DesignModal({ open, onClose, settings, onChange }: { open: boolean; onC
           <Toggle label={t("Mostrar barra de progreso")} checked={s.showProgress !== false} onChange={(v) => onChange({ ...s, showProgress: v })} />
           <Toggle label={t("Permitir botón \"Atrás\"")} hint={t("Desactívalo si no quieres que cambien respuestas")} checked={s.allowBack !== false} onChange={(v) => onChange({ ...s, allowBack: v })} />
           <Toggle label={t("Permitir responder con voz")} hint={t("En las preguntas abiertas, el participante puede dictar y el navegador lo transcribe. No se guarda audio.")} checked={voiceOn(s)} onChange={(v) => onChange({ ...s, voiceAnswers: v })} />
+          <Toggle label={t("Grabar la sesión del participante")} hint={t("Graba lo que pasa en pantalla dentro del estudio: clics, desplazamiento y cambios de pantalla. Lo que se escribe se oculta. El participante ve un aviso antes de empezar.")} checked={!!s.recording} onChange={(v) => onChange({ ...s, recording: v })} />
           <Toggle label={t("Ocultar créditos de redekorate")} checked={!!s.hideCredit} onChange={(v) => onChange({ ...s, hideCredit: v })} />
           <div className="border-t border-line pt-2">
             <Toggle label={t("Pedir consentimiento informado")} hint={t("Recomendado si recolectas datos personales")} checked={!!s.consent?.enabled}

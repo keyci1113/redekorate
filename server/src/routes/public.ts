@@ -5,6 +5,8 @@ import { one, query } from "../lib/db.js";
 import { readUser } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { sessionCreateLimiter } from "../lib/security.js";
+import { GRACE_MS, MAX_BYTES, MAX_CHUNKS, pack, recordingOn, span, validEvents } from "../lib/recordings.js";
+import { pool } from "../lib/db.js";
 
 const NO_ANSWER = new Set(["welcome", "context", "thank_you"]);
 const device = (ua: string) => /ipad|tablet/i.test(ua) ? "tablet" : /mobi|android|iphone/i.test(ua) ? "mobile" : "desktop";
@@ -72,6 +74,36 @@ publicApi.put("/sessions/:id/answers/:blockId", async (req, res) => {
 publicApi.post("/sessions/:id/complete", async (req, res) => {
   const se = await openSession(req.params.id);
   await query("update sessions set completed_at = now() where id = $1", [se.id]);
+  res.json({ ok: true });
+});
+
+/**
+ * A piece of the session's screen recording, sent every few seconds by the participant's browser.
+ * Accepted only while the study records sessions and the session is still open (or just closed).
+ * Sending the same piece twice changes nothing, so a retry is safe.
+ */
+publicApi.post("/sessions/:id/recording", async (req, res) => {
+  if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) throw notFound("Sesión");
+  const se = await one<{ id: string; study_id: string; completed_at: Date | null; status: string; settings: unknown }>(
+    "select se.id, se.study_id, se.completed_at, s.status, coalesce(s.published_settings, s.settings) as settings from sessions se join studies s on s.id = se.study_id where se.id = $1", [req.params.id]);
+  if (!se) throw notFound("Sesión");
+  if (se.status !== "live" || !recordingOn(se.settings)) throw new HttpError(403, "Este estudio no graba sesiones");
+  if (se.completed_at && Date.now() - new Date(se.completed_at).getTime() > GRACE_MS) throw new HttpError(409, "La sesión ya fue completada");
+  const b = parse(z.object({ seq: z.number().int().min(0).max(MAX_CHUNKS - 1), events: z.array(z.unknown()) }), req.body);
+  if (!validEvents(b.events)) throw new HttpError(400, "Grabación inválida");
+  const data = pack(b.events), { first, last } = span(b.events);
+  const db = await pool.connect();
+  try {
+    await db.query("begin");
+    const { rows: [rec] } = await db.query(
+      "insert into session_recordings(session_id, study_id) values ($1,$2) on conflict (session_id) do update set updated_at = now() returning bytes", [se.id, se.study_id]);
+    if (rec.bytes + data.length > MAX_BYTES) { await db.query("rollback"); throw new HttpError(413, "Grabación demasiado grande"); }
+    const added = await db.query("insert into session_recording_chunks(session_id, seq, data) values ($1,$2,$3) on conflict do nothing", [se.id, b.seq, data]);
+    if (added.rowCount) await db.query(
+      "update session_recordings set events = events + $2, bytes = bytes + $3, first_ts = least(coalesce(first_ts, $4), $4), last_ts = greatest(coalesce(last_ts, $5), $5) where session_id = $1",
+      [se.id, b.events.length, data.length, Math.round(first), Math.round(last)]);
+    await db.query("commit");
+  } catch (e) { await db.query("rollback").catch(() => {}); throw e; } finally { db.release(); }
   res.json({ ok: true });
 });
 

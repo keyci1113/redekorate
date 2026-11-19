@@ -13,6 +13,7 @@ export interface StudySettings {
   hideCredit?: boolean;
   voiceAnswers?: boolean;   // on by default: participants can dictate text answers
   consent?: { enabled: boolean; text: string };
+  recording?: boolean;      // off by default: record what participants do on screen during the study
 }
 
 /** Voice answers are on unless the study turned them off. */

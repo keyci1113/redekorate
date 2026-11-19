@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Lock, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Lock, ShieldCheck, Video } from "lucide-react";
 import { api } from "../lib/api";
 import type { Block } from "../blocks/types";
 import { blockDef } from "../blocks/registry";
@@ -11,6 +11,7 @@ import { Button, ErrorNote, Spinner, cx } from "../components/ui";
 import { LogoMark, Wordmark } from "../components/Logo";
 import { brandStyle, logoHeight, type StudySettings } from "../lib/settings";
 import { getLang, useLang } from "../lib/i18n";
+import { startRecording, type Recorder } from "../lib/recorder";
 
 import { t } from "../lib/i18n";
 interface PublicStudy { id?: string; title: string; status: string; blocks?: Block[]; settings?: StudySettings }
@@ -48,6 +49,16 @@ export function RunnerPage() {
   return <Run slug={slug!} blocks={state.study.blocks ?? []} settings={state.study.settings ?? {}} preview={!!state.preview} />;
 }
 
+/** Shown before anything is recorded: what is captured and what is not. */
+function RecordingNotice() {
+  return (
+    <p className="mt-6 flex items-start gap-2.5 rounded-xl border border-line bg-surface p-3.5 text-left text-[13px] leading-relaxed text-ink-2">
+      <Video size={16} aria-hidden className="mt-0.5 shrink-0 text-accent" />
+      <span>{t("Este estudio graba tu actividad en pantalla mientras participas: dónde haces clic, cómo te desplazas y qué pantallas ves. No graba tu cámara ni tu micrófono, y lo que escribes aparece oculto en la grabación.")}</span>
+    </p>
+  );
+}
+
 function Center({ children }: { children: ReactNode }) {
   return <div className="flex min-h-full items-center justify-center p-6">{children}</div>;
 }
@@ -62,6 +73,9 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
   const [consented, setConsented] = useState(!settings.consent?.enabled);
   const [agree, setAgree] = useState(false);
   const session = useRef<string | null>(null);
+  const recorder = useRef<Recorder | null>(null);
+  const recording = !!settings.recording && !preview;
+  useEffect(() => () => { void recorder.current?.stop(); }, []);
   const shownAt = useRef(Date.now());
   const openedAt = useRef(Date.now());   // when the first screen showed (after consent), sent with the new session
   const block = blocks[i];
@@ -82,11 +96,17 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
     if (settings.consent?.enabled) qs.consent = "aceptado";
     const { session_id } = await api.post<{ session_id: string }>(`/public/studies/${slug}/sessions`, { participant: qs, elapsed_ms: Math.max(0, Date.now() - openedAt.current) });
     session.current = session_id;
+    // The recording starts once the participant has seen the notice and pressed Start. If it cannot start, the study goes on without it.
+    if (recording) startRecording(session_id).then((r) => { recorder.current = r; }).catch(() => {});
     return session_id;
   }
 
   async function finish(sid: string | null) {
+    await recorder.current?.flush();
     if (sid) await api.post(`/public/sessions/${sid}/complete`);
+    // A moment more, so the replay ends on the thank-you screen.
+    const r = recorder.current; recorder.current = null;
+    if (r) window.setTimeout(() => void r.stop(), 1500);
     if (finalIdx >= 0 && i !== finalIdx) { setHistory((h) => [...h, i]); setI(finalIdx); } else setFinished(true);
   }
 
@@ -140,6 +160,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
               <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[var(--color-accent)]" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
               <span className="text-[15px]">{t("He leído la información y acepto participar de forma voluntaria.")}</span>
             </label>
+            {recording && <RecordingNotice />}
             <div className="mt-6 flex justify-end"><Button variant="primary" size="lg" disabled={!agree} onClick={() => setConsented(true)}>{t("Continuar")} <ArrowRight size={16} /></Button></div>
           </div>
         ) : (
@@ -150,6 +171,7 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
               <>
                 <BlockView block={block} value={values[block.id]} preview={preview} settings={settings}
                   onChange={(v) => setValues((s) => ({ ...s, [block.id]: v }))} onAdvance={(v) => next(v)} />
+                {recording && i === 0 && !session.current && <RecordingNotice />}
                 {err && <div className="mt-4"><ErrorNote>{err}</ErrorNote></div>}
                 {block.type !== "thank_you" && !(autoAdvance && !preview) && (
                   <div className={cx("mt-9 flex items-center gap-3", block.type === "welcome" ? "justify-center" : "justify-between")}>
@@ -176,7 +198,8 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
       </main>
 
       <footer className="flex flex-wrap items-center justify-between gap-2 px-5 py-4 text-xs text-ink-3">
-        <span className="flex items-center gap-1.5"><Lock size={11} /> {t("Datos protegidos · solo el equipo de investigación ve tus respuestas")}</span>
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1"><span className="flex items-center gap-1.5"><Lock size={11} /> {t("Datos protegidos · solo el equipo de investigación ve tus respuestas")}</span>
+          {recording && <span className="flex items-center gap-1.5"><span aria-hidden className="h-1.5 w-1.5 rounded-full bg-bad" />{t("Grabando la pantalla de este estudio")}</span>}</span>
         {!settings.hideCredit && <span className="flex shrink-0 items-center gap-1.5">{t("Hecho con")} <LogoMark size={13} /><Wordmark height={10} /></span>}
       </footer>
     </div>

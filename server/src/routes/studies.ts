@@ -1,5 +1,6 @@
 import { translate } from "../lib/i18n.js";
 import { Router } from "express";
+import { unpackInner } from "../lib/recordings.js";
 import { z } from "zod";
 import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
@@ -161,13 +162,34 @@ studies.get("/:id/results", async (req, res) => {
     [s.id],
   );
   const insights = await query("select * from insights where study_id = $1 order by created_at desc", [s.id]);
+  // Which sessions have a screen recording, and how long it is.
+  const recordings = await query("select session_id, events, bytes, greatest(coalesce(last_ts - first_ts, 0), 0)::int as duration_ms from session_recordings where study_id = $1 and events > 0", [s.id]);
   await noteOpen(s.id, req.user!.id, "results");
-  res.json({ study: s, sessions, answers, insights, role: await projectRole(s.project_id, req.user!.id) });
+  res.json({ study: s, sessions, answers, insights, recordings, role: await projectRole(s.project_id, req.user!.id) });
 });
 
 studies.delete("/:id/sessions/:sid", async (req, res) => {
   await ownStudy(req.params.id, req.user!.id, "editor");
   await query("delete from sessions where id = $1 and study_id = $2", [req.params.sid, req.params.id]);
+  res.json({ ok: true });
+});
+
+// ── Session recordings ──────────────────────────────────────────
+const UUID = /^[0-9a-f-]{36}$/i;
+studies.get("/:id/recordings/:sid", async (req, res) => {
+  const s = await ownStudy(req.params.id, req.user!.id);
+  if (!UUID.test(req.params.sid)) throw notFound("Grabación");
+  const chunks = await query<{ data: Buffer }>(
+    "select c.data from session_recording_chunks c join session_recordings r on r.session_id = c.session_id where r.session_id = $1 and r.study_id = $2 order by c.seq", [req.params.sid, s.id]);
+  if (!chunks.length) throw notFound("Grabación");
+  // Chunks are already JSON: they are joined as text instead of being parsed and written again.
+  res.type("application/json").send(`{"events":[${chunks.map((c) => unpackInner(c.data)).filter(Boolean).join(",")}]}`);
+});
+
+studies.delete("/:id/recordings/:sid", async (req, res) => {
+  const s = await ownStudy(req.params.id, req.user!.id, "editor");
+  if (!UUID.test(req.params.sid)) throw notFound("Grabación");
+  await query("delete from session_recordings where session_id = $1 and study_id = $2", [req.params.sid, s.id]);
   res.json({ ok: true });
 });
 

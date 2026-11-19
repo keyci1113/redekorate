@@ -11,6 +11,7 @@ import { studies } from "./routes/studies.js";
 import { insights } from "./routes/insights.js";
 import { participants } from "./routes/participants.js";
 import { publicApi } from "./routes/public.js";
+import { purgeOldRecordings } from "./lib/recordings.js";
 import { dashboard } from "./routes/dashboard.js";
 import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
@@ -123,5 +124,10 @@ if (existsSync(webDist)) {
 app.use(errorHandler);
 
 migrate()
+  .then(() => {
+    // Old session recordings are deleted once a day (and at start).
+    const purge = () => purgeOldRecordings().then((n) => { if (n) console.log(`Deleted ${n} session recordings past their retention time`); }).catch((e) => console.warn("[recordings] purge failed:", e.message));
+    void purge(); setInterval(purge, 24 * 3600 * 1000).unref();
+  })
   .then(() => app.listen(port, () => console.log(`Redekorate en http://localhost:${port}`)))
   .catch((e) => { console.error("No se pudo migrar la base de datos", e); process.exit(1); });
