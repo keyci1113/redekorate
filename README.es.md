@@ -2,6 +2,8 @@
 
 Herramienta propia (tipo Maze) para planear, lanzar y analizar investigación de UX: crea un proyecto, elige el método, configúralo, envía el link a participantes reales y comparte un reporte con insights.
 
+Creado por **Keyci Padilla**.
+
 ## Flujo
 
 1. **Inicio:** un dashboard con estudios activos, respuestas de los últimos 14 días, actividad reciente, borradores e insights.

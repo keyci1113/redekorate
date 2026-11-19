@@ -7,6 +7,8 @@ A self-hosted UX research tool in the spirit of Maze: create a project, pick a m
 
 [Leer en español](README.es.md)
 
+Created by **Keyci Padilla**.
+
 ![Home dashboard](docs/screenshots/home-redesign/home-snapshot-en-1280.png)
 
 ## Features
