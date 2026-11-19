@@ -8,6 +8,7 @@ import { useAuth } from "../lib/auth";
 import { copy, useLoad } from "../lib/hooks";
 import { canComment, canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
 import { relTime, t } from "../lib/i18n";
+import { isSendShortcut } from "../lib/keys";
 import type { ProjectRole, Severity, Study } from "../lib/types";
 import type { DocRecord } from "../docs/types";
 import { Avatar } from "../components/Avatar";
@@ -53,6 +54,7 @@ function useTicket(projectId: string, number: number, onChanged?: () => void) {
     columns: meta.data?.columns?.length ? meta.data.columns : BUILT_IN_COLUMNS,
     patch: (p: Patch, optimistic?: Partial<TicketDetail>) => run(() => api.patch(base, p), optimistic),
     comment: (body: string, visibility: "internal" | "email_to_reporter") => run(() => api.post(`${base}/comments`, { body, visibility })),
+    editComment: (id: string, body: string) => run(() => api.patch(`${base}/comments/${id}`, { body })),
     deleteComment: (id: string) => run(() => api.del(`${base}/comments/${id}`)),
     link: (target_type: LinkTarget, target: { id?: string; number?: number }) => run(() => api.post(`${base}/links`, { target_type, target_id: target.id, target_number: target.number })),
     unlink: (id: string) => run(() => api.del(`${base}/links/${id}`)),
@@ -522,7 +524,7 @@ function Linked({ ctx }: { ctx: Ctx }) {
           <Link to={`/projects/${projectId}/new?ticket=${x.number}`} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium hover:border-line-2"><FlaskConical size={14} aria-hidden />{t("Crear estudio")}</Link>
           {x.converted_insight_id
             ? <Link to={`/projects/${projectId}?tab=insights`} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium hover:border-line-2"><Lightbulb size={14} aria-hidden />{t("Ver insight")}</Link>
-            : <button type="button" onClick={() => setConverting(true)} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium hover:border-line-2"><Lightbulb size={14} aria-hidden />{t("Convertir en insight")}</button>}
+            : x.type !== "research_request" && <button type="button" onClick={() => setConverting(true)} className="focus-ring inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-medium hover:border-line-2"><Lightbulb size={14} aria-hidden />{t("Convertir en insight")}</button>}
         </div>
       )}
       {converting && <ConvertDialog ticket={x} error={ctx.api.error} onClose={() => { setConverting(false); ctx.api.clearError(); }} onConvert={async (b) => { if (await ctx.api.toInsight(b)) setConverting(false); }} />}
@@ -539,12 +541,14 @@ function ConvertDialog({ ticket, error, onClose, onConvert }: { ticket: TicketDe
   const [severity, setSeverity] = useState<Severity>(severityFromPriority(ticket.priority));
   const [tags, setTags] = useState(ticket.labels.join(", "));
   const [saving, setSaving] = useState(false);
+  // A ref, not only state: two clicks in the same frame both see saving === false before React re-renders.
+  const pending = useRef(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (saving || !title.trim()) return;
-    setSaving(true);
+    if (pending.current || !title.trim()) return;
+    pending.current = true; setSaving(true);
     try { await onConvert({ title: title.trim(), body, severity, tags: tags.split(",").map((x) => x.trim().replace(/^#/, "")).filter(Boolean) }); }
-    finally { setSaving(false); }
+    finally { pending.current = false; setSaving(false); }
   }
   const label = "mb-1.5 block text-[13px] font-semibold";
   return (
@@ -637,6 +641,7 @@ function Conversation({ ctx, people }: { ctx: Ctx; people: Person[] }) {
   const [mode, setMode] = useState<"internal" | "email_to_reporter">("internal");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const [pick, setPick] = useState(0);
   const [caret, setCaret] = useState(0);
   const box = useRef<HTMLTextAreaElement | null>(null);
@@ -651,15 +656,15 @@ function Conversation({ ctx, people }: { ctx: Ctx; people: Person[] }) {
     requestAnimationFrame(() => { box.current?.focus(); box.current?.setSelectionRange(next.caret, next.caret); });
   };
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (isSendShortcut(e)) { e.preventDefault(); void submit(); return; }
     if (!listOpen) return;
     if (e.key === "ArrowDown") { e.preventDefault(); e.stopPropagation(); setPick((pick + 1) % options.length); }
     else if (e.key === "ArrowUp") { e.preventDefault(); e.stopPropagation(); setPick((pick - 1 + options.length) % options.length); }
     else if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); choose(options[Math.min(pick, options.length - 1)].name); }
     else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setCaret(-1); }
   };
-  const send = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!body.trim()) return;
+  const submit = async () => {
+    if (busy || !body.trim()) return;
     setBusy(true);
     if (await ctx.api.comment(body.trim(), mode)) setBody("");
     setBusy(false);
@@ -679,18 +684,21 @@ function Conversation({ ctx, people }: { ctx: Ctx; people: Person[] }) {
             <div className="min-w-0 flex-1">
               <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
                 <span className="font-semibold">{c.name ?? t("Cuenta eliminada")}</span>
-                <span className="text-xs text-ink-3">{r ? `${visibilityLabel(c, to)} · ` : ""}{fmtMoment(c.created_at)}</span>
+                <span className="text-xs text-ink-3">{r ? `${visibilityLabel(c, to)} · ` : ""}{fmtMoment(c.created_at)}{c.edited_at && <span title={fmtMoment(c.edited_at)}> · {t("editado")}</span>}</span>
+                {c.user_id === me?.id && c.visibility === "internal" && editing !== c.id && <button type="button" onClick={() => setEditing(c.id)} className="focus-ring rounded text-xs text-ink-3 underline hover:text-ink">{t("Editar")}</button>}
                 {(c.user_id === me?.id || roleIsOwner(ctx.api.role)) && c.visibility === "internal" && <button type="button" onClick={() => void ctx.api.deleteComment(c.id)} className="focus-ring rounded text-xs text-ink-3 underline hover:text-bad">{t("Borrar")}</button>}
               </p>
-              <p className="mt-0.5 text-sm leading-relaxed whitespace-pre-line">
-                {splitMentions(c.body, people).map((part, i) => part.mention ? <span key={i} className="font-semibold text-accent-ink">{part.text}</span> : <span key={i}>{part.text}</span>)}
-              </p>
+              {editing === c.id ? <CommentEditor initial={c.body} onCancel={() => setEditing(null)} onSave={async (next) => { if (await ctx.api.editComment(c.id, next)) setEditing(null); }} /> : (
+                <p className="mt-0.5 text-sm leading-relaxed whitespace-pre-line">
+                  {splitMentions(c.body, people).map((part, i) => part.mention ? <span key={i} className="font-semibold text-accent-ink">{part.text}</span> : <span key={i}>{part.text}</span>)}
+                </p>
+              )}
             </div>
           </li>
         ))}
       </ul>
       {ctx.canWrite && (
-        <form onSubmit={send} className="mt-4 flex flex-col gap-2">
+        <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="mt-4 flex flex-col gap-2">
           {canReply && <div role="tablist" aria-label={t("Tipo de mensaje")} className="flex w-fit gap-1 rounded-[10px] bg-ink/5 p-1">{tab("email_to_reporter", t("Responder a {a}", { a: to }))}{tab("internal", t("Comentario interno"))}</div>}
           <div className="relative">
             <label><span className="sr-only">{label}</span>
@@ -710,12 +718,38 @@ function Conversation({ ctx, people }: { ctx: Ctx; people: Person[] }) {
             )}
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-ink-3">{mode === "internal" ? (r ? t("Solo tu equipo ve los comentarios internos. Escribe @ para mencionar a alguien.") : t("Escribe @ para mencionar a alguien.")) : t("Se envía por correo a {a}.", { a: r?.email ?? "" })}</span>
+            <span className="text-xs text-ink-3">{mode === "internal" ? (r ? t("Solo tu equipo ve los comentarios internos. Escribe @ para mencionar a alguien.") : t("Escribe @ para mencionar a alguien.")) : t("Se envía por correo a {a}.", { a: r?.email ?? "" })} {t("⌘/Ctrl + Enter para enviar")}</span>
             <Button type="submit" variant="primary" size="lg" disabled={busy || !body.trim()}>{mode === "internal" ? t("Comentar") : t("Enviar correo")}</Button>
           </div>
         </form>
       )}
     </section>
+  );
+}
+
+/** Editing one's own comment in place: ⌘/Ctrl+Enter saves, Escape cancels. */
+function CommentEditor({ initial, onSave, onCancel }: { initial: string; onSave: (body: string) => Promise<void>; onCancel: () => void }) {
+  const [body, setBody] = useState(initial);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (busy || !body.trim()) return;
+    if (body.trim() === initial) { onCancel(); return; }
+    setBusy(true);
+    try { await onSave(body.trim()); } finally { setBusy(false); }
+  };
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); void save(); }} className="mt-1 flex flex-col gap-2">
+      <label><span className="sr-only">{t("Editar comentario")}</span>
+        <textarea autoFocus value={body} maxLength={4000} onChange={(e) => setBody(e.target.value)} className="field min-h-20"
+          onKeyDown={(e) => {
+            if (isSendShortcut(e)) { e.preventDefault(); void save(); }
+            else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onCancel(); }
+          }} /></label>
+      <span className="flex justify-end gap-2">
+        <Button type="button" size="sm" onClick={onCancel}>{t("Cancelar")}</Button>
+        <Button type="submit" size="sm" variant="primary" disabled={busy || !body.trim()}>{t("Guardar")}</Button>
+      </span>
+    </form>
   );
 }
 

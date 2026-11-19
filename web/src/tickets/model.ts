@@ -47,7 +47,7 @@ export interface TicketLink {
 }
 export interface TicketActivity { id: string; action: string; from_value: string | null; to_value: string | null; created_at: string; actor_id: string | null; actor_name: string | null; actor_avatar: string | null }
 export type CommentVisibility = "internal" | "email_to_reporter" | "reply_from_reporter";
-export interface TicketComment { id: string; body: string; created_at: string; user_id: string | null; name: string | null; avatar: string | null; visibility: CommentVisibility }
+export interface TicketComment { id: string; body: string; created_at: string; edited_at?: string | null; user_id: string | null; name: string | null; avatar: string | null; visibility: CommentVisibility }
 export interface ReporterMeta {
   page_url?: string; page_title?: string; os?: string; browser?: string; window_size?: string; screen_resolution?: string;
   pixel_ratio?: number | string; color_depth?: string; language?: string; timezone?: string; approx_location?: string; sent_at?: string;

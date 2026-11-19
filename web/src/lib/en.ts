@@ -3617,4 +3617,14 @@ export const EN: Record<string, string> = {
 "{n} % hecho": "{n}% done",
 "Actualizar": "Refresh",
 "Cerrar resumen del día": "Close the daily brief",
+// UI review round 2: tickets, insights and comments
+"Escribe un título.": "Enter a title.",
+"Elige un tipo.": "Choose a type.",
+"Ticket #{n} creado": "Ticket #{n} created",
+"Quitar filtro": "Clear filter",
+"Viene del ticket": "From ticket",
+"Editar «{a}»": "Edit “{a}”",
+"Eliminar «{a}»": "Delete “{a}”",
+"editado": "edited",
+"Editar comentario": "Edit comment",
 };

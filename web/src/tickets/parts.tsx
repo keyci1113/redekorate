@@ -172,17 +172,19 @@ export function Dialog({ title, subtitle, onClose, children, footer, width = 560
   };
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/45 px-4 py-6 sm:py-12" onMouseDown={onClose}>
+      {/* The dialog never grows past the window (dvh: the visible height, also on phones): the title and the footer stay
+          in view and only the body scrolls. The heights match the overlay's py-6 / sm:py-12. */}
       <div ref={box} role="dialog" aria-modal="true" aria-labelledby={id} onKeyDown={onKey} onMouseDown={(e) => e.stopPropagation()} style={{ maxWidth: width }}
-        className="tk-dialog flex w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-(--shadow-lift)">
-        <div className="flex items-start justify-between gap-4 px-5 pt-4">
+        className="tk-dialog flex max-h-[calc(100dvh-3rem)] w-full flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-(--shadow-lift) sm:max-h-[calc(100dvh-6rem)]">
+        <div className="flex shrink-0 items-start justify-between gap-4 px-5 pt-4">
           <div className="flex min-w-0 flex-col gap-0.5">
             <h2 id={id} className="text-[17px] leading-snug font-bold">{title}</h2>
             {subtitle && <p className="text-xs text-ink-3">{subtitle}</p>}
           </div>
           <button type="button" onClick={onClose} aria-label={t("Cerrar diálogo")} className="focus-ring -mt-1 -mr-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-ink-2 hover:bg-ink/5"><X size={16} /></button>
         </div>
-        <div className="flex flex-col gap-3.5 px-5 py-4">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-2 border-t border-line bg-paper px-5 py-3">{footer}</div>}
+        <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-5 py-4">{children}</div>
+        {footer && <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-line bg-paper px-5 py-3">{footer}</div>}
       </div>
     </div>
   );

@@ -49,7 +49,8 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
   const [links, setLinks] = useState<Chosen[]>([]);
   const [another, setAnother] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);   // what the server answered
+  const [tried, setTried] = useState(false);                  // a Create was attempted: from then on, missing fields are marked
   const [made, setMade] = useState<number | null>(null);
   const titleRef = useRef<HTMLInputElement | null>(null);
   const people = meta.data?.people ?? [], milestones = meta.data?.milestones ?? [];
@@ -57,10 +58,19 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
   const who = people.find((p) => p.id === assignee);
 
   const addLabel = () => { const v = draft.trim(); if (v && !labels.some((l) => l.toLowerCase() === v.toLowerCase())) setLabels([...labels, v]); setDraft(""); };
+  // Worked out from the fields on every render, so the message goes away as soon as they are filled in.
+  const missingTitle = tried && !title.trim(), missingType = tried && !type;
+  const missing = missingTitle && missingType ? t("Escribe un título y elige un tipo.") : missingTitle ? t("Escribe un título.") : missingType ? t("Elige un tipo.") : null;
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !type) { setError(t("Escribe un título y elige un tipo.")); return; }
-    setBusy(true); setError(null);
+    if (busy) return;
+    setError(null);
+    if (!title.trim() || !type) {
+      setTried(true);
+      (!title.trim() ? titleRef.current : document.querySelector<HTMLInputElement>("input[name='ticket-type']"))?.focus();
+      return;
+    }
+    setBusy(true);
     try {
       const r = await api.post<{ ticket: TicketDetail }>(`/projects/${projectId}/tickets`, {
         title: title.trim(), type, description, priority, ...(column ? { column: column.id } : {}), due_date: due || null, milestone_id: milestone || null,
@@ -69,7 +79,7 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
       });
       onCreated(r.ticket);
       if (!another) { onClose(); return; }
-      setMade(r.ticket.number); setTitle(""); setDescription(""); setDraft("");
+      setMade(r.ticket.number); setTitle(""); setDescription(""); setDraft(""); setTried(false);
       await meta.reload();
       titleRef.current?.focus();
     } catch (err) { setError((err as Error).message); }
@@ -78,8 +88,16 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
 
   return (
     <Dialog onClose={onClose} title={insight ? t("Crear ticket desde un insight") : t("Nuevo ticket")}
-      subtitle={insight ? t("En {a} · será {b}", { a: projectName, b: next }) : t("En {a} · será {b} · estado {c}", { a: projectName, b: next, c: column ? columnName(column) : columnName({ name: null, status: "todo" }) })}>
-      <form onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
+      subtitle={insight ? t("En {a} · será {b}", { a: projectName, b: next }) : t("En {a} · será {b} · estado {c}", { a: projectName, b: next, c: column ? columnName(column) : columnName({ name: null, status: "todo" }) })}
+      footer={
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          {insight ? <span /> : (
+            <label htmlFor="nt-another" className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-[13px]"><input id="nt-another" type="checkbox" value="create-another" checked={another} onChange={(e) => setAnother(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />{t("Crear otro después de este")}</label>
+          )}
+          <span className="flex gap-2"><Button type="button" onClick={onClose}>{t("Cancelar")}</Button><Button type="submit" form="new-ticket" variant="primary" disabled={busy}>{busy ? t("Creando…") : t("Crear ticket")}</Button></span>
+        </div>
+      }>
+      <form id="new-ticket" onSubmit={submit} className="flex flex-col gap-3.5" noValidate>
         {insight && (
           <div className="rounded-xl border border-line bg-paper p-3">
             <p className="text-xs font-semibold text-ink-3">{t("Evidencia que viene del insight")}</p>
@@ -89,14 +107,16 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
           </div>
         )}
         <F id="nt-title" text={t("Título")} required hint={insight ? t("Sugerido a partir del título del insight. Edítalo para describir el trabajo.") : undefined}>
-          <input id="nt-title" ref={titleRef} data-autofocus type="text" required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)} className={input} />
+          <input id="nt-title" ref={titleRef} data-autofocus type="text" required maxLength={300} value={title} onChange={(e) => setTitle(e.target.value)}
+            aria-invalid={missingTitle || undefined} aria-describedby={missingTitle ? "nt-missing" : undefined} className={cx(input, missingTitle && "border-bad")} />
         </F>
-        <fieldset className="flex flex-col">
+        <fieldset className="flex flex-col" aria-describedby={missingType ? "nt-missing" : undefined}>
           <legend className={cx(label, "mb-1.5")}>{t("Tipo")}<Req /></legend>
           <div className="flex flex-wrap gap-2">
             {TYPES.map((x) => (
-              <label key={x} className={cx("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-surface px-2.5 text-[13px] font-medium has-focus-visible:ring-2 has-focus-visible:ring-accent", type === x ? "border-accent bg-accent-soft" : "border-line-2")}>
-                <input type="radio" name="ticket-type" required checked={type === x} onChange={() => setType(x)} className="accent-(--color-accent)" />{typeLabel(x)}
+              // Each option has a value and a label tied to it by id, so a screen reader names it ("Bug") instead of reading "on".
+              <label key={x} htmlFor={`nt-type-${x}`} className={cx("inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-surface px-2.5 text-[13px] font-medium has-focus-visible:ring-2 has-focus-visible:ring-accent", type === x ? "border-accent bg-accent-soft" : missingType ? "border-bad" : "border-line-2")}>
+                <input id={`nt-type-${x}`} type="radio" name="ticket-type" value={x} required aria-invalid={missingType || undefined} checked={type === x} onChange={() => setType(x)} className="accent-(--color-accent)" />{typeLabel(x)}
               </label>
             ))}
           </div>
@@ -153,14 +173,9 @@ export function NewTicketDialog({ projectId, projectName, column, insight, onClo
             </div>
           </div>
         )}
+        {missing && <div id="nt-missing" role="alert"><ErrorNote>{missing}</ErrorNote></div>}
         {error && <ErrorNote>{error}</ErrorNote>}
         <p role="status" className={made ? "text-[13px] font-medium text-good" : "sr-only"}>{made ? t("Ticket #{n} creado. Puedes crear el siguiente.", { n: made }) : ""}</p>
-        <div className="-mx-5 -mb-4 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-paper px-5 py-3">
-          {insight ? <span /> : (
-            <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 text-[13px]"><input type="checkbox" checked={another} onChange={(e) => setAnother(e.target.checked)} className="h-4 w-4 accent-(--color-accent)" />{t("Crear otro después de este")}</label>
-          )}
-          <span className="flex gap-2"><Button type="button" onClick={onClose}>{t("Cancelar")}</Button><Button type="submit" variant="primary" disabled={busy}>{t("Crear ticket")}</Button></span>
-        </div>
       </form>
     </Dialog>
   );
