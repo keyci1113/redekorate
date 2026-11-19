@@ -15,6 +15,7 @@ import { purgeOldRecordings } from "./lib/recordings.js";
 import { dashboard } from "./routes/dashboard.js";
 import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
+import { files } from "./routes/files.js";
 import { admin } from "./routes/admin.js";
 import { orgs } from "./routes/orgs.js";
 import { errorHandler } from "./lib/http.js";
@@ -58,6 +59,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth/oauth", oauth);
 app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);
+app.use("/api/projects/:id/files", files);
 app.use("/api/projects", projects);
 app.use("/api/studies", studies);
 app.use("/api/insights", insights);

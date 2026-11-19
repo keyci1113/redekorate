@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { BarChart3, Copy, FlaskConical, MoreHorizontal, Pencil, PenLine, Plus, Trash2 } from "lucide-react";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
@@ -13,6 +13,7 @@ import { InsightsPanel } from "../components/InsightsPanel";
 import { DocsPanel } from "../components/DocsPanel";
 import { ArchitecturePanel } from "../architecture/ArchitecturePanel";
 import { isDiagramKind } from "../architecture/model";
+import { FilesPanel } from "../components/FilesPanel";
 import { ParticipantsPanel } from "../components/ParticipantsPanel";
 import { ReportsPanel } from "../components/ReportsPanel";
 import { MembersPanel, sharedLabel } from "../components/MembersPanel";
@@ -28,8 +29,12 @@ export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
-  const [tab, setTab] = useState<"studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", participants: "participants", report: "report", files: "files", members: "members", comments: "comments" } as const;
+  const [tab, setTab] = useState<"studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "files" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  const [fileCount, setFileCount] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    api.get<{ files: unknown[] }>(`/projects/${id}/files`).then((r) => setFileCount(r.files.length)).catch(() => {});
+  }, [id]);
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -81,11 +86,12 @@ export function ProjectPage() {
         {/* Two groups: the research itself, then the team's shared space. */}
         <Tabs value={tab} onChange={setTab} label={t("Secciones del proyecto")} items={[
           { id: "studies", group: "research", label: t("Estudios"), count: list.length },
-          { id: "docs", group: "research", label: t("Documentos"), count: uxDocs.length },
+          { id: "docs", group: "research", label: t("Documentos UX"), count: uxDocs.length },
           { id: "architecture", group: "research", label: t("Arquitectura"), count: diagrams.length },
           { id: "insights", group: "research", label: t("Insights"), count: insights.data?.insights.length ?? 0 },
           { id: "participants", group: "research", label: t("Participantes"), count: participants.data?.participants.length ?? 0 },
           { id: "report", group: "research", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
+          { id: "files", group: "team", label: t("Archivos"), count: fileCount },
           { id: "members", group: "team", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
           { id: "comments", group: "team", label: t("Comentarios") },
         ] satisfies TabItem<typeof tab>[]} />
@@ -103,6 +109,7 @@ export function ProjectPage() {
         ))}
         {tab === "docs" && <DocsPanel projectId={p.id} docs={uxDocs} onChange={docs.reload} preselect={params.get("new")} canEdit={canEdit} />}
         {tab === "architecture" && <ArchitecturePanel projectId={p.id} diagrams={diagrams} onChange={docs.reload} canEdit={canEdit} />}
+        {tab === "files" && <FilesPanel projectId={p.id} canEdit={canEdit} onCount={setFileCount} />}
         {tab === "insights" && (
           <InsightsPanel projectId={p.id} studies={list} insights={insights.data?.insights ?? []} onChange={insights.reload} canEdit={canEdit} />
         )}
