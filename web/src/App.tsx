@@ -31,6 +31,7 @@ const OrgPage = lazy(() => import("./pages/OrgsPage").then((m) => ({ default: m.
 const WelcomePage = lazy(() => import("./pages/WelcomePage").then((m) => ({ default: m.WelcomePage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
+const ConnectPage = lazy(() => import("./pages/ConnectPage").then((m) => ({ default: m.ConnectPage })));
 
 function Private({ children }: { children: ReactNode }) {
   const { user, loading } = useAuth();
@@ -79,6 +80,7 @@ export function App() {
         <Route path="/orgs" element={<OrgsPage />} />
         <Route path="/orgs/:id" element={<OrgPage />} />
         <Route path="/help" element={<HelpPage />} />
+        <Route path="/connect" element={<ConnectPage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
       </Route>
       <Route path="/welcome" element={<Private><WelcomePage /></Private>} />
