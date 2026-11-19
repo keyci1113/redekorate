@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { KeyRound, Link2, LogOut, Plug, ShieldCheck, Trash2, Unlink, UserRound } from "lucide-react";
+import { Bell, KeyRound, Link2, LogOut, Plug, ShieldCheck, Trash2, Unlink, UserRound } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { timeAgo, useLoad } from "../lib/hooks";
@@ -9,6 +9,7 @@ import { Button, Card, ErrorNote, Field } from "../components/ui";
 import { PasswordStrength, passwordOk } from "../components/PasswordStrength";
 import { AvatarField } from "../components/AvatarField";
 import { OutsideAccess } from "../components/OutsideAccess";
+import { Toggle } from "../components/editing";
 import { ProviderIcon, SsoButtons, ssoErrorMessage, type SsoProviderInfo } from "../components/SsoButtons";
 
 import { t } from "../lib/i18n";
@@ -46,6 +47,11 @@ export function AccountPage() {
   const [del, setDel] = useState("");
   const profile = useForm(), password = useForm(), sessions = useForm(), danger = useForm(), linking = useForm();
   const signIn = useLoad(() => api.get<SignIn>("/auth/oauth/identities"), []);
+  const notices = useLoad(() => api.get<{ email: boolean }>("/notifications"), []);
+  const setEmailNotices = (email: boolean) => {
+    notices.setData((d) => d && { ...d, email });
+    void api.put("/notifications/settings", { email }).catch(() => notices.reload());
+  };
   const hasPassword = signIn.data?.has_password ?? true;
   const ssoError = ssoErrorMessage(params.get("error"));
 
@@ -98,6 +104,13 @@ export function AccountPage() {
             </div>
           </Section>
         )}
+
+        <div id="notificaciones" className="scroll-mt-6">
+          <Section icon={<Bell size={16} />} title={t("Notificaciones")} text={t("Te avisamos cuando te asignan un ticket, te mencionan, o cuando se mueve o se comenta un ticket en el que estás. Siempre lo ves en la campana de arriba.")}>
+            <Toggle checked={notices.data?.email ?? true} onChange={setEmailNotices} label={t("Avisarme también por correo")}
+              hint={t("Un correo a {a} por cada novedad. Lo que tú mismo haces nunca te genera avisos.", { a: user?.email ?? "" })} />
+          </Section>
+        </div>
 
         <Section icon={<KeyRound size={16} />} title={hasPassword ? t("Contraseña") : t("Crear contraseña")}
           text={hasPassword ? t("Al cambiarla, se cierran tus sesiones en otros dispositivos.") : t("Tu cuenta entra con Google o Microsoft. Una contraseña te da una segunda forma de acceso.")}>
