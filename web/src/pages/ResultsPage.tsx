@@ -146,6 +146,10 @@ function Responses({ study, sessions, answers, recordings, onChange, canEdit }: 
   const [replay, setReplay] = useState<{ id: string; number: number } | null>(null);
   const recorded = new Map(recordings.map((r) => [r.session_id, r]));
   const qs = answeredBlocks(study.blocks);
+  const discard = async (id: string) => {
+    if (!confirm(t("¿Eliminar esta respuesta? Úsalo para descartar pruebas o respuestas inválidas."))) return;
+    await api.del(`/studies/${study.id}/sessions/${id}`); onChange();
+  };
   if (!sessions.length) return <Empty icon={<Plus size={20} />} title={t("Aún no hay participantes")} text={t("Comparte el link del estudio para empezar a recibir respuestas.")} />;
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -156,7 +160,8 @@ function Responses({ study, sessions, answers, recordings, onChange, canEdit }: 
         const shown = revealed.has(s.id);
         return (
           <div key={s.id} className={cx(idx > 0 && "border-t border-line")}>
-            <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left hover:bg-paper/50">
+            <div className="flex items-center hover:bg-paper/50">
+            <button onClick={() => setOpen(open === s.id ? null : s.id)} aria-expanded={open === s.id} className={cx("flex min-w-0 flex-1 items-center gap-4 py-3.5 pl-5 text-left", canEdit ? "pr-2" : "pr-5")}>
               <span className="w-24 text-sm font-medium tabular-nums">#{sessions.length - idx}</span>
               <span className="flex-1 text-sm text-ink-2">{timeAgo(s.started_at)}{s.device && <span className="ml-2 text-xs text-ink-3">· {s.device === "mobile" ? t("Móvil") : s.device === "tablet" ? t("Tablet") : t("Escritorio")}</span>}
                 {fields.length > 0 && (
@@ -176,6 +181,9 @@ function Responses({ study, sessions, answers, recordings, onChange, canEdit }: 
               <span className={cx("w-24 rounded-full px-2 py-0.5 text-center text-xs font-medium", s.completed_at ? "bg-good-soft text-good" : "bg-ink/5 text-ink-3")}>{s.completed_at ? t("Completa") : t("Incompleta")}</span>
               <ChevronDown size={16} className={cx("text-ink-3 transition", open === s.id && "rotate-180")} />
             </button>
+            {canEdit && <button type="button" onClick={() => discard(s.id)} title={t("Eliminar respuesta")} aria-label={t("Eliminar respuesta #{n}", { n: sessions.length - idx })}
+              className="focus-ring mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"><Trash2 size={16} /></button>}
+            </div>
             {open === s.id && (
               <div className="border-t border-line bg-paper/40 px-5 py-4">
                 {fields.length > 0 && (
@@ -217,10 +225,7 @@ function Responses({ study, sessions, answers, recordings, onChange, canEdit }: 
                       await api.del(`/studies/${study.id}/recordings/${s.id}`); onChange();
                     }}>{t("Eliminar grabación")}</Button>}
                   </>}
-                  {canEdit && <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {
-                    if (!confirm(t("¿Eliminar esta respuesta? Úsalo para descartar pruebas o respuestas inválidas."))) return;
-                    await api.del(`/studies/${study.id}/sessions/${s.id}`); onChange();
-                  }}>{t("Descartar respuesta")}</Button>}
+                  {canEdit && <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={() => discard(s.id)}>{t("Eliminar respuesta")}</Button>}
                 </div>
               </div>
             )}

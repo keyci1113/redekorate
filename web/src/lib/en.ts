@@ -286,7 +286,6 @@ export const EN: Record<string, string> = {
 "Deja activo el orden aleatorio.": "Keep random order on.",
 "Deja registro de cualquier observación, por pequeña que sea": "Record every observation, however small",
 "Desactívalo si no quieres que cambien respuestas": "Turn it off if you don't want people to change answers",
-"Descartar respuesta": "Discard response",
 "Describe aquí la tarea que el participante acaba de realizar.": "Describe here the task the participant just completed.",
 "Describe las actividades específicas de cada etapa": "Describe the specific activities of each stage",
 "Describe para quién estás diseñando": "Describe who you're designing for",
@@ -2743,4 +2742,6 @@ export const EN: Record<string, string> = {
 "Posición en la grabación": "Position in the recording",
 "Velocidad": "Speed",
 "Saltar pausas": "Skip pauses",
+"Eliminar respuesta": "Delete response",
+"Eliminar respuesta #{n}": "Delete response #{n}",
 };
