@@ -1,3 +1,4 @@
+import type { Area, MemberLevel } from "./access";
 import type { Block } from "../blocks/types";
 import type { ProjectCategory } from "./projectCategories";
 
@@ -10,7 +11,9 @@ export interface Identity { provider: "google" | "microsoft"; email: string | nu
 
 /** Project roles, lowest to highest. Commenter reads everything and can leave comments. */
 export type ProjectRole = "owner" | "editor" | "commenter" | "viewer";
-export interface ProjectMember { user_id: string; name: string; email: string; avatar: string | null; role: ProjectRole; created_at: string }
+export interface ProjectMember { user_id: string; name: string; email: string; avatar: string | null; role: ProjectRole; areas?: Area[]; created_at: string }
+/** Someone who reaches a project through its organization, without being a collaborator of it. */
+export interface OrgAccessMember { user_id: string; name: string; email: string; avatar: string | null; org_role: OrgRole; role: ProjectRole; areas: Area[] }
 
 /** Organization roles: owner (everything), admin (settings and people), member (commenter on every project). */
 export type OrgRole = "owner" | "admin" | "member";
@@ -18,8 +21,13 @@ export interface Organization {
   id: string; name: string; logo: string | null; color: string; created_at: string;
   role: OrgRole; member_count: number; project_count: number;
 }
-export interface OrgMember { user_id: string; name: string; email: string; avatar: string | null; role: OrgRole; created_at: string }
-export interface OrgInvite { id: string; email: string; role: "admin" | "member"; created_at: string; expires_at: string; invited_by: string | null }
+export interface OrgMember {
+  user_id: string; name: string; email: string; avatar: string | null; role: OrgRole; created_at: string;
+  // For members (owners and admins have everything): every project or only the chosen ones, what they can do and which sections.
+  all_projects: boolean; project_role: MemberLevel; areas: Area[];
+  projects: { id: string; role: MemberLevel; areas: Area[] }[];   // the organization's projects they are a collaborator of
+}
+export interface OrgInvite { id: string; email: string; role: "admin" | "member"; created_at: string; expires_at: string; invited_by: string | null; all_projects: boolean; project_role: MemberLevel; areas: Area[]; project_ids: string[] }
 /** The organization fields a project carries (null when personal). */
 export interface OrgRef { organization_id?: string | null; org_name?: string | null; org_logo?: string | null; org_color?: string | null }
 
@@ -29,7 +37,7 @@ export interface Project extends OrgRef {
   id: string; name: string; description: string; color: string; archived: boolean;
   /** What kind of work the project holds; older answers may lack it (then it is UX research). */
   category?: ProjectCategory;
-  role?: ProjectRole; owner_name?: string;   // rol de quien consulta; owner_name para proyectos compartidos
+  role?: ProjectRole; areas?: Area[]; owner_name?: string;   // rol de quien consulta; owner_name para proyectos compartidos
   created_at: string; updated_at: string;
   study_count?: number; live_count?: number; response_count?: number; insight_count?: number;
   started_count?: number; document_count?: number; participant_count?: number; share_count?: number;

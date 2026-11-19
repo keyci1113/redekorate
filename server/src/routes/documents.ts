@@ -4,10 +4,11 @@ import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { notFound, parse } from "../lib/http.js";
-import { ownProject } from "./projects.js";
-import { projectRole, requireProject, type ProjectRole } from "../lib/access.js";
+import { projectRole, projectIn, type ProjectRole } from "../lib/access.js";
 import { checkDocument, fromAssistant, refuse } from "../lib/contentCheck.js";
 import { beforeReplace, filled, listVersions, restoreVersion } from "../lib/versions.js";
+
+const requireProject = projectIn("research"), ownProject = requireProject;
 
 export const documents = Router();
 documents.use(requireAuth);

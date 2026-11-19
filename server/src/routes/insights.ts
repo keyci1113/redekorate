@@ -3,9 +3,10 @@ import { z } from "zod";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { ownProject } from "./projects.js";
-import { requireProject } from "../lib/access.js";
+import { projectIn } from "../lib/access.js";
 import { patchOf } from "../lib/schemas.js";
+
+const requireProject = projectIn("research"), ownProject = requireProject;
 
 export const insights = Router();
 insights.use(requireAuth);

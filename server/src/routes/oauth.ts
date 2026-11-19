@@ -6,7 +6,7 @@ import { readUser, requireAuth, shortCookieOpts, signSession, signShort, verifyS
 import { HttpError, parse } from "../lib/http.js";
 import { authLimiter } from "../lib/security.js";
 import { authorizeUrl, displayName, exchangeCode, pkce, provider, providers, safeNext, verifiedEmail, verifyIdToken, type Provider } from "../lib/oauth.js";
-import { pendingInvite } from "./auth.js";
+import { acceptInvite, pendingInvite } from "./auth.js";
 
 /**
  * Inicio de sesión con Google y Microsoft.
@@ -102,21 +102,18 @@ oauth.get("/:provider/callback", authLimiter, async (req, res) => {
       const anyUser = !!(await one("select 1 from users limit 1"));
       let role: Role = anyUser ? "member" : "admin";
       let inviteId: string | null = null;
-      let org: { id: string; role: "admin" | "member" } | null = null;   // an organization invite also joins the organization
       if (st.invite) {
         const inv = await pendingInvite(st.invite);
         if (!inv) return fail(res, "invite");
         if (inv.email !== email) return fail(res, "invite_email");
         role = inv.role; inviteId = inv.id;
-        if (inv.organization_id) org = { id: inv.organization_id, role: inv.org_role ?? "member" };
       } else if (process.env.ALLOW_REGISTRATION === "false" && anyUser) {
         return fail(res, "closed");
       }
       user = await one<U>(
         "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,null,$3,now()) returning id, email, name, role, avatar, onboarded_at, token_version, disabled_at",
         [name, email, role]);
-      if (inviteId) await query("update invites set accepted_at = now() where id = $1", [inviteId]);
-      if (org) await query("insert into organization_members(organization_id, user_id, role) values ($1,$2,$3) on conflict do nothing", [org.id, user!.id, org.role]);
+      if (inviteId) await acceptInvite(inviteId, user!.id);
     }
     if (user!.disabled_at) return fail(res, "disabled");
     await query("insert into user_identities(provider, subject, user_id, email, last_login_at) values ($1,$2,$3,$4,now())", [id, sub, user!.id, email]);

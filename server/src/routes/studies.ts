@@ -5,10 +5,11 @@ import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { ownProject } from "./projects.js";
-import { ORG_COLS, projectRole, requireProject, type ProjectRole } from "../lib/access.js";
+import { ORG_COLS, projectRole, projectIn, type ProjectRole } from "../lib/access.js";
 import { checkStudy, fromAssistant, refuse } from "../lib/contentCheck.js";
 import { beforeReplace, filled, listVersions, restoreVersion } from "../lib/versions.js";
+
+const requireProject = projectIn("research"), ownProject = requireProject;
 
 export const studies = Router();
 studies.use(requireAuth);

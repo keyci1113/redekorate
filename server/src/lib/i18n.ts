@@ -25,6 +25,7 @@ const EN: Record<string, string> = {
   "Escribe el correo de tu cuenta para confirmar": "Type your account email to confirm",
   "Solo quien es dueño del proyecto puede hacer esto": "Only the project owner can do this",
   "Tu rol en este proyecto es de solo lectura": "Your role in this project is read-only",
+  "No tienes acceso a esta sección del proyecto": "You don't have access to this section of the project",
   "Tu rol en este proyecto no permite comentar": "Your role in this project does not allow commenting",
   "Organización no encontrado": "Organization not found",
   "Miembro no encontrado": "Member not found",

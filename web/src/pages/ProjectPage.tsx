@@ -6,7 +6,8 @@ import { CommentsPanel } from "../components/CommentsPanel";
 import { OrgChip } from "./OrgsPage";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
-import type { Insight, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
+import type { Insight, OrgAccessMember, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
+import { hasArea } from "../lib/access";
 import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, cx, type TabItem } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
@@ -27,9 +28,12 @@ import { categoryOf } from "../lib/projectCategories";
 export function ProjectPage() {
   const { id } = useParams();
   const nav = useNavigate();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  type TabId = "studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "members" | "comments";
   const TAB_FROM_PARAM = { insights: "insights", docs: "docs", architecture: "architecture", participants: "participants", report: "report", members: "members", comments: "comments" } as const;
-  const [tab, setTab] = useState<"studies" | "docs" | "architecture" | "insights" | "participants" | "report" | "members" | "comments">(TAB_FROM_PARAM[params.get("tab") as keyof typeof TAB_FROM_PARAM] ?? "studies");
+  // The tab lives in the URL, so any view inside it can be linked, and links between tabs just work.
+  const wanted: TabId = (TAB_FROM_PARAM as Record<string, TabId | undefined>)[params.get("tab") ?? ""] ?? "studies";
+  const setTab = (next: TabId) => setParams(next === "studies" ? {} : { tab: next }, { replace: true });
   const [editOpen, setEditOpen] = useState(false);
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
@@ -37,7 +41,7 @@ export function ProjectPage() {
   const docs = useLoad(() => api.get<{ documents: DocRecord[] }>(`/documents?project_id=${id}`), [id]);
   const participants = useLoad(() => api.get<{ participants: Participant[] }>(`/participants?project_id=${id}`), [id]);
   const shares = useLoad(() => api.get<{ shares: ProjectShare[] }>(`/projects/${id}/shares`), [id]);
-  const members = useLoad(() => api.get<{ members: ProjectMember[] }>(`/projects/${id}/members`), [id]);
+  const members = useLoad(() => api.get<{ members: ProjectMember[]; via_org?: OrgAccessMember[] }>(`/projects/${id}/members`), [id]);
   const orgs = useLoad(() => (editOpen ? api.get<{ organizations: Organization[] }>("/orgs") : Promise.resolve({ organizations: [] as Organization[] })), [editOpen]);
 
   if (project.loading) return <Spinner />;
@@ -48,6 +52,11 @@ export function ProjectPage() {
   const allDocs = docs.data?.documents ?? [];
   const uxDocs = allDocs.filter((d) => !isDiagramKind(d.kind)), diagrams = allDocs.filter((d) => isDiagramKind(d.kind));
   const role = p.role;
+  // Sections this person can open here; the tabs of the others are not shown.
+  const research = hasArea(p.areas, "research");
+  const RESEARCH_TABS: TabId[] = ["studies", "docs", "architecture", "insights", "participants", "report"];
+  const allowed = (x: TabId) => (RESEARCH_TABS.includes(x) ? research : true);
+  const tab: TabId = allowed(wanted) ? wanted : research ? "studies" : "members";
   const canEdit = roleCanEdit(role);
   const isOwner = roleIsOwner(role);
 
@@ -72,14 +81,14 @@ export function ProjectPage() {
         </div>
         {canEdit && <div className="flex shrink-0 gap-2">
           <Button variant="ghost" icon={<Pencil size={15} />} onClick={() => setEditOpen(true)}>{t("Editar")}</Button>
-          <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Nuevo estudio")}</Button>
+          {research && <Button variant="primary" icon={<Plus size={16} />} onClick={() => nav(`/projects/${p.id}/new`)}>{t("Nuevo estudio")}</Button>}
         </div>}
       </div>
       <AccessNotice role={role} owner={p.owner_name} className="mt-4 max-w-2xl" />
 
       <div className="mt-8">
         {/* Two groups: the research itself, then the team's shared space. */}
-        <Tabs value={tab} onChange={setTab} label={t("Secciones del proyecto")} items={[
+        <Tabs value={tab} onChange={setTab} label={t("Secciones del proyecto")} items={([
           { id: "studies", group: "research", label: t("Estudios"), count: list.length },
           { id: "docs", group: "research", label: t("Documentos"), count: uxDocs.length },
           { id: "architecture", group: "research", label: t("Arquitectura"), count: diagrams.length },
@@ -88,7 +97,7 @@ export function ProjectPage() {
           { id: "report", group: "research", label: t("Reporte"), count: shares.data?.shares.length ?? 0 },
           { id: "members", group: "team", label: t("Colaboradores"), count: members.data?.members.length ?? 0 },
           { id: "comments", group: "team", label: t("Comentarios") },
-        ] satisfies TabItem<typeof tab>[]} />
+        ] satisfies TabItem<TabId>[]).filter((x) => allowed(x.id))} />
       </div>
 
       <div className="mt-6">
@@ -109,7 +118,7 @@ export function ProjectPage() {
         {tab === "participants" && (
           <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
         )}
-        {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} onChange={members.reload} />)}
+        {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} viaOrg={members.data?.via_org ?? []} onChange={members.reload} />)}
         {tab === "comments" && <CommentsPanel projectId={p.id} role={role} />}
         {tab === "report" && (
           <ReportsPanel projectId={p.id} projectName={p.name} projectColor={p.color} studies={list} documents={uxDocs} diagrams={diagrams} hasDescription={!!p.description?.trim()} insightCount={insights.data?.insights.length ?? 0} shares={shares.data?.shares ?? []} onChange={shares.reload} canEdit={canEdit} />

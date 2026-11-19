@@ -118,9 +118,11 @@ Only the owner adds or removes people, archives or deletes the project, or moves
 |---|---|
 | Owner | Everything, including deleting the organization |
 | Admin | Change the profile, add or remove people, send invitations |
-| Member | See every project of the organization as a **commenter** |
+| Member | What an admin chooses for them: every project or only some, as editor, commenter or read-only, in the sections picked |
 
-Owners and admins act as owners of every organization project. When a project has an explicit collaborator role and an organization role, the higher one wins. New studies in an organization project start with the organization's logo and color as their brand, and public reports show the logo next to Redekorate's. People who already have an account are added by email; people who don't get a 7-day invitation link that creates the account and joins the organization. Deleting an organization never deletes projects: they become personal projects of their owners again.
+**Sections and per-project access.** A project has two sections: *UX research* (studies, documents, insights, participants, reports) and *Project management* (tickets, milestones, roadmap). For each organization member, and for each project collaborator, you pick *Everything*, *UX research* or *Project management*; the tabs and data of the other section are hidden from them and refused by the API. An organization member can reach every project or only the ones you choose, and the People tab shows a preview of what they will have before you save. An invitation carries the same choices.
+
+Owners and admins act as owners of every organization project. When a project has an explicit collaborator role and an organization role, the higher one wins and the sections add up. New studies in an organization project start with the organization's logo and color as their brand, and public reports show the logo next to Redekorate's. People who already have an account are added by email; people who don't get a 7-day invitation link that creates the account and joins the organization. Deleting an organization never deletes projects: they become personal projects of their owners again.
 
 ## Connect AI apps (MCP)
 

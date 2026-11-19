@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowRight, Building2, Check, Copy, Crown, FolderOpen, LogOut, Mail, Plus, Settings, Trash2, UserPlus, X } from "lucide-react";
+import { ArrowRight, Building2, Check, Copy, Crown, FolderOpen, LogOut, Mail, Plus, Settings, ShieldCheck, Trash2, UserPlus, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { timeAgo, useLoad } from "../lib/hooks";
@@ -10,6 +10,8 @@ import { Button, Card, Empty, ErrorNote, Field, Modal, Spinner, Tabs, Tag, cx } 
 import { Avatar } from "../components/Avatar";
 import { OrgLogo } from "../components/OrgLogo";
 import { OrgForm } from "../components/OrgForm";
+import { AccessEditor, AccessTags } from "../components/AccessEditor";
+import { DEFAULT_ACCESS, accessProblem, type MemberAccess } from "../lib/access";
 import { getLang, t } from "../lib/i18n";
 import { NoAccessNote } from "../components/AccessNotice";
 
@@ -27,7 +29,7 @@ export function OrgsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="max-w-2xl">
           <h1 className="page-title">{t("Organizaciones")}</h1>
-          <p className="mt-2 text-[15px] text-ink-2">{t("Un espacio con logo para tu empresa, tu equipo o tus clientes. Quien pertenece a una organización ve todos sus proyectos y puede comentar en ellos.")}</p>
+          <p className="mt-2 text-[15px] text-ink-2">{t("Un espacio con logo para tu empresa, tu equipo o tus clientes. Tú decides qué proyectos y qué secciones ve cada persona.")}</p>
         </div>
         <Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nueva organización")}</Button>
       </div>
@@ -114,18 +116,28 @@ export function OrgPage() {
             ))}
           </ul>
         ))}
-        {tab === "people" && (members.loading ? <Spinner /> : <People org={o} members={members.data?.members ?? []} onChange={() => { members.reload(); org.reload(); }} />)}
+        {tab === "people" && (members.loading ? <Spinner /> : <People org={o} members={members.data?.members ?? []} projects={list} onChange={() => { members.reload(); org.reload(); projects.reload(); }} />)}
         {tab === "settings" && manage && <OrgSettings org={o} onChange={org.reload} />}
       </div>
     </div>
   );
 }
 
-function People({ org, members, onChange }: { org: Organization; members: OrgMember[]; onChange: () => void }) {
+/** "Todos los proyectos" or "2 proyectos": where a member's access applies. */
+const scopeLabel = (all: boolean, n: number) => (all ? t("Todos los proyectos") : n === 1 ? t("1 proyecto") : t("{a} proyectos", { a: n }));
+const accessOf = (m: OrgMember): MemberAccess => ({ all_projects: m.all_projects, project_role: m.project_role, areas: m.areas, project_ids: m.projects.map((p) => p.id) });
+
+function People({ org, members, projects, onChange }: { org: Organization; members: OrgMember[]; projects: Project[]; onChange: () => void }) {
   const { user: me } = useAuth();
   const manage = canManageOrg(org.role);
   const roles = assignableOrgRoles(org.role);
   const [form, setForm] = useState<{ email: string; role: OrgRole }>({ email: "", role: "member" });
+  const [access, setAccess] = useState<MemberAccess>(DEFAULT_ACCESS);
+  const [editing, setEditing] = useState<{ member: OrgMember; access: MemberAccess } | null>(null);
+  // Owners and admins have everything, so the access choice only travels with a member.
+  const withAccess = () => (form.role === "member" ? { ...form, ...access, project_ids: access.all_projects ? [] : access.project_ids } : form);
+  const blocked = form.role === "member" && accessProblem(access) !== null;
+  const reset = () => { setForm({ email: "", role: "member" }); setAccess(DEFAULT_ACCESS); };
   const [invites, setInvites] = useState<OrgInvite[]>([]);
   const [sent, setSent] = useState<{ link: string; mailed: boolean; email: string } | null>(null);
   const [copied, setCopied] = useState(false);
@@ -133,10 +145,10 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
   const [busy, setBusy] = useState(false);
   useEffect(() => { if (manage) api.get<{ invites: OrgInvite[] }>(`/orgs/${org.id}/invites`).then((r) => setInvites(r.invites)).catch(() => {}); }, [org.id, manage]);
   const act = async (fn: () => Promise<unknown>) => { setBusy(true); setError(null); try { await fn(); onChange(); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } };
-  const add = (e: FormEvent) => { e.preventDefault(); return act(async () => { await api.post(`/orgs/${org.id}/members`, form); setForm({ email: "", role: "member" }); }); };
+  const add = (e: FormEvent) => { e.preventDefault(); return act(async () => { await api.post(`/orgs/${org.id}/members`, withAccess()); reset(); }); };
   const invite = () => act(async () => {
-    const r = await api.post<{ invites: OrgInvite[]; link: string; mailed: boolean }>(`/orgs/${org.id}/invites`, { email: form.email, role: form.role === "owner" ? "admin" : form.role });
-    setInvites(r.invites); setSent({ link: r.link, mailed: r.mailed, email: form.email }); setForm({ email: "", role: "member" });
+    const r = await api.post<{ invites: OrgInvite[]; link: string; mailed: boolean }>(`/orgs/${org.id}/invites`, { ...withAccess(), role: form.role === "owner" ? "admin" : form.role });
+    setInvites(r.invites); setSent({ link: r.link, mailed: r.mailed, email: form.email }); reset();
   });
   const copy = (s: string) => navigator.clipboard?.writeText(s).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {});
 
@@ -144,18 +156,23 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
     <div className="space-y-5">
       <Card className="p-4">
         <p className="font-semibold">{t("Personas")}</p>
-        <p className="mt-1 text-sm text-ink-2">{t("Miembros ven todos los proyectos de la organización y pueden comentar. Admins además cambian ajustes y personas. Solo quien es dueño elimina la organización.")}</p>
+        <p className="mt-1 text-sm text-ink-2">{t("A cada miembro le eliges qué proyectos ve, qué secciones abre y qué puede hacer. Admins ven todo y además cambian ajustes y personas. Solo quien es dueño elimina la organización.")}</p>
         {!manage && <NoAccessNote className="mt-3">{t("No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.")}</NoAccessNote>}
         {manage && (
-          <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end" onSubmit={add}>
+          <form className="mt-4 space-y-4" onSubmit={add}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
             <Field label={t("Rol")}>
               <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as OrgRole })}>
                 {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
               </select>
             </Field>
-            <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy}>{t("Agregar")}</Button>
-            <Button type="button" icon={<Mail size={15} />} disabled={busy || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
+            <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy || blocked}>{t("Agregar")}</Button>
+            <Button type="button" icon={<Mail size={15} />} disabled={busy || blocked || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
+            </div>
+            {form.role === "member"
+              ? <div className="rounded-xl border border-line p-4"><AccessEditor name="new-member" value={access} onChange={setAccess} projects={projects} />{blocked && <p role="alert" className="mt-3 text-sm text-bad">{t("Elige al menos un proyecto.")}</p>}</div>
+              : <p className="text-sm text-ink-2">{t("Admins y dueños abren todos los proyectos y todas las secciones.")}</p>}
           </form>
         )}
         {manage && <p className="mt-2 text-xs text-ink-3">{t("Agregar: una cuenta que ya existe. Invitar: envía un enlace de 7 días para crear la cuenta y entrar directo a la organización.")}</p>}
@@ -175,12 +192,19 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
           const self = m.user_id === me?.id;
           const editable = manage && (org.role === "owner" || m.role !== "owner");
           return (
-            <li key={m.user_id} className="flex items-center gap-3 px-4 py-3 text-sm">
+            <li key={m.user_id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
               <Avatar name={m.name} avatar={m.avatar} size={32} />
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{m.name}{self && <span className="ml-1.5 text-xs font-normal text-ink-3">({t("tú")})</span>}</p>
                 <p className="truncate text-xs text-ink-3">{m.email}</p>
               </div>
+              {m.role === "member" ? (
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <AccessTags areas={m.areas} level={m.project_role} />
+                  <Tag>{scopeLabel(m.all_projects, m.projects.length)}</Tag>
+                  {manage && <Button size="sm" icon={<ShieldCheck size={14} />} disabled={busy} onClick={() => setEditing({ member: m, access: accessOf(m) })}>{t("Acceso")}</Button>}
+                </span>
+              ) : <span className="text-xs text-ink-3">{t("Todo, en todos los proyectos")}</span>}
               {editable ? (
                 <select className="field h-8 w-32 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/orgs/${org.id}/members/${m.user_id}`, { role: e.target.value }))}>
                   {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
@@ -203,6 +227,7 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
               <li key={i.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <Mail size={15} className="text-ink-3" />
                 <span className="min-w-0 flex-1 truncate">{i.email} <span className="text-xs text-ink-3">· {orgRoleLabel(i.role)} · {t("vence")} {fmt(i.expires_at)}</span></span>
+                {i.role === "member" && <span className="flex flex-wrap items-center gap-1.5"><AccessTags areas={i.areas} level={i.project_role} /><Tag>{scopeLabel(i.all_projects, i.project_ids.length)}</Tag></span>}
                 <button disabled={busy} aria-label={t("Revocar invitación")} title={t("Revocar invitación")} className="rounded p-1.5 text-ink-3 hover:text-bad"
                   onClick={() => act(async () => { const r = await api.del<{ invites: OrgInvite[] }>(`/orgs/${org.id}/invites/${i.id}`); setInvites(r.invites); })}><X size={15} /></button>
               </li>
@@ -210,6 +235,19 @@ function People({ org, members, onChange }: { org: Organization; members: OrgMem
           </ul>
         </div>
       )}
+      <Modal open={editing !== null} onClose={() => setEditing(null)} title={editing ? t("Acceso de {a}", { a: editing.member.name }) : ""} wide>
+        {editing && (
+          <form onSubmit={(e) => { e.preventDefault(); const { member, access: a } = editing; void act(async () => { await api.patch(`/orgs/${org.id}/members/${member.user_id}`, a.all_projects ? { all_projects: true, project_role: a.project_role, areas: a.areas } : a); setEditing(null); }); }}>
+            <AccessEditor name="edit-member" value={editing.access} onChange={(a) => setEditing({ ...editing, access: a })} projects={projects} />
+            {accessProblem(editing.access) && <p role="alert" className="mt-3 text-sm text-bad">{t("Elige al menos un proyecto.")}</p>}
+            {editing.access.all_projects && editing.member.projects.length > 0 && <p className="mt-3 text-xs text-ink-3">{t("También es colaborador/a directo de {a} proyectos; eso se cambia en la pestaña Colaboradores de cada proyecto.", { a: editing.member.projects.length })}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={() => setEditing(null)}>{t("Cancelar")}</Button>
+              <Button variant="primary" disabled={busy || accessProblem(editing.access) !== null}>{t("Guardar acceso")}</Button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 }
