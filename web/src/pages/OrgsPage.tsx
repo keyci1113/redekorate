@@ -156,19 +156,20 @@ function People({ org, members, projects, onChange }: { org: Organization; membe
     <div className="space-y-5">
       <Card className="p-4">
         <p className="font-semibold">{t("Personas")}</p>
-        <p className="mt-1 text-sm text-ink-2">{t("A cada miembro le eliges qué proyectos ve, qué secciones abre y qué puede hacer. Admins ven todo y además cambian ajustes y personas. Solo quien es dueño elimina la organización.")}</p>
+        <p className="mt-1 text-sm text-ink-2">{t("Cada persona tiene dos cosas: su rol en la organización y su acceso a los proyectos. Rol: Admin ve todo y además cambia ajustes y personas; Miembro solo entra a lo que le des. Acceso a los proyectos: qué proyectos ve, qué secciones abre y qué puede hacer en ellas. Solo quien es dueño elimina la organización.")}</p>
         {!manage && <NoAccessNote className="mt-3">{t("No tienes acceso para invitar personas ni cambiar sus permisos: eso lo hacen admins de la organización.")}</NoAccessNote>}
         {manage && (
           <form className="mt-4 space-y-4" onSubmit={add}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
-            <Field label={t("Rol")}>
-              <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as OrgRole })}>
-                {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
-              </select>
-            </Field>
-            <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy || blocked}>{t("Agregar")}</Button>
-            <Button type="button" icon={<Mail size={15} />} disabled={busy || blocked || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
+              <div className="flex-1"><Field label={t("Correo")}><input className="field" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field></div>
+              <div className="sm:w-48"><Field label={t("Rol en la organización")}>
+                <select className="field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as OrgRole })}>
+                  {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
+                </select>
+              </Field></div>
+              {/* Same place as on a project's Collaborators: next to the email and the role. */}
+              <Button variant="primary" icon={<UserPlus size={15} />} disabled={busy || blocked}>{t("Agregar")}</Button>
+              <Button type="button" icon={<Mail size={15} />} disabled={busy || blocked || !form.email} onClick={invite} title={t("Para quien aún no tiene cuenta")}>{t("Invitar")}</Button>
             </div>
             {form.role === "member"
               ? <div className="rounded-xl border border-line p-4"><AccessEditor name="new-member" value={access} onChange={setAccess} projects={projects} />{blocked && <p role="alert" className="mt-3 text-sm text-bad">{t("Elige al menos un proyecto.")}</p>}</div>
@@ -206,7 +207,7 @@ function People({ org, members, projects, onChange }: { org: Organization; membe
                 </span>
               ) : <span className="text-xs text-ink-3">{t("Todo, en todos los proyectos")}</span>}
               {editable ? (
-                <select className="field h-8 w-32 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/orgs/${org.id}/members/${m.user_id}`, { role: e.target.value }))}>
+                <select className="field h-8 w-32 py-0 text-[13px]" value={m.role} disabled={busy} aria-label={t("Rol en la organización de {a}", { a: m.name })} onChange={(e) => act(() => api.patch(`/orgs/${org.id}/members/${m.user_id}`, { role: e.target.value }))}>
                   {roles.map((r) => <option key={r} value={r}>{orgRoleLabel(r)}</option>)}
                 </select>
               ) : <Tag><span className="flex items-center gap-1">{m.role === "owner" && <Crown size={11} />} {orgRoleLabel(m.role)}</span></Tag>}
