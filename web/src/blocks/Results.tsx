@@ -14,7 +14,7 @@ import { Card, Stat, cx, toneFor } from "../components/ui";
 import { usePrint } from "../lib/print";
 import { formatDuration } from "../lib/hooks";
 
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
 /** Barra horizontal: una sola serie, un solo tono; el texto siempre en tinta. */
@@ -332,7 +332,7 @@ function CardSortResult({ block, answers }: { block: CardSortBlock; answers: Ans
         <Stat label={t("Grupos promedio")} value={r.avgGroups.toFixed(1)} />
         <Stat label={block.mode === "closed" ? t("Categorías usadas") : t("Categorías distintas")} value={r.categories.length} />
         <Stat label={t("Acuerdo promedio")} value={`${Math.round(avgAgreement * 100)}%`} tone={toneFor(avgAgreement, 0.7, 0.4, { n: r.n })}
-          sub={lowCards.length ? t("{a} tarjetas con acuerdo bajo", { a: lowCards.length }) : t("Ninguna tarjeta con acuerdo bajo")} />
+          sub={lowCards.length ? plural(lowCards.length, { one: "{n} tarjeta con acuerdo bajo", other: "{n} tarjetas con acuerdo bajo" }) : t("Ninguna tarjeta con acuerdo bajo")} />
       </div>
       <div className="flex gap-1 rounded-lg bg-paper p-1 print:hidden">
         {([["cards", t("Por tarjeta")], ["matrix", t("Matriz de similitud")], ["categories", t("Categorías")]] as const).map(([id, l]) => (

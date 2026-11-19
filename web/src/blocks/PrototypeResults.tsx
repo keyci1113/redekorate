@@ -9,7 +9,7 @@ import { formatDuration } from "../lib/hooks";
 import { Stat, cx, toneFor } from "../components/ui";
 import { usePrint } from "../lib/print";
 
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) : 0);
 
 export function PrototypeResult({ block: raw, answers, proto }: { block: PrototypeTaskBlock; answers: Answer[]; proto?: Prototype }) {
@@ -33,10 +33,10 @@ export function PrototypeResult({ block: raw, answers, proto }: { block: Prototy
   return (
     <div className="space-y-6">
       <div className={cx("grid grid-cols-2 gap-3", !link && "sm:grid-cols-4")}>
-        <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={claimed ? t("{a} de {b} · {c} autodeclarados", { a: success.length, b: n, c: claimed }) : t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
+        <Stat label={t("Tasa de éxito")} value={`${pct(success.length, n)}%`} sub={claimed ? plural(claimed, { one: "{a} de {b} · {n} autodeclarado", other: "{a} de {b} · {n} autodeclarados" }, { a: success.length, b: n }) : t("{a} de {b}", { a: success.length, b: n })} tone={toneFor(pct(success.length, n), 80, 60, { n })} />
         {!link && <Stat label={t("Éxito directo")} value={`${pct(direct, n)}%`} sub={block.expectedPath.length >= 2 ? t("siguió la ruta esperada") : t("sin regresar a pantallas")} tone={toneFor(pct(direct, n), 60, 40, { n })} />}
         <Stat label={t("Tiempo mediano")} value={formatDuration(median(success.map((v) => v.ms)))} sub={t("en tareas exitosas")} />
-        {!link && <Stat label={html ? t("Clics sin respuesta") : t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={t("{a} de {b} clics", { a: misclicks, b: allClicks.length })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />}
+        {!link && <Stat label={html ? t("Clics sin respuesta") : t("Clics fuera de zona")} value={`${pct(misclicks, allClicks.length)}%`} sub={plural(allClicks.length, { one: "{a} de {n} clic", other: "{a} de {n} clics" }, { a: misclicks })} tone={toneFor(pct(misclicks, allClicks.length), 15, 30, { n: allClicks.length, lowerIsBetter: true })} />}
       </div>
 
       <div>

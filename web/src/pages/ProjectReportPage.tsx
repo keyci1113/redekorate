@@ -21,7 +21,7 @@ import type { Lang } from "../lib/i18n";
 const DiagramCanvas = lazy(() => import("../architecture/DiagramCanvas").then((m) => ({ default: m.DiagramCanvas })));
 const SitemapEditor = lazy(() => import("../architecture/DiagramPage").then((m) => ({ default: m.SitemapEditor })));
 
-import { LangSwitch, locale, t } from "../lib/i18n";
+import { LangSwitch, locale, plural, t } from "../lib/i18n";
 
 interface StudyReport {
   study: { id: string; title: string; method: string; status: string; blocks: Block[]; settings?: StudySettings; published_at: string | null };
@@ -164,7 +164,7 @@ export function ProjectReportPage() {
                     <span className="font-semibold">{m.name}</span>
                     <StateChip state={m.state} />
                   </div>
-                  <p className="mt-1 text-sm text-ink-3 tabular-nums">{fmtDay(m.begin_date)} – {fmtDay(m.end_date)} · {t("{a} de {b} tickets hechos", { a: m.done, b: m.total })}</p>
+                  <p className="mt-1 text-sm text-ink-3 tabular-nums">{fmtDay(m.begin_date)} – {fmtDay(m.end_date)} · {plural(m.total, { one: "{a} de {n} ticket hecho", other: "{a} de {n} tickets hechos" }, { a: m.done })}</p>
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-ink/10" role="progressbar" aria-valuenow={m.progress} aria-valuemin={0} aria-valuemax={100} aria-label={t("Avance de {a}", { a: m.name })}>
                     <div className="h-full rounded-full bg-accent" style={{ width: `${m.progress}%` }} />
                   </div>

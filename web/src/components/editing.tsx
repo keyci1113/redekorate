@@ -6,7 +6,7 @@ import { uid, type usePaneWidth } from "../lib/hooks";
 import type { Option } from "../blocks/types";
 import { cx } from "./ui";
 
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 /** Zona para subir una imagen: arrastrar, pegar o elegir archivo. */
 export function ImageDrop({ value, onChange, label = t("Subir imagen"), compact, hint, cover }: {
   value?: string | null; onChange: (url: string | null) => void; label?: string; compact?: boolean; hint?: string; cover?: boolean;
@@ -95,7 +95,7 @@ export function OptionsEditor({ label, items, onChange, withImages, placeholder 
             const labels = bulkText.split("\n").map((s) => s.trim()).filter(Boolean);
             onChange(labels.map((l, i) => items.find((x) => x.label === l) ?? { id: items[i]?.label === l ? items[i].id : uid(), label: l }));
             setBulkOpen(false);
-          }}>{t("Aplicar")} {bulkText.split("\n").filter((s) => s.trim()).length} {t("elementos")}</button>
+          }}>{plural(bulkText.split("\n").filter((s) => s.trim()).length, { one: "Aplicar {n} elemento", other: "Aplicar {n} elementos" })}</button>
         </div>
       ) : (
         <>

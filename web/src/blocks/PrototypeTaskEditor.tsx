@@ -98,7 +98,7 @@ export function PrototypeTaskEditor({ block, set, ctx }: { block: PrototypeTaskB
           <ScreenGrid screens={screens} selected={shown.startScreen ? [shown.startScreen] : []}
             onPick={(id) => set({ startScreen: id, expectedPath: shown.expectedPath.length ? [id, ...shown.expectedPath.slice(1)] : [] })} />
         </Field>}
-        <Field group label={t("{a} · Pantalla(s) meta", { a: n(2) })} hint={t("Al llegar aquí, la tarea se marca como completada.")}>
+        <Field group label={t("{a} · Pantallas meta", { a: n(2) })} hint={t("Al llegar aquí, la tarea se marca como completada.")}>
           <ScreenGrid screens={screens} selected={shown.goalScreens}
             onPick={(id) => set({ goalScreens: shown.goalScreens.includes(id) ? shown.goalScreens.filter((g) => g !== id) : [...shown.goalScreens, id] })} />
         </Field>

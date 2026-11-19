@@ -5,7 +5,7 @@ import { useRef, useState, type PointerEvent } from "react";
 import { AlertTriangle, ArrowDown, ArrowUp, GripVertical, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { uid } from "../lib/hooks";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 import { Button, ErrorNote, cx } from "../components/ui";
 import { rankSlot, rankTarget } from "../blocks/ranking";
 import { MAX_COLUMNS, STATUSES, columnOf, columnsProblem, looksLikeReviewAsDone, moveItem, type Column, type ColumnDraft, type Ticket, type TicketStatus } from "./model";
@@ -122,7 +122,7 @@ export function BoardColumnsDialog({ projectId, columns, tickets, onClose, onSav
                   {STATUSES.map((s) => <option key={s} value={s}>{statusLabel(s)}</option>)}
                 </select>
               </label>
-              <span className="w-16 text-right text-xs text-ink-3 tabular-nums">{d.id ? t("{a} tickets", { a: count(d.id) }) : t("nueva")}</span>
+              <span className="w-16 text-right text-xs text-ink-3 tabular-nums">{d.id ? plural(count(d.id), { one: "{n} ticket", other: "{n} tickets" }) : t("nueva")}</span>
               <button type="button" className={cx(icon, "hover:bg-bad-soft hover:text-bad")} disabled={draft.length <= 2} onClick={() => setDraft(draft.filter((x) => x.key !== d.key))} aria-label={t("Quitar la columna {a}", { a: d.name })} title={t("Quitar columna")}><Trash2 size={15} /></button>
               <p className="basis-full pl-1 text-xs text-ink-3 sm:pl-28">{statusHelp(d.status)}</p>
               {looksLikeReviewAsDone(d) && (
@@ -143,7 +143,7 @@ export function BoardColumnsDialog({ projectId, columns, tickets, onClose, onSav
             <p className="font-semibold">{t("Los tickets de las columnas que quitas se mueven, no se borran.")}</p>
             {removed.map((c) => (
               <label key={c.id} className="flex flex-wrap items-center gap-2">
-                <ColumnChip column={c} /><span className="text-ink-2">{t("{a} tickets pasan a", { a: count(c.id) })}</span>
+                <ColumnChip column={c} /><span className="text-ink-2">{plural(count(c.id), { one: "{n} ticket pasa a", other: "{n} tickets pasan a" })}</span>
                 <select className="field h-9 w-44 py-0 text-[13px]" value={target(c)?.key ?? ""} onChange={(e) => setMoves({ ...moves, [c.id]: e.target.value })}>
                   {existing.map((d) => <option key={d.key} value={d.key}>{d.name || t("(sin nombre)")}</option>)}
                 </select>

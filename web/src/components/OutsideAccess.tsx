@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, Copy, KeyRound, Plug, Unplug } from "lucide-react";
 import { api } from "../lib/api";
 import { copy, timeAgo, useLoad } from "../lib/hooks";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 import { Button, ErrorNote } from "./ui";
 
 export type Scope = "read" | "write";
@@ -51,7 +51,7 @@ export function OutsideAccessSummary() {
       {access.error ? <ErrorNote>{access.error}</ErrorNote> : d && (
         <p className="text-sm text-ink-2">
           {d.apps.length === 0 && d.tokens.length === 0 ? t("Ninguna app ni token tiene acceso todavía.")
-            : t("{a} apps conectadas y {b} tokens activos.", { a: d.apps.length, b: d.tokens.length })}
+            : t("{a} y {b}.", { a: plural(d.apps.length, { one: "{n} app conectada", other: "{n} apps conectadas" }), b: plural(d.tokens.length, { one: "{n} token activo", other: "{n} tokens activos" }) })}
         </p>
       )}
       <Link to="/connect" className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:border-accent">

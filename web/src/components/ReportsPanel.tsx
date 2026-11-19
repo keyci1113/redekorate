@@ -7,7 +7,7 @@ import type { DocRecord } from "../docs/types";
 import { Button, Card, Empty, ErrorNote, Tag } from "./ui";
 import { ShareLink } from "../pages/BuilderPage";
 import { ProjectReportPdf, ReportPdfButton, type ReportStudy } from "./ReportPdf";
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 
 export const projectReportUrl = (token: string) => `${window.location.origin}/pr/${token}`;
 
@@ -110,7 +110,7 @@ export function ReportsPanel({ projectId, projectName, projectColor, studies, do
             {err && <div className="mt-3"><ErrorNote>{err}</ErrorNote></div>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button variant="primary" disabled={!picked.size || busy} onClick={create}>
-                {busy ? t("Creando…") : picked.size ? t("Crear link con {a} elemento(s)", { a: picked.size }) : t("Elige qué incluir")}
+                {busy ? t("Creando…") : picked.size ? plural(picked.size, { one: "Crear link con {n} elemento", other: "Crear link con {n} elementos" }) : t("Elige qué incluir")}
               </Button>
               <Button variant="ghost" onClick={() => setPicked(new Set(groups.flatMap((g) => g.items.map((i) => i.id))))}>{t("Incluir todo el proyecto")}</Button>
               {studyIds.length > 0 && <ReportPdfButton title={projectName} label={t("PDF de los estudios")} load={pdf(studyIds)} />}
