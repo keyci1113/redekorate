@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { ArrowLeft, CheckCircle2, TriangleAlert, X } from "lucide-react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { ArrowLeft, CheckCircle2, ChevronDown, TriangleAlert, X } from "lucide-react";
+import { Menu, MenuItem } from "./Menu";
 import { Link } from "react-router-dom";
 import type { StudyStatus, Severity } from "../lib/types";
 
@@ -174,43 +175,102 @@ export function Stat({ label, value, sub, tone, note }: { label: string; value: 
 
 export interface TabItem<T extends string> { id: T; label: string; count?: number; group?: string }
 
+/**
+ * Which tabs fit in the row and which go into "Más": the first `fit` tabs, with the active one always kept
+ * visible (it takes the last visible slot when it would otherwise overflow).
+ */
+export function splitTabs(count: number, fit: number, active: number): { visible: number[]; overflow: number[] } {
+  if (fit >= count) return { visible: [...Array(count).keys()], overflow: [] };
+  const n = Math.max(1, fit);
+  const visible = [...Array(n).keys()];
+  if (active >= n) visible[n - 1] = active;
+  return { visible, overflow: [...Array(count).keys()].filter((i) => !visible.includes(i)) };
+}
+
+const tabClass = (on: boolean) => cx(
+  "group relative flex items-center gap-1.5 rounded-t-md px-2.5 pt-2.5 pb-3 text-sm font-medium whitespace-nowrap transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
+  on ? "text-ink" : "text-ink-3 hover:text-ink",
+);
+const MORE_WIDTH = 96;   // room kept for the "Más" button when some tabs overflow
+
 /** Underline tabs. A count shows as a small badge when there is something to count; when `group` changes from one item to the
- *  next, a thin divider separates them. The row scrolls sideways on its own when the tabs don't fit, so the page never does. */
+ *  next, a thin divider separates them. Tabs that don't fit go into a "Más" menu, so none hides behind a scrollbar. */
 export function Tabs<T extends string>({ value, onChange, items, label }: { value: T; onChange: (v: T) => void; items: TabItem<T>[]; label?: string }) {
+  const row = useRef<HTMLDivElement>(null);
+  const measure = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState(items.length);
+  const sig = items.map((it) => `${it.id}:${it.label}:${it.count ?? ""}:${it.group ?? ""}`).join("|");
+  useLayoutEffect(() => {
+    const el = row.current, m = measure.current;
+    if (!el || !m) return;
+    const calc = () => {
+      const widths = [...m.children].map((c) => (c as HTMLElement).getBoundingClientRect().width);
+      const avail = el.clientWidth;
+      if (widths.reduce((a, w) => a + w, 0) <= avail) { setFit(widths.length); return; }
+      let used = 0, n = 0;
+      while (n < widths.length && used + widths[n] + MORE_WIDTH <= avail) used += widths[n++];
+      setFit(n);
+    };
+    calc();
+    const ro = new ResizeObserver(calc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sig]);
+  const activeIndex = items.findIndex((it) => it.id === value);
+  const { visible, overflow } = splitTabs(items.length, fit, activeIndex);
+  const badge = (it: TabItem<T>, on: boolean) => !!it.count && <span className={cx("min-w-5 rounded-full px-1.5 text-center text-[11px] leading-[18px] font-semibold tabular-nums transition", on ? "bg-accent-soft text-accent-ink" : "bg-ink/5 text-ink-3")}>{it.count}</span>;
   return (
-    // On a phone the row runs to the screen edges, so a tab is never cut off at the page margin.
-    <div role={label ? "navigation" : undefined} aria-label={label} className="rk-tabs overflow-x-auto [scrollbar-width:thin] max-sm:-mx-(--page-gutter) max-sm:px-(--page-gutter)">
-      <div className="flex min-w-max items-stretch border-b border-line">
-        {items.map((it, i) => {
-          const on = value === it.id;
-          const divider = i > 0 && it.group !== items[i - 1].group;
+    <div role={label ? "navigation" : undefined} aria-label={label} className="relative">
+      {/* Every tab at its natural width, off-screen, to work out how many fit. */}
+      {/* A zero-size clipped box, so the measuring row never widens the page. */}
+      <div aria-hidden className="pointer-events-none invisible absolute top-0 left-0 h-0 w-0 overflow-hidden">
+        <div ref={measure} className="flex w-max">
+          {items.map((it, i) => (
+            <span key={it.id} className="flex items-stretch">
+              {i > 0 && it.group !== items[i - 1].group && <span className="mx-1.5 w-px" />}
+              <span className={tabClass(false)}>{it.label}{badge(it, false)}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+      <div ref={row} className="flex min-w-0 items-stretch border-b border-line">
+        {visible.map((i, k) => {
+          const it = items[i], on = value === it.id;
+          const prev = k > 0 ? items[visible[k - 1]] : undefined;
+          const divider = !!prev && it.group !== prev.group;
           return (
             <div key={it.id} className="flex items-stretch">
               {divider && <span aria-hidden className="mx-1.5 my-3 w-px bg-line-2/60" />}
-              <button
-                type="button"
-                ref={on ? (el) => el?.scrollIntoView({ block: "nearest", inline: "nearest" }) : undefined}
-                onClick={() => onChange(it.id)}
-                aria-current={on ? "page" : undefined}
-                className={cx(
-                  "group relative flex items-center gap-1.5 rounded-t-md px-2.5 pt-2.5 pb-3 text-sm font-medium whitespace-nowrap transition outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-inset",
-                  on ? "text-ink" : "text-ink-3 hover:text-ink",
-                )}
-              >
+              <button type="button" onClick={() => onChange(it.id)} aria-current={on ? "page" : undefined} className={tabClass(on)}>
                 {it.label}
-                {!!it.count && <span className={cx("min-w-5 rounded-full px-1.5 text-center text-[11px] leading-[18px] font-semibold tabular-nums transition", on ? "bg-accent-soft text-accent-ink" : "bg-ink/5 text-ink-3")}>{it.count}</span>}
+                {badge(it, on)}
                 {/* The underline sits on the row's border, so the bar reads as one line. */}
                 <span aria-hidden className={cx("absolute inset-x-2 -bottom-px h-0.5 rounded-full transition", on ? "bg-accent" : "bg-transparent group-hover:bg-line-2")} />
               </button>
             </div>
           );
         })}
+        {overflow.length > 0 && (
+          <Menu label={t("Más secciones")} width={240} button={(props, open) => (
+            <button {...props} className={cx(tabClass(false), open && "text-ink")}>
+              {t("Más")} <ChevronDown size={14} aria-hidden />
+              {overflow.some((i) => items[i].count) && <span className="sr-only">{t("({a} con contenido)", { a: overflow.filter((i) => items[i].count).length })}</span>}
+            </button>
+          )}>
+            {(close) => overflow.map((i) => (
+              <MenuItem key={items[i].id} onSelect={() => { close(false); onChange(items[i].id); }}>
+                <span className="flex-1">{items[i].label}</span>{badge(items[i], false)}
+              </MenuItem>
+            ))}
+          </Menu>
+        )}
       </div>
     </div>
   );
 }
 
 /** The way back to the page this one was opened from: "← Project · Documents". `color` adds the project's swatch.
+ *  The "·" is visual only; screen readers hear "Project Documents" with no punctuation read aloud.
  *  `compact` is for the top bar of full-screen pages: on a phone only the arrow shows, and the text stays for screen readers. */
 export function BackLink({ to, label, section, color, compact, className }: { to: string; label: string; section?: string; color?: string; compact?: boolean; className?: string }) {
   return (
@@ -220,7 +280,7 @@ export function BackLink({ to, label, section, color, compact, className }: { to
       <ArrowLeft size={16} aria-hidden className="shrink-0 transition-transform group-hover:-translate-x-0.5 motion-reduce:transform-none" />
       {color && <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: color }} />}
       <span className={cx("truncate", compact && "max-w-40 max-sm:sr-only lg:max-w-64")}>
-        <span className="font-medium text-ink-2 group-hover:text-ink">{label}</span>{section && <><span aria-hidden> · </span><span className="sr-only">, </span>{section}</>}
+        <span className="font-medium text-ink-2 group-hover:text-ink">{label}</span>{section && <><span aria-hidden> · </span><span className="sr-only"> </span>{section}</>}
       </span>
     </Link>
   );

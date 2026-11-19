@@ -3,6 +3,7 @@ import type { Block, Logic, LogicOp, LogicRule } from "./types";
 import { blockDef } from "./registry";
 import { uid } from "../lib/hooks";
 import { Tip } from "../components/editing";
+import { defaultGoTo } from "./review";
 
 import { t } from "../lib/i18n";
 function choiceOptions(b: Block): { id: string; label: string }[] {
@@ -31,11 +32,11 @@ export function LogicEditor({ block, blocks, onChange }: { block: Block; blocks:
   const newRule = (): LogicRule => ({
     id: uid(), op: OPS()[kind][0].id,
     value: kind === "choice" ? opts[0]?.id : kind === "number" ? (block.type === "nps" ? 7 : 3) : undefined,
-    goTo: targets[0]?.id ?? "end",
+    goTo: defaultGoTo(blocks, idx),   // the next block would change nothing
   });
 
-  const Target = ({ value, onPick, allowNext }: { value?: string; onPick: (v: string) => void; allowNext?: boolean }) => (
-    <select className="field py-1.5" value={value ?? ""} onChange={(e) => onPick(e.target.value)}>
+  const Target = ({ value, onPick, allowNext, label }: { value?: string; onPick: (v: string) => void; allowNext?: boolean; label: string }) => (
+    <select aria-label={label} className="field py-1.5" value={value ?? ""} onChange={(e) => onPick(e.target.value)}>
       {allowNext && <option value="">{t("Siguiente bloque")}</option>}
       {targets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
       <option value="end">{t("Terminar el estudio")}</option>
@@ -58,21 +59,21 @@ export function LogicEditor({ block, blocks, onChange }: { block: Block; blocks:
               </div>
               <p className="text-[13px] text-ink-2">{t("Si la respuesta…")}</p>
               <div className="grid grid-cols-[auto_1fr] gap-2">
-                <select className="field py-1.5" value={r.op} onChange={(e) => upd(r.id, { op: e.target.value as LogicOp })}>
+                <select aria-label={t("Regla {n}: condición", { n: n + 1 })} className="field py-1.5" value={r.op} onChange={(e) => upd(r.id, { op: e.target.value as LogicOp })}>
                   {OPS()[kind].map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 {kind === "choice" && (
-                  <select className="field py-1.5" value={String(r.value ?? "")} onChange={(e) => upd(r.id, { value: e.target.value })}>
+                  <select aria-label={t("Regla {n}: respuesta", { n: n + 1 })} className="field py-1.5" value={String(r.value ?? "")} onChange={(e) => upd(r.id, { value: e.target.value })}>
                     {opts.map((o) => <option key={o.id} value={o.id}>{o.label || t("(sin texto)")}</option>)}
                   </select>
                 )}
                 {kind === "number" && (
-                  <input type="number" className="field py-1.5" value={Number(r.value ?? 0)} onChange={(e) => upd(r.id, { value: +e.target.value })} />
+                  <input type="number" aria-label={t("Regla {n}: valor", { n: n + 1 })} className="field py-1.5" value={Number(r.value ?? 0)} onChange={(e) => upd(r.id, { value: +e.target.value })} />
                 )}
                 {kind === "success" && <span className="self-center text-[13px] text-ink-3">{block.type === "tree_test" ? t("el destino correcto") : block.type === "prototype_task" || block.type === "timed_task" ? t("la tarea") : t("el área correcta")}</span>}
               </div>
               <p className="text-[13px] text-ink-2">{t("…entonces ir a")}</p>
-              <Target value={r.goTo} onPick={(v) => upd(r.id, { goTo: v })} />
+              <Target label={t("Regla {n}: ir a", { n: n + 1 })} value={r.goTo} onPick={(v) => upd(r.id, { goTo: v })} />
             </div>
           ))}
           <button onClick={() => set({ ...logic, rules: [...logic.rules, newRule()] })}
@@ -86,7 +87,7 @@ export function LogicEditor({ block, blocks, onChange }: { block: Block; blocks:
 
       <div className="border-t border-line pt-4">
         <p className="mb-2 text-[13px] font-medium text-ink-2">{logic.rules.length ? t("En cualquier otro caso, ir a") : t("Después de este bloque, ir a")}</p>
-        <Target allowNext value={logic.otherwise} onPick={(v) => set({ ...logic, otherwise: v || undefined })} />
+        <Target allowNext label={logic.rules.length ? t("En cualquier otro caso, ir a") : t("Después de este bloque, ir a")} value={logic.otherwise} onPick={(v) => set({ ...logic, otherwise: v || undefined })} />
       </div>
       {block.type === "tree_test" && block.correct.length === 0 && logic.rules.length > 0 && <p className="text-xs text-warn">{t("Marca la respuesta correcta en Contenido para que las reglas de acierto funcionen.")}</p>}
       {block.type === "first_click" && !block.area && logic.rules.length > 0 && <p className="text-xs text-warn">{t("Dibuja el área correcta en Contenido para que las reglas de acierto funcionen.")}</p>}

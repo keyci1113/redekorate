@@ -66,7 +66,7 @@ export function peakDay(days: Day[]): Day | null {
 }
 
 // ── Estudios activos ────────────────────────────────────────────────
-export interface LiveLike { id: string; responses: number; started: number; last_response_at: string | null; title?: string; method?: string }
+export interface LiveLike { id: string; responses: number; started: number; last_response_at: string | null; title?: string; method?: string; updated_at?: string | null; published_at?: string | null }
 export type LiveSortKey = "recent" | "completion" | "title" | "method";
 export interface LiveSort { key: LiveSortKey; dir: "asc" | "desc" }
 /** Atajos del selector: "Más reciente" y "Menor completado". */
@@ -79,9 +79,20 @@ export function toggleSort(cur: LiveSort, key: LiveSortKey): LiveSort {
   return { key, dir: key === "title" || key === "method" ? "asc" : "desc" };
 }
 
-/** "recent": última respuesta primero. "lowest": menor completado primero (sin datos al final). */
+/** The latest of edited, published and last response: what "Más reciente" means for a study in any status. */
+export function latestActivity(s: Pick<LiveLike, "last_response_at" | "updated_at" | "published_at">): number {
+  const ts = [s.updated_at, s.published_at, s.last_response_at].filter((x): x is string => !!x).map((x) => new Date(x).getTime());
+  return ts.length ? Math.max(...ts) : -Infinity;
+}
+
+export type StudyFilter = "all" | "live" | "draft" | "closed";
+export const STUDY_FILTERS: StudyFilter[] = ["all", "live", "draft", "closed"];
+/** The Studies page filter; "all" keeps every status. */
+export const filterStudies = <T extends { status: string }>(list: T[], f: StudyFilter): T[] => (f === "all" ? list : list.filter((s) => s.status === f));
+
+/** "recent": última actividad primero (edición, publicación o respuesta). "lowest": menor completado primero (sin datos al final). */
 export function sortLive<T extends LiveLike>(list: T[], by: LiveSort): T[] {
-  const time = (s: T) => (s.last_response_at ? new Date(s.last_response_at).getTime() : -Infinity);
+  const time = (s: T) => latestActivity(s);
   const sign = by.dir === "asc" ? 1 : -1;
   const text = (s: T) => (by.key === "title" ? s.title : s.method) ?? "";
   return [...list].sort((a, b) => {

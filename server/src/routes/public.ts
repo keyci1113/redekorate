@@ -29,12 +29,15 @@ publicApi.post("/studies/:slug/sessions", sessionCreateLimiter, async (req, res)
   const s = await one("select id, status, published_version from studies where public_slug = $1", [req.params.slug]);
   if (!s || s.status !== "live") throw new HttpError(410, "Este estudio no está recibiendo respuestas");
   // Solo aceptamos parámetros cortos de la URL (p. ej. ?pid=123&source=email). Nunca guardamos IP.
-  const { participant } = parse(z.object({
+  const { participant, elapsed_ms } = parse(z.object({
     participant: z.record(z.string().max(40), z.string().max(120)).refine((o) => Object.keys(o).length <= 10, "Demasiados parámetros").default({}),
+    // The runner only creates the session when the participant leaves the first screen; this is how long that
+    // screen was open, so started_at (and the study's median time) includes it. Capped at 3 hours.
+    elapsed_ms: z.number().int().nonnegative().optional(),
   }), req.body ?? {});
   const session = await one(
-    "insert into sessions(study_id, participant, device, study_version) values ($1,$2,$3,$4) returning id",
-    [s.id, JSON.stringify(participant), device(String(req.headers["user-agent"] ?? "")), s.published_version],
+    "insert into sessions(study_id, participant, device, study_version, started_at) values ($1,$2,$3,$4, now() - make_interval(secs => $5::double precision / 1000)) returning id",
+    [s.id, JSON.stringify(participant), device(String(req.headers["user-agent"] ?? "")), s.published_version, Math.min(elapsed_ms ?? 0, 3 * 3600_000)],
   );
   res.status(201).json({ session_id: session!.id });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Lock, ShieldCheck } from "lucide-react";
 import { api } from "../lib/api";
@@ -6,6 +6,7 @@ import type { Block } from "../blocks/types";
 import { blockDef } from "../blocks/registry";
 import { BlockView, isAnswered, isWide } from "../blocks/Runner";
 import { nextIndex } from "../blocks/logic";
+import { nextHint } from "../blocks/nextHint";
 import { Button, ErrorNote, Spinner, cx } from "../components/ui";
 import { LogoMark, Wordmark } from "../components/Logo";
 import { brandStyle, type StudySettings } from "../lib/settings";
@@ -62,20 +63,24 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
   const [agree, setAgree] = useState(false);
   const session = useRef<string | null>(null);
   const shownAt = useRef(Date.now());
+  const openedAt = useRef(Date.now());   // when the first screen showed (after consent), sent with the new session
   const block = blocks[i];
   const showProgress = settings.showProgress !== false;
   const allowBack = settings.allowBack !== false;
   const finalIdx = blocks[blocks.length - 1]?.type === "thank_you" ? blocks.length - 1 : -1;
 
   useEffect(() => { shownAt.current = Date.now(); window.scrollTo({ top: 0 }); }, [i]);
+  useEffect(() => { if (consented) openedAt.current = Date.now(); }, [consented]);
 
   const canNext = !block || !block.required || isAnswered(block, values[block.id]);
+  const hint = block ? nextHint(block, values[block.id], canNext) : null;
+  const hintId = useId();
 
   async function ensureSession() {
     if (preview || session.current) return session.current;
     const qs = Object.fromEntries([...new URLSearchParams(window.location.search)].filter(([k]) => k !== "preview").slice(0, 10).map(([k, v]) => [k.slice(0, 40), v.slice(0, 120)]));
     if (settings.consent?.enabled) qs.consent = "aceptado";
-    const { session_id } = await api.post<{ session_id: string }>(`/public/studies/${slug}/sessions`, { participant: qs });
+    const { session_id } = await api.post<{ session_id: string }>(`/public/studies/${slug}/sessions`, { participant: qs, elapsed_ms: Math.max(0, Date.now() - openedAt.current) });
     session.current = session_id;
     return session_id;
   }
@@ -124,7 +129,8 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
       {showProgress && <div className="h-1 bg-line"><div className="h-1 bg-accent transition-all duration-500" style={{ width: `${progress * 100}%` }} /></div>}
       {settings.brand?.logo && <div className="flex justify-center pt-6"><img src={settings.brand.logo} alt="" className="h-9 object-contain" /></div>}
 
-      <main className="flex flex-1 items-center justify-center px-5 py-12">
+      {/* Top-aligned: content that grows (a new group, a help text) pushes down instead of making the screen jump. */}
+      <main className="flex flex-1 items-start justify-center px-5 pt-10 pb-12 sm:pt-16">
         {!consented ? (
           <div className="w-full max-w-xl animate-[fadeUp_.35s_ease-out]">
             <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-accent"><ShieldCheck size={22} /></span>
@@ -154,7 +160,9 @@ function Run({ slug, blocks, settings, preview }: { slug: string; blocks: Block[
                     )}
                     <div className="flex items-center gap-3">
                       {block.type !== "welcome" && !block.required && !isAnswered(block, values[block.id]) && <span className="text-xs text-ink-3">{t("Opcional")}</span>}
-                      <Button variant="primary" size="lg" className="!bg-accent hover:!opacity-90" onClick={() => next()} disabled={!canNext || busy}>
+                      {/* Why the button is disabled, so nobody is stuck guessing. */}
+                      {!canNext && hint && <span id={hintId} className="text-right text-[13px] text-ink-2" aria-live="polite">{hint}</span>}
+                      <Button variant="primary" size="lg" className="!bg-accent hover:!opacity-90" onClick={() => next()} disabled={!canNext || busy} aria-describedby={!canNext && hint ? hintId : undefined}>
                         {block.type === "welcome" ? block.buttonLabel : t("Siguiente")} {block.type !== "welcome" && <ArrowRight size={16} />}
                       </Button>
                     </div>

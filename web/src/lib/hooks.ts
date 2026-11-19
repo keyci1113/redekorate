@@ -33,6 +33,20 @@ export function usePaneWidth(key: string, initial: number, min: number, max: num
   return { width, handleProps };
 }
 
+/** Whether a CSS media query matches, kept in step with resizes. */
+export function useMediaQuery(query: string): boolean {
+  const get = () => typeof window !== "undefined" && !!window.matchMedia?.(query).matches;
+  const [on, setOn] = useState(get);
+  useEffect(() => {
+    const m = window.matchMedia?.(query);
+    if (!m) return;
+    const h = () => setOn(m.matches);
+    h(); m.addEventListener("change", h);
+    return () => m.removeEventListener("change", h);
+  }, [query]);
+  return on;
+}
+
 /** Preferencia booleana guardada en el navegador (solo comodidad de quien edita). */
 export function usePref(key: string, initial: boolean): [boolean, (v: boolean) => void] {
   const [v, setV] = useState(() => { try { const s = localStorage.getItem(`pref:${key}`); return s === null ? initial : s === "1"; } catch { return initial; } });

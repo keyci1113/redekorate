@@ -79,3 +79,17 @@ dashboard.get("/", async (req, res) => {
   const [totals, trend, study_trend, live, drafts, activity, insights, insight_counts, recent] = await Promise.all([totalsQ, trendQ, study_trendQ, liveQ, draftsQ, activityQ, insightsQ, insight_countsQ, recentQ]);
   res.json({ totals, trend, study_trend, live, drafts, activity, insights, insight_counts, recent });
 });
+
+// Every study the person can see, in any status, for the Studies page (filtered and sorted on the client).
+dashboard.get("/studies", async (req, res) => {
+  const studies = await query(
+    `with ${ACC_CTE}
+     select s.id, s.project_id, s.title, s.method, s.status, s.updated_at, s.published_at, p.name as project_name, p.color as project_color,
+       (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as responses,
+       (select count(*)::int from sessions se where se.study_id = s.id) as started,
+       (select max(se.completed_at) from sessions se where se.study_id = s.id) as last_response_at
+     from studies s join projects p on p.id = s.project_id
+     where s.project_id in (select id from acc) and not p.archived
+     order by greatest(s.updated_at, s.published_at, (select max(se.completed_at) from sessions se where se.study_id = s.id)) desc nulls last`, [req.user!.id]);
+  res.json({ studies });
+});

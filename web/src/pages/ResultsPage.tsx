@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ChevronDown, Download, ExternalLink, Link2, PenLine, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Download, Eye, EyeOff, ExternalLink, Link2, Lock, PenLine, Plus, Trash2 } from "lucide-react";
+import { participantFields } from "../lib/participantFields";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import { rememberStudy } from "../lib/recent";
@@ -74,7 +75,7 @@ export function ResultsPage() {
         </Card>
       )}
 
-      <div className="mt-8"><Overview sessions={sessions} /></div>
+      <div className="mt-8"><Overview sessions={sessions} answers={answers} /></div>
 
       <div className="mt-8">
         <Tabs value={tab} onChange={setTab} items={[
@@ -138,6 +139,8 @@ export function formatAnswer(block: Block, value: unknown, settings?: StudySetti
 
 function Responses({ study, sessions, answers, onChange, canEdit }: { study: Study; sessions: Session[]; answers: Answer[]; onChange: () => void; canEdit: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());   // rows whose email/phone are shown in full
+  const toggleReveal = (id: string) => setRevealed((r) => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const qs = answeredBlocks(study.blocks);
   if (!sessions.length) return <Empty icon={<Plus size={20} />} title={t("Aún no hay participantes")} text={t("Comparte el link del estudio para empezar a recibir respuestas.")} />;
   return (
@@ -145,12 +148,24 @@ function Responses({ study, sessions, answers, onChange, canEdit }: { study: Stu
       {sessions.map((s, idx) => {
         const mine = answers.filter((a) => a.session_id === s.id);
         const dur = s.completed_at ? new Date(s.completed_at).getTime() - new Date(s.started_at).getTime() : 0;
-        const meta = Object.entries(s.participant ?? {}).filter(([k]) => k !== "preview");
+        const fields = participantFields(s.participant as Record<string, string> | null);
+        const shown = revealed.has(s.id);
         return (
           <div key={s.id} className={cx(idx > 0 && "border-t border-line")}>
             <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left hover:bg-paper/50">
               <span className="w-24 text-sm font-medium tabular-nums">#{sessions.length - idx}</span>
-              <span className="flex-1 text-sm text-ink-2">{timeAgo(s.started_at)}{s.device && <span className="ml-2 text-xs text-ink-3">· {s.device === "mobile" ? t("Móvil") : s.device === "tablet" ? t("Tablet") : t("Escritorio")}</span>}{meta.length > 0 && <span className="ml-2 text-xs text-ink-3">{meta.map(([k, v]) => `${k}=${v}`).join(" · ")}</span>}</span>
+              <span className="flex-1 text-sm text-ink-2">{timeAgo(s.started_at)}{s.device && <span className="ml-2 text-xs text-ink-3">· {s.device === "mobile" ? t("Móvil") : s.device === "tablet" ? t("Tablet") : t("Escritorio")}</span>}
+                {fields.length > 0 && (
+                  <span className="mt-1 flex flex-wrap gap-1.5">
+                    {fields.slice(0, 3).map((f) => (
+                      <span key={f.key} className="inline-flex max-w-56 items-baseline gap-1 rounded-md bg-ink/5 px-1.5 py-0.5 text-xs">
+                        <span className="shrink-0 text-ink-3">{f.label}</span><span className="truncate text-ink-2">{shown ? f.value : f.masked}</span>
+                      </span>
+                    ))}
+                    {fields.length > 3 && <span className="text-xs text-ink-3">+{fields.length - 3}</span>}
+                  </span>
+                )}
+              </span>
               <span className="hidden text-sm tabular-nums text-ink-3 sm:block">{mine.length}/{qs.length} {t("respuestas")}</span>
               <span className="w-24 text-right text-sm tabular-nums text-ink-3">{dur ? `${Math.round(dur / 1000)} s` : ""}</span>
               <span className={cx("w-24 rounded-full px-2 py-0.5 text-center text-xs font-medium", s.completed_at ? "bg-good-soft text-good" : "bg-ink/5 text-ink-3")}>{s.completed_at ? t("Completa") : t("Incompleta")}</span>
@@ -158,6 +173,26 @@ function Responses({ study, sessions, answers, onChange, canEdit }: { study: Stu
             </button>
             {open === s.id && (
               <div className="border-t border-line bg-paper/40 px-5 py-4">
+                {fields.length > 0 && (
+                  <div className="mb-4 rounded-lg border border-line bg-surface p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="flex items-center gap-1.5 text-xs font-medium text-ink-3"><Lock size={11} aria-hidden /> {t("Datos del participante · protegidos")}</p>
+                      {fields.some((f) => f.sensitive) && (
+                        <button type="button" onClick={() => toggleReveal(s.id)} aria-pressed={shown} className="focus-ring flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-accent hover:bg-accent-soft">
+                          {shown ? <EyeOff size={12} aria-hidden /> : <Eye size={12} aria-hidden />} {shown ? t("Ocultar") : t("Mostrar")}
+                        </button>
+                      )}
+                    </div>
+                    <dl className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+                      {fields.map((f) => (
+                        <div key={f.key} className="flex min-w-0 items-baseline gap-2 text-sm">
+                          <dt className="shrink-0 text-ink-3">{f.label}</dt>
+                          <dd className="truncate">{shown ? f.value : f.masked}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                )}
                 <dl className="space-y-3">
                   {qs.map((b) => {
                     const a = mine.find((x) => x.block_id === b.id);

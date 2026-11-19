@@ -51,7 +51,7 @@ export function ReportPage() {
         <h1 className="display mt-2 text-5xl leading-tight sm:text-6xl">{study.title}</h1>
         {study.published_at && <p className="mt-2 text-sm text-ink-3">{t("Publicado el")} {new Date(study.published_at).toLocaleDateString(locale(), { dateStyle: "long" })}</p>}
 
-        <div className="mt-10"><Overview sessions={sessions} /></div>
+        <div className="mt-10"><Overview sessions={sessions} answers={answers} /></div>
 
         {insights.length > 0 && (
           <section className="mt-14">

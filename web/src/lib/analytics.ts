@@ -10,9 +10,16 @@ export function median(xs: number[]) {
 }
 export const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
 
-export function overview(sessions: Session[]) {
+/**
+ * Totals for a study. The median time is over completed sessions only: completed_at − started_at, and never less
+ * than the time the session spent on its own answers (older sessions started on leaving the first screen, so their
+ * clock missed it). With `answers`, the study median can't come out below any single question's median.
+ */
+export function overview(sessions: Session[], answers: Answer[] = []) {
   const completed = sessions.filter((s) => s.completed_at);
-  const durations = completed.map((s) => new Date(s.completed_at!).getTime() - new Date(s.started_at).getTime());
+  const answered = new Map<string, number>();
+  for (const a of answers) answered.set(a.session_id, (answered.get(a.session_id) ?? 0) + (a.duration_ms ?? 0));
+  const durations = completed.map((s) => Math.max(new Date(s.completed_at!).getTime() - new Date(s.started_at).getTime(), answered.get(s.id) ?? 0));
   return {
     started: sessions.length,
     completed: completed.length,

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BarChart3, Check, CircleAlert, Copy, CopyPlus, Eye, GitBranch, GripVertical, Lightbulb, Link2,
-  Monitor, Palette, PanelLeft, PanelRight, Plus, Rocket, Search, Smartphone, Square, Trash2, X,
+  Monitor, MoreHorizontal, Palette, PanelLeft, PanelRight, Plus, Rocket, Search, Smartphone, Square, Trash2, X,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { copy, uid, useLoad, usePaneWidth, usePref } from "../lib/hooks";
+import { copy, uid, useLoad, useMediaQuery, usePaneWidth, usePref } from "../lib/hooks";
 import type { Project, Study } from "../lib/types";
 import type { Block } from "../blocks/types";
 import { BLOCKS, BLOCK_GROUPS, blockDef, isStructural } from "../blocks/registry";
@@ -13,11 +13,13 @@ import { BlockEditor } from "../blocks/Editor";
 import { LogicEditor } from "../blocks/LogicEditor";
 import { BlockView, isWide } from "../blocks/Runner";
 import { validateStudy, type Issue } from "../blocks/validate";
+import { estimateMinutes } from "../blocks/review";
+import { Menu, MenuItem } from "../components/Menu";
 import { BackLink, Button, ErrorNote, Field, Modal, Spinner, StatusBadge, cx } from "../components/ui";
 import { ImageDrop, PaneHandle, Segmented, Toggle, useSortable } from "../components/editing";
 import { BRAND_COLORS, defaultConsent, brandStyle, voiceOn, type StudySettings } from "../lib/settings";
 import { templateByKey } from "../templates/catalog";
-import { getLang, setContentLang } from "../lib/i18n";
+import { getLang, setContentLang, tc } from "../lib/i18n";
 import { PrototypeEditor, newPrototype } from "../components/PrototypeEditor";
 import { rememberStudy } from "../lib/recent";
 import { canEdit } from "../lib/roles";
@@ -47,6 +49,11 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   const [designOpen, setDesignOpen] = useState(false);
   const [checkOpen, setCheckOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  // Below lg the three panes don't fit side by side: one shows at a time, picked with a segmented switch.
+  const narrow = useMediaQuery("(max-width: 1023.98px)");
+  const [view, setView] = useState<"blocks" | "edit" | "preview">("blocks");
+  const nav = useNavigate();
   const [guideOpen, setGuideOpen] = useState(true);
   const [previewValue, setPreviewValue] = useState<Record<string, unknown>>({});
   const first = useRef(true);
@@ -84,6 +91,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
 
   const current = blocks.find((b) => b.id === selected) ?? null;
   const patch = (id: string, p: Partial<Block>) => setBlocks((bs) => bs.map((b) => (b.id === id ? ({ ...b, ...p } as Block) : b)));
+  const pick = (id: string) => { setSelected(id); if (narrow) setView("edit"); };
   const remove = (id: string) => {
     const i = blocks.findIndex((b) => b.id === id);
     const next = blocks.filter((b) => b.id !== id);
@@ -98,8 +106,9 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
       const n = [...bs]; n.splice(Math.min(at, end), 0, nb); return n;
     });
     setSelected(nb.id); setAdding(false); setPanel("content");
+    if (narrow) setView("edit");
   };
-  const duplicate = (b: Block) => insert({ ...structuredClone(b), id: uid(), logic: undefined, title: `${b.title} (copia)` });
+  const duplicate = (b: Block) => insert({ ...structuredClone(b), id: uid(), logic: undefined, title: `${b.title} (${tc("copia")})` });
   const sortable = useSortable(blocks, setBlocks);
 
   async function publishChanges() {
@@ -113,36 +122,59 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
   }
 
   const errorsCount = issues.filter((i) => i.level === "error").length;
+  const tryIt = () => window.open(`/s/${study.public_slug}?preview=1`, "_blank", "noopener");
+  const leftOn = narrow ? view === "blocks" : showLeft;
+  const rightOn = narrow ? view === "edit" : showRight;
 
   return (
     <div className="rk-page-in flex h-screen flex-col">
       {/* Barra superior */}
-      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-4">
+      <header className="flex h-14 shrink-0 items-center gap-2 border-b border-line bg-surface px-3 sm:px-4">
         <BackLink compact to={`/projects/${project.id}`} color={project.color} label={project.name} section={t("Estudios")} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t("Título del estudio")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
-        <span className="hidden text-xs text-ink-3 md:block">
+        {/* Keeps a usable width and truncates; the secondary actions move into ⋯ before it gets squeezed. */}
+        <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t("Título del estudio")} title={title} className="focus-ring min-w-24 flex-1 truncate rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper sm:min-w-32" />
+        <span className="hidden shrink-0 text-xs text-ink-3 md:block" aria-live="polite">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} /> {t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : ""}
         </span>
-        <StatusBadge status={study.status} />
-        <div className="hidden rounded-lg bg-paper p-0.5 lg:flex">
+        <span className="hidden shrink-0 sm:inline-flex"><StatusBadge status={study.status} /></span>
+        <div className="hidden shrink-0 rounded-lg bg-paper p-0.5 xl:flex">
           <button onClick={() => setShowLeft(!showLeft)} aria-pressed={showLeft} title={showLeft ? t("Ocultar lista de bloques") : t("Mostrar lista de bloques")} aria-label={t("Lista de bloques")}
             className={cx("focus-ring rounded-md p-1.5", showLeft ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelLeft size={14} /></button>
           <button onClick={() => setShowRight(!showRight)} aria-pressed={showRight} title={showRight ? t("Ocultar panel de propiedades") : t("Mostrar panel de propiedades")} aria-label={t("Panel de propiedades")}
             className={cx("focus-ring rounded-md p-1.5", showRight ? "bg-surface text-ink shadow-sm" : "text-ink-3 hover:text-ink")}><PanelRight size={14} /></button>
         </div>
-        <Button size="sm" variant="ghost" icon={<Smartphone size={15} />} onClick={() => setProtoEditor({})}>{t("Prototipos")}{prototypes.length ? ` · ${prototypes.length}` : ""}</Button>
-        <Button size="sm" variant="ghost" icon={<Palette size={15} />} onClick={() => setDesignOpen(true)}>{t("Diseño")}</Button>
-        <Button size="sm" variant="ghost" icon={<Eye size={15} />} onClick={() => window.open(`/s/${study.public_slug}?preview=1`, "_blank", "noopener")}>{t("Probar")}</Button>
-        <Link to={`/studies/${study.id}/results`} className="hidden lg:block"><Button size="sm" variant="ghost" icon={<BarChart3 size={15} />}>{t("Resultados")}</Button></Link>
-        {study.status === "draft" && <Button size="sm" variant="primary" icon={<Rocket size={15} />} onClick={() => setCheckOpen(true)}>{t("Publicar")}</Button>}
+        {/* Each secondary action shows inline from its breakpoint up and sits in the ⋯ menu below it. */}
+        <Button size="sm" variant="ghost" className="shrink-0 max-2xl:hidden" icon={<Smartphone size={15} />} onClick={() => setProtoEditor({})}>{t("Prototipos")}{prototypes.length ? ` · ${prototypes.length}` : ""}</Button>
+        <Button size="sm" variant="ghost" className="shrink-0 max-xl:hidden" icon={<Palette size={15} />} onClick={() => setDesignOpen(true)}>{t("Diseño")}</Button>
+        <Button size="sm" variant="ghost" className="shrink-0 max-xl:hidden" icon={<Eye size={15} />} onClick={tryIt}>{t("Probar")}</Button>
+        <Button size="sm" variant="ghost" className="shrink-0 max-2xl:hidden" icon={<BarChart3 size={15} />} onClick={() => nav(`/studies/${study.id}/results`)}>{t("Resultados")}</Button>
+        {study.status === "draft" && <Button size="sm" variant="primary" className="shrink-0" icon={<Rocket size={15} />} aria-label={t("Publicar")} onClick={() => setCheckOpen(true)}><span className="max-sm:sr-only">{t("Publicar")}</span></Button>}
         {study.status === "live" && <>
-          {study.has_unpublished && <Button size="sm" variant="primary" icon={<Rocket size={15} />} onClick={() => setCheckOpen(true)}>{t("Publicar cambios")}</Button>}
-          <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}>{t("Compartir")}</Button>
-          <Button size="sm" variant="ghost" icon={<Square size={13} />} onClick={() => setStatus("closed")}>{t("Cerrar")}</Button>
+          {study.has_unpublished && <Button size="sm" variant="primary" className="shrink-0" icon={<Rocket size={15} />} aria-label={t("Publicar cambios")} onClick={() => setCheckOpen(true)}><span className="max-sm:sr-only">{t("Publicar cambios")}</span></Button>}
+          <Button size="sm" className="shrink-0" icon={<Link2 size={15} />} aria-label={t("Compartir")} onClick={() => setShareOpen(true)}><span className="max-lg:sr-only">{t("Compartir")}</span></Button>
         </>}
-        {study.status === "closed" && <Button size="sm" icon={<Rocket size={15} />} onClick={() => setStatus("live")}>{t("Reabrir")}</Button>}
+        {study.status === "closed" && <Button size="sm" className="shrink-0" icon={<Rocket size={15} />} aria-label={t("Reabrir")} onClick={() => setStatus("live")}><span className="max-sm:sr-only">{t("Reabrir")}</span></Button>}
+        {/* Live studies always need ⋯ (it holds "Cerrar estudio"); otherwise it goes once every action fits inline. */}
+        <span className={cx("shrink-0", study.status !== "live" && "2xl:hidden")}>
+          <Menu label={t("Más acciones")} width={220} button={(props) => (
+            <button {...props} aria-label={t("Más acciones")} title={t("Más acciones")} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5 hover:text-ink"><MoreHorizontal size={17} /></button>
+          )}>
+            {(close) => <>
+              <span className="contents 2xl:hidden"><MenuItem onSelect={() => { close(); setProtoEditor({}); }}><Smartphone size={15} aria-hidden /> {t("Prototipos")}{prototypes.length ? ` · ${prototypes.length}` : ""}</MenuItem></span>
+              <span className="contents xl:hidden"><MenuItem onSelect={() => { close(); setDesignOpen(true); }}><Palette size={15} aria-hidden /> {t("Diseño")}</MenuItem></span>
+              <span className="contents xl:hidden"><MenuItem onSelect={() => { close(); tryIt(); }}><Eye size={15} aria-hidden /> {t("Probar")}</MenuItem></span>
+              <span className="contents 2xl:hidden"><MenuItem onSelect={() => { close(false); nav(`/studies/${study.id}/results`); }}><BarChart3 size={15} aria-hidden /> {t("Resultados")}</MenuItem></span>
+              {study.status === "live" && <MenuItem danger onSelect={() => { close(false); setCloseOpen(true); }}><Square size={13} aria-hidden /> {t("Cerrar estudio")}</MenuItem>}
+            </>}
+          </Menu>
+        </span>
       </header>
+      {narrow && (
+        <div className="shrink-0 border-b border-line bg-surface px-3 py-2" role="group" aria-label={t("Panel visible")}>
+          <Segmented value={view} onChange={setView} options={[{ id: "blocks", label: t("Bloques") }, { id: "edit", label: t("Editar") }, { id: "preview", label: t("Vista previa") }]} />
+        </div>
+      )}
 
       {study.status === "live" && (
         <div className="border-b border-warn/20 bg-warn-soft px-4 py-1.5 text-center text-xs text-warn">
@@ -154,7 +186,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
 
       <div className="flex min-h-0 flex-1">
         {/* ── Lista de bloques ── */}
-        {showLeft && <aside className="flex shrink-0 flex-col border-r border-line bg-paper" style={{ width: leftPane.width }}>
+        {leftOn && <aside className={cx("flex flex-col bg-paper", narrow ? "min-w-0 flex-1" : "shrink-0 border-r border-line")} style={narrow ? undefined : { width: leftPane.width }}>
           {template?.guide && guideOpen && (
             <div className="m-3 mb-1 rounded-xl border border-accent/15 bg-accent-soft/70 p-3">
               <div className="mb-1.5 flex items-center justify-between">
@@ -175,7 +207,7 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
               const bi = issuesFor(b.id);
               return (
                 <li key={b.id} {...sortable.props(i)} className={cx(sortable.drag === i && "opacity-40", sortable.over === i && sortable.drag !== i && "rounded-lg ring-2 ring-accent/40")}>
-                  <div onClick={() => setSelected(b.id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && setSelected(b.id)}
+                  <div onClick={() => pick(b.id)} role="button" tabIndex={0} onKeyDown={(e) => e.key === "Enter" && pick(b.id)}
                     className={cx("focus-ring group flex cursor-pointer items-center gap-2 rounded-lg px-2 py-2 transition", on ? "bg-surface shadow-sm ring-1 ring-line" : "hover:bg-ink/[0.04]")}>
                     <GripVertical size={13} className="shrink-0 cursor-grab text-ink-3/50 group-hover:text-ink-3" />
                     <span className="w-4 text-right text-[11px] text-ink-3 tabular-nums">{i + 1}</span>
@@ -201,20 +233,21 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
             <Button variant="primary" className="w-full" icon={<Plus size={16} />} aria-expanded={adding} onClick={() => setAdding(!adding)}>{t("Agregar bloque")}</Button>
           </div>
         </aside>}
-        {showLeft && <PaneHandle {...leftPane.handleProps} label={t("Ancho de la lista de bloques")} />}
+        {leftOn && !narrow && <PaneHandle {...leftPane.handleProps} label={t("Ancho de la lista de bloques")} />}
 
         {/* ── Vista previa ── */}
-        <section className="flex min-w-0 flex-1 flex-col bg-[radial-gradient(var(--color-line-2)_1px,transparent_1px)] [background-size:18px_18px]">
+        <section className={cx("min-w-0 flex-1 flex-col bg-[radial-gradient(var(--color-line-2)_1px,transparent_1px)] [background-size:18px_18px]", narrow && view !== "preview" ? "hidden" : "flex")}>
           <div className="flex items-center justify-center gap-1 pt-4">
             <span className="label mr-2">{t("Vista del participante")}</span>
             {([["desktop", Monitor], ["mobile", Smartphone]] as const).map(([d, Icon]) => (
-              <button key={d} onClick={() => setDevice(d)} title={d === "desktop" ? t("Escritorio") : t("Móvil")}
+              <button key={d} onClick={() => setDevice(d)} title={d === "desktop" ? t("Escritorio") : t("Móvil")} aria-label={d === "desktop" ? t("Escritorio") : t("Móvil")} aria-pressed={device === d}
                 className={cx("focus-ring rounded-md p-1.5 transition", device === d ? "bg-surface text-ink shadow-sm ring-1 ring-line" : "text-ink-3 hover:text-ink")}><Icon size={15} /></button>
             ))}
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-6 lg:p-8">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {/* A phone-sized frame (390px, never more than 85% of the pane) against the full pane width, so Mobile is always narrower than Desktop. */}
             {current ? (
-              <div className={cx("mx-auto transition-all", device === "mobile" ? "max-w-[390px]" : isWide(current) ? "max-w-4xl" : "max-w-2xl")}>
+              <div className={cx("mx-auto transition-all", device === "mobile" ? "w-[390px] max-w-[85%]" : cx("w-full", isWide(current) ? "max-w-4xl" : "max-w-2xl"))}>
                 <div style={brandStyle(settings) as CSSProperties}
                   className={cx("border border-line bg-paper shadow-xl shadow-ink/5", device === "mobile" ? "rounded-[2rem] px-5 py-10" : "rounded-2xl px-6 py-12 sm:px-12")}>
                   {settings.brand?.logo && <img src={settings.brand.logo} alt="" className="mx-auto mb-8 h-8 object-contain" />}
@@ -242,10 +275,10 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
             )}
           </div>
         </section>
-        {showRight && <PaneHandle {...rightPane.handleProps} className="hidden lg:block" label={t("Ancho del panel de propiedades")} />}
+        {rightOn && !narrow && <PaneHandle {...rightPane.handleProps} label={t("Ancho del panel de propiedades")} />}
 
         {/* ── Propiedades ── */}
-        {showRight && <aside className="hidden shrink-0 flex-col border-l border-line bg-surface lg:flex" style={{ width: rightPane.width }}>
+        {rightOn && <aside className={cx("flex flex-col bg-surface", narrow ? "min-w-0 flex-1" : "shrink-0 border-l border-line")} style={narrow ? undefined : { width: rightPane.width }}>
           {current ? (
             <>
               <div className="flex shrink-0 border-b border-line px-2">
@@ -275,9 +308,16 @@ function Builder({ initial, project, onStudy }: { initial: Study; project: Proje
       )}
       <DesignModal open={designOpen} onClose={() => setDesignOpen(false)} settings={settings} onChange={setSettings} />
       <ChecklistModal open={checkOpen} onClose={() => setCheckOpen(false)} issues={issues} blocks={blocks}
-        onGo={(id) => { setSelected(id); setPanel("content"); setCheckOpen(false); }} onPublish={() => (study.status === "live" ? publishChanges() : setStatus("live"))} errors={errorsCount} />
+        onGo={(id) => { pick(id); setPanel("content"); setCheckOpen(false); }} onPublish={() => (study.status === "live" ? publishChanges() : setStatus("live"))} errors={errorsCount} />
+      <Modal open={closeOpen} onClose={() => setCloseOpen(false)} title={t("¿Cerrar el estudio?")}>
+        <p className="text-sm text-ink-2">{t("Los participantes ya no podrán responder. Las respuestas que ya tienes se conservan, y puedes reabrirlo cuando quieras.")}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={() => setCloseOpen(false)}>{t("Cancelar")}</Button>
+          <Button variant="danger" icon={<Square size={13} />} onClick={async () => { await setStatus("closed"); setCloseOpen(false); }}>{t("Cerrar estudio")}</Button>
+        </div>
+      </Modal>
       <Modal open={shareOpen} onClose={() => setShareOpen(false)} title={t("Tu estudio está activo 🎉")}>
-        <ShareLink url={studyUrl(study.public_slug)} />
+        <ShareLink url={studyUrl(study.public_slug)} label={t("Link del estudio")} />
         <p className="mt-3 text-sm text-ink-3">{t("Envía este link a tus participantes, no necesitan crear cuenta. Tip: agrega parámetros para identificar el origen, por ejemplo")} <code className="rounded bg-paper px-1">{t("?source=linkedin")}</code>.</p>
       </Modal>
     </div>
@@ -375,7 +415,7 @@ function ChecklistModal({ open, onClose, issues, blocks, onGo, onPublish, errors
   open: boolean; onClose: () => void; issues: Issue[]; blocks: Block[]; onGo: (id: string) => void; onPublish: () => void; errors: number;
 }) {
   const questions = blocks.filter((b) => !isStructural(b)).length;
-  const minutes = Math.max(1, Math.round(blocks.reduce((t, b) => t + ({ card_sort: 240, sus: 90, tree_test: 45, preference: 40, matrix: 40, ranking: 30 } as Record<string, number>)[b.type] || (isStructural(b) ? 8 : 20), 0) / 60));
+  const minutes = estimateMinutes(blocks);
   return (
     <Modal open={open} onClose={onClose} title={t("Revisión antes de publicar")} wide>
       <div className="mb-5 grid grid-cols-3 gap-3 text-center">
@@ -405,11 +445,11 @@ function ChecklistModal({ open, onClose, issues, blocks, onGo, onPublish, errors
   );
 }
 
-export function ShareLink({ url }: { url: string }) {
+export function ShareLink({ url, label = t("Link para participantes") }: { url: string; label?: string }) {
   const [done, setDone] = useState(false);
   return (
     <div className="flex gap-2">
-      <input readOnly className="field font-mono text-[13px]" value={url} onFocus={(e) => e.target.select()} />
+      <input readOnly aria-label={label} className="field font-mono text-[13px]" value={url} onFocus={(e) => e.target.select()} />
       <Button variant="primary" icon={done ? <Check size={15} /> : <Copy size={15} />} onClick={async () => { if (await copy(url)) { setDone(true); setTimeout(() => setDone(false), 1500); } }}>
         {done ? t("Copiado") : t("Copiar")}
       </Button>
