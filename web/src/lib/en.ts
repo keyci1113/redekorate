@@ -3342,8 +3342,6 @@ export const EN: Record<string, string> = {
 "a ver el documento «{a}»": "to view the document “{a}”",
 "a comentar el documento «{a}»": "to comment on the document “{a}”",
 "a editar el documento «{a}»": "to edit the document “{a}”",
-"Tipo de ticket para cada clase de feedback": "Ticket type for each kind of feedback",
-"Tipo de ticket para {a}": "Ticket type for {a}",
 "{n} esta semana": "{n} this week",
 "Configurar widget": "Widget settings",
 "Violeta": "Violet",
