@@ -4,6 +4,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, Calendar, ChevronDown, Columns3, Flag, Kanban, List as ListIcon, MessageSquareDot, MoreHorizontal, Plus, Search, Ticket as TicketIcon, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
+import { debounce } from "../lib/debounce";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
 import { plural, t } from "../lib/i18n";
 import { Button, Empty, ErrorNote, cx } from "../components/ui";
@@ -28,7 +29,8 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
   const [params, setParams] = useSearchParams();
   const state = useMemo(() => readView(params), [params]);
   const setState = (next: Partial<ViewState>) => setParams((prev) => writeView(prev, { ...readView(prev), ...next }), { replace: true });
-  const setFilters = (f: Partial<Filters>) => setState({ filters: { ...state.filters, ...f } });
+  // Merged into the URL as it is when the change lands, not as it was at render: a debounced search must not undo a filter picked meanwhile.
+  const setFilters = (f: Partial<Filters>) => setParams((prev) => { const cur = readView(prev); return writeView(prev, { ...cur, filters: { ...cur.filters, ...f } }); }, { replace: true });
 
   const load = useLoad(() => api.get<TicketList>(`/projects/${projectId}/tickets`), [projectId]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -38,6 +40,7 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
   const [creating, setCreating] = useState<Column | null>(null);
   const [editingColumns, setEditingColumns] = useState(false);
   const [deleting, setDeleting] = useState<number[] | null>(null);
+  const [flash, setFlash] = useState<number | null>(null);   // a ticket just created: scrolled into view and highlighted for a moment
   useEffect(() => { if (load.data) { setTickets(load.data.tickets); setCols(load.data.columns?.length ? load.data.columns : BUILT_IN_COLUMNS); } }, [load.data]);
   useEffect(() => { onCount?.(tickets.length); }, [tickets.length, onCount]);
 
@@ -82,6 +85,21 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
     if (state.ticket && numbers.includes(state.ticket)) setState({ ticket: null });
     onLinksChange?.();
   }
+  useEffect(() => {
+    if (flash === null) return;
+    const card = document.querySelector<HTMLElement>(`[data-ticket-link="${flash}"]`);
+    const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    card?.scrollIntoView({ block: "center", inline: "nearest", behavior: still ? "auto" : "smooth" });
+    const done = setTimeout(() => setFlash(null), 2600);
+    return () => clearTimeout(done);
+  }, [flash, tickets]);
+  /** After "Create ticket": a toast that says so (with a way to open it), and the new card brought into view. */
+  async function created(number: number) {
+    toast(t("Ticket #{n} creado", { n: number }), { action: { label: t("Abrir"), run: () => setState({ ticket: number }) } });
+    await load.reload();
+    setFlash(number);
+    onLinksChange?.();
+  }
   const closePanel = () => {
     const n = state.ticket;
     setState({ ticket: null });
@@ -108,7 +126,7 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
           <Empty icon={<Search size={20} />} title={t("Ningún ticket coincide con los filtros")} text={t("Prueba con menos filtros o con otra búsqueda.")}
             action={<Button onClick={() => setState({ filters: NO_FILTERS })}>{t("Limpiar filtros")}</Button>} />
         ) : state.view === "board" ? (
-          <Board projectId={projectId} cols={cols} columns={columns} canEdit={canEdit} open={state.ticket} hrefFor={hrefFor} onMove={move} onMenuMove={(n, c) => void moveFromMenu(n, c)} onAdd={openNew} />
+          <Board projectId={projectId} cols={cols} columns={columns} canEdit={canEdit} open={state.ticket} flash={flash} hrefFor={hrefFor} onMove={move} onMenuMove={(n, c) => void moveFromMenu(n, c)} onAdd={openNew} />
         ) : (
           <>
             {canEdit && selected.size > 0 && (
@@ -128,7 +146,7 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
 
       {editingColumns && <BoardColumnsDialog projectId={projectId} columns={cols} tickets={tickets} onClose={() => setEditingColumns(false)}
         onSaved={(r) => { setCols(r.columns); setTickets(r.tickets); setEditingColumns(false); }} />}
-      {creating && <NewTicketDialog projectId={projectId} projectName={projectName} column={creating} onClose={() => setCreating(null)} onCreated={() => { void load.reload(); onLinksChange?.(); }} />}
+      {creating && <NewTicketDialog projectId={projectId} projectName={projectName} column={creating} onClose={() => setCreating(null)} onCreated={(tk) => void created(tk.number)} />}
       {deleting && <DeleteDialog tickets={tickets.filter((x) => deleting.includes(x.number))} onClose={() => setDeleting(null)} onConfirm={() => remove(deleting)} />}
       <Toaster />
     </div>
@@ -144,6 +162,26 @@ function Pill({ children, count, ...rest }: { children: ReactNode; count?: numbe
     </button>
   );
 }
+/**
+ * The ticket search. What the person types stays in the input's own state; only the query goes to the URL, after a
+ * short pause. (Feeding the input straight from the URL dropped letters: a keystroke landed before the URL caught
+ * up with the previous one, so "pago" typed fast ended as "o".) A change made elsewhere, such as "Clear filters",
+ * still reaches the box.
+ */
+function SearchInput({ value, onChange }: { value: string; onChange: (q: string) => void }) {
+  const [text, setText] = useState(value);
+  const sent = useRef(value);
+  const write = useRef(onChange);
+  write.current = onChange;
+  const push = useMemo(() => debounce((q: string) => { sent.current = q; write.current(q); }, 250), []);
+  useEffect(() => () => push.cancel(), [push]);
+  useEffect(() => { if (value !== sent.current) { push.cancel(); sent.current = value; setText(value); } }, [value, push]);
+  return (
+    <input type="search" value={text} onChange={(e) => { setText(e.target.value); push(e.target.value); }} onKeyDown={(e) => { if (e.key === "Enter") push.flush(); }}
+      placeholder={t("Buscar tickets")} className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3" />
+  );
+}
+
 const toggleIn = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
 
 function Toolbar({ state, setState, setFilters, people, milestones, labels, canEdit, onNew, onColumns, hrefView, widgetHref }: {
@@ -166,7 +204,7 @@ function Toolbar({ state, setState, setFilters, people, milestones, labels, canE
         </nav>
         <label className="flex min-h-11 max-w-[280px] flex-[1_1_200px] items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-3 text-ink-3 focus-within:border-accent">
           <Search size={16} aria-hidden /><span className="sr-only">{t("Buscar tickets")}</span>
-          <input type="search" value={f.q} onChange={(e) => setFilters({ q: e.target.value })} placeholder={t("Buscar tickets")} className="w-full min-w-0 bg-transparent text-sm text-ink outline-none placeholder:text-ink-3" />
+          <SearchInput value={f.q} onChange={(q) => setFilters({ q })} />
         </label>
         <div className="flex flex-wrap items-center gap-2">
           <Menu label={t("Filtrar por persona asignada")} button={(p) => <Pill {...p} count={f.assignee.length}>{t("Asignado")}</Pill>}>
@@ -237,8 +275,8 @@ function ActiveFilters({ filters: f, setFilters, people, milestones, onClear }: 
 }
 
 // ── Board ───────────────────────────────────────────────────────
-function Board({ projectId, cols, columns, canEdit, open, hrefFor, onMove, onMenuMove, onAdd }: {
-  cols: Column[]; columns: Record<string, Ticket[]>; canEdit: boolean; open: number | null; hrefFor: (n: number) => string;
+function Board({ projectId, cols, columns, canEdit, open, flash, hrefFor, onMove, onMenuMove, onAdd }: {
+  cols: Column[]; columns: Record<string, Ticket[]>; canEdit: boolean; open: number | null; flash: number | null; hrefFor: (n: number) => string;
   onMove: (number: number, column: string, before: number | null) => void; onMenuMove: (number: number, column: string) => void; onAdd: (c: Column) => void; projectId: string;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -261,7 +299,8 @@ function Board({ projectId, cols, columns, canEdit, open, hrefFor, onMove, onMen
       <div className="overflow-x-auto pb-2">
         <div className="flex min-w-[1100px] items-start gap-4">
           {cols.map((col) => {
-            const status = col.id, cards = columns[status] ?? [], shown = expanded.has(status) ? cards : cards.slice(0, COLUMN_PREVIEW);
+            // A column also opens up when it holds the card just created, so it can be shown.
+            const status = col.id, cards = columns[status] ?? [], shown = expanded.has(status) || cards.slice(COLUMN_PREVIEW).some((c) => c.number === flash) ? cards : cards.slice(0, COLUMN_PREVIEW);
             return (
               <section key={status} aria-label={t("{a}, {b}", { a: columnName(col), b: ticketCount(cards.length) })}
                 onDragOver={(e) => hover(e, status, null)} onDrop={(e) => drop(e, status, null)}
@@ -271,7 +310,7 @@ function Board({ projectId, cols, columns, canEdit, open, hrefFor, onMove, onMen
                   {canEdit && <button type="button" onClick={() => onAdd(col)} aria-label={t("Agregar ticket en {a}", { a: columnName(col) })} className="focus-ring flex h-11 w-11 items-center justify-center rounded-lg text-ink-2 hover:bg-ink/5"><Plus size={16} /></button>}
                 </div>
                 {shown.map((c) => (
-                  <Card key={c.id} projectId={projectId} ticket={c} cols={cols} href={hrefFor(c.number)} selected={open === c.number} canEdit={canEdit} dropTarget={over?.status === status && over.before === c.number}
+                  <Card key={c.id} projectId={projectId} ticket={c} cols={cols} href={hrefFor(c.number)} selected={open === c.number} flash={flash === c.number} canEdit={canEdit} dropTarget={over?.status === status && over.before === c.number}
                     onDragStart={() => { dragging.current = c.number; }} onDragEnd={() => { dragging.current = null; setOver(null); }}
                     onDragOver={(e) => hover(e, status, c.number)} onDrop={(e) => drop(e, status, c.number)} onStatus={(s) => onMenuMove(c.number, s)} />
                 ))}
@@ -289,14 +328,14 @@ function Board({ projectId, cols, columns, canEdit, open, hrefFor, onMove, onMen
   );
 }
 
-function Card({ projectId, ticket: c, cols, href, selected, canEdit, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop, onStatus }: {
-  projectId: string; ticket: Ticket; cols: Column[]; href: string; selected: boolean; canEdit: boolean; dropTarget: boolean;
+function Card({ projectId, ticket: c, cols, href, selected, flash, canEdit, dropTarget, onDragStart, onDragEnd, onDragOver, onDrop, onStatus }: {
+  projectId: string; ticket: Ticket; cols: Column[]; href: string; selected: boolean; flash?: boolean; canEdit: boolean; dropTarget: boolean;
   onDragStart: () => void; onDragEnd: () => void; onDragOver: (e: DragEvent) => void; onDrop: (e: DragEvent) => void; onStatus: (column: string) => void;
 }) {
   return (
     <article draggable={canEdit} onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(c.number)); onDragStart(); }} onDragEnd={onDragEnd} onDragOver={onDragOver} onDrop={onDrop}
-      className={cx("relative flex flex-col gap-2.5 rounded-xl border bg-surface p-3.5 shadow-[0_1px_2px_rgb(26_21_35/0.04)] hover:bg-paper",
-        selected ? "border-accent outline-2 outline-accent" : "border-line", dropTarget && "shadow-[0_-3px_0_0_var(--color-accent)]", canEdit && "cursor-grab active:cursor-grabbing")}>
+      className={cx("relative flex flex-col gap-2.5 rounded-xl border p-3.5 shadow-[0_1px_2px_rgb(26_21_35/0.04)]",
+        flash ? "bg-accent-soft" : "bg-surface hover:bg-paper", selected || flash ? "border-accent outline-2 outline-accent" : "border-line", dropTarget && "shadow-[0_-3px_0_0_var(--color-accent)]", canEdit && "cursor-grab active:cursor-grabbing")}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs font-semibold text-ink-3 tabular-nums">#{c.number}</span>
         <span className="flex items-center gap-1">

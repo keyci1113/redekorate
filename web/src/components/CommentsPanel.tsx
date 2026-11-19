@@ -8,6 +8,7 @@ import type { Comment, ProjectRole } from "../lib/types";
 import { Avatar } from "./Avatar";
 import { Button, Empty, ErrorNote, Spinner } from "./ui";
 import { t } from "../lib/i18n";
+import { isSendShortcut } from "../lib/keys";
 
 /** Comments on a project, a study or a document. Commenters and up write; authors and the project owner delete. */
 export function CommentsPanel({ projectId, studyId, documentId, role }: { projectId: string; studyId?: string; documentId?: string; role: ProjectRole | null | undefined }) {
@@ -62,7 +63,7 @@ export function CommentsPanel({ projectId, studyId, documentId, role }: { projec
           <Avatar name={me?.name ?? ""} avatar={me?.avatar} size={32} />
           <div className="flex-1 space-y-2">
             <textarea className="field min-h-20" placeholder={t("Escribe un comentario…")} value={body} maxLength={4000} aria-label={t("Nuevo comentario")}
-              onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") send(e); }} />
+              onChange={(e) => setBody(e.target.value)} onKeyDown={(e) => { if (isSendShortcut(e)) send(e); }} />
             {err && <ErrorNote>{err}</ErrorNote>}
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs text-ink-3">{t("⌘/Ctrl + Enter para enviar")}</span>

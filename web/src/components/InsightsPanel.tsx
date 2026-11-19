@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
-import { Check, Lightbulb, Pencil, Plus, Search, Ticket as TicketIcon, Trash2 } from "lucide-react";
+import { Link, useSearchParams } from "react-router-dom";
+import { Check, Lightbulb, Pencil, Plus, Search, Ticket as TicketIcon, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo } from "../lib/hooks";
 import type { Confidence, Insight, Severity, Study } from "../lib/types";
@@ -9,6 +9,8 @@ import { Button, Card, Empty, ErrorNote, Field, Modal, SeverityBadge, Tag, cx } 
 import { plural, t } from "../lib/i18n";
 import { NewTicketDialog } from "../tickets/NewTicketDialog";
 const SEVERITIES = (): [Severity, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")], ["critical", t("Crítica")]];
+/** Tickets made from or linked to the insight, apart from the one it was converted from (shown on its own line). */
+const linkedTickets = (i: Insight) => (i.ticket_numbers ?? []).filter((n) => n !== i.source_ticket?.number);
 const CONFIDENCES = (): [Confidence, string][] => [["low", t("Baja")], ["medium", t("Media")], ["high", t("Alta")]];
 
 export function InsightsPanel({ projectId, projectName, studyId, studies, insights, onChange, canEdit = true }: {
@@ -17,7 +19,10 @@ export function InsightsPanel({ projectId, projectName, studyId, studies, insigh
   const [ticketFor, setTicketFor] = useState<Insight | null>(null);
   const [editing, setEditing] = useState<Insight | "new" | null>(null);
   const [q, setQ] = useState("");
-  const [tag, setTag] = useState<string | null>(null);
+  // The tag filter lives in the URL (?tag=…), so a filtered list can be linked to and survives a reload.
+  const [params, setParams] = useSearchParams();
+  const tag = params.get("tag");
+  const setTag = (next: string | null) => setParams((prev) => { const p = new URLSearchParams(prev); if (next) p.set("tag", next); else p.delete("tag"); return p; }, { replace: true });
   const [review, setReview] = useState<"all" | "pending" | "reviewed">("all");
   const pendingCount = insights.filter((i) => !i.reviewed_at).length;
   const allTags = useMemo(() => [...new Set(insights.flatMap((i) => i.tags))].sort(), [insights]);
@@ -54,11 +59,16 @@ export function InsightsPanel({ projectId, projectName, studyId, studies, insigh
       {allTags.length > 0 && (
         <div className="mb-5 flex flex-wrap gap-1.5">
           {allTags.map((t) => (
-            <button key={t} onClick={() => setTag(tag === t ? null : t)}
+            <button key={t} type="button" aria-pressed={tag === t} onClick={() => setTag(tag === t ? null : t)}
               className={cx("focus-ring rounded-full border px-2.5 py-1 text-xs font-medium transition", tag === t ? "border-ink bg-ink text-paper" : "border-line bg-surface text-ink-2 hover:border-line-2")}>
               #{t}
             </button>
           ))}
+          {tag && (
+            <button type="button" onClick={() => setTag(null)} className="focus-ring inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold text-accent-ink hover:underline">
+              <X size={12} aria-hidden />{t("Quitar filtro")}
+            </button>
+          )}
         </div>
       )}
 
@@ -69,14 +79,23 @@ export function InsightsPanel({ projectId, projectName, studyId, studies, insigh
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((i) => (
-            <Card key={i.id} className="group flex flex-col p-4">
+            <Card key={i.id} className="flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <h3 className="font-semibold leading-snug">{i.title}</h3>
-                {canEdit && <div className="flex shrink-0 gap-0.5 opacity-0 transition group-hover:opacity-100">
-                  <button onClick={() => setEditing(i)} className="focus-ring rounded p-1 text-ink-3 hover:text-ink" aria-label={t("Editar")}><Pencil size={14} /></button>
-                  <button onClick={() => remove(i)} className="focus-ring rounded p-1 text-ink-3 hover:text-bad" aria-label={t("Eliminar")}><Trash2 size={14} /></button>
+                {/* Always shown, in the quiet ink-3 color: hover-only actions were unreachable by keyboard and on touch screens. */}
+                {canEdit && <div className="flex shrink-0 gap-0.5">
+                  <button type="button" onClick={() => setEditing(i)} className="focus-ring rounded p-1.5 text-ink-3 hover:bg-ink/5 hover:text-ink" aria-label={t("Editar «{a}»", { a: i.title })} title={t("Editar")}><Pencil size={14} /></button>
+                  <button type="button" onClick={() => remove(i)} className="focus-ring rounded p-1.5 text-ink-3 hover:bg-ink/5 hover:text-bad" aria-label={t("Eliminar «{a}»", { a: i.title })} title={t("Eliminar")}><Trash2 size={14} /></button>
                 </div>}
               </div>
+              {i.source_ticket && (
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs text-ink-3">
+                  <TicketIcon size={13} aria-hidden />{t("Viene del ticket")}
+                  <Link to={`/projects/${projectId}/tickets/${i.source_ticket.number}`} className="focus-ring min-w-0 truncate rounded font-semibold text-accent-ink hover:underline">
+                    <span className="tabular-nums">#{i.source_ticket.number}</span> {i.source_ticket.title}
+                  </Link>
+                </p>
+              )}
               {i.body && <p className="mt-2 line-clamp-4 text-sm leading-relaxed whitespace-pre-line text-ink-2">{i.body}</p>}
               <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
                 <SeverityBadge severity={i.severity} />
@@ -90,10 +109,10 @@ export function InsightsPanel({ projectId, projectName, studyId, studies, insigh
               <p className="mt-2 text-[11px] text-ink-3">{i.study_title && !studyId ? `${i.study_title} · ` : ""}{timeAgo(i.created_at)}</p>
               {projectName && (
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line/60 pt-3 text-[13px]">
-                  {i.ticket_numbers?.length ? (
+                  {linkedTickets(i).length ? (
                     <span className="flex flex-wrap items-center gap-x-2 text-ink-2">
-                      <TicketIcon size={14} aria-hidden className="text-ink-3" />{plural(i.ticket_numbers.length, { one: "{n} ticket", other: "{n} tickets" })}
-                      {i.ticket_numbers.map((n) => <Link key={n} to={`/projects/${projectId}/tickets/${n}`} className="focus-ring rounded font-semibold text-accent-ink tabular-nums hover:underline">#{n}</Link>)}
+                      <TicketIcon size={14} aria-hidden className="text-ink-3" />{plural(linkedTickets(i).length, { one: "{n} ticket", other: "{n} tickets" })}
+                      {linkedTickets(i).map((n) => <Link key={n} to={`/projects/${projectId}/tickets/${n}`} className="focus-ring rounded font-semibold text-accent-ink tabular-nums hover:underline">#{n}</Link>)}
                     </span>
                   ) : <span className="text-ink-3">{t("Sin tickets")}</span>}
                   {canEdit && <Button size="lg" className="h-11" icon={<Plus size={14} />} onClick={() => setTicketFor(i)}>{t("Crear ticket")}</Button>}

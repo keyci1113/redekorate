@@ -67,6 +67,7 @@ export interface Insight {
   created_at: string;
   reviewed_at?: string | null;   // null = pendiente de revisar
   ticket_numbers?: number[];     // tickets created from or linked to this insight
+  source_ticket?: { number: number; title: string } | null;   // the ticket this insight was converted from
 }
 
 export interface Share { id: string; token: string; created_at: string }

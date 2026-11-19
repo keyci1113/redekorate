@@ -68,7 +68,7 @@ Categories: `ux_research` (the default), `software`, `ai`, `automation`, `it`, `
 |---|---|---|
 | `GET /projects/{project_id}/tickets` | `listTickets` | One page of tickets (see below), plus the board's columns, the people and the milestones |
 | `POST /projects/{project_id}/tickets` | `createTicket` | `title` and any field below; `links` ties it to insights, studies, documents or tickets |
-| `GET /projects/{project_id}/tickets/{number}` | `getTicket` | The ticket with its comments, activity and links |
+| `GET /projects/{project_id}/tickets/{number}` | `getTicket` | The ticket with its comments, activity and links. Also open, read-only, to someone who can open the project but not its tickets when they were @mentioned on this ticket (`ticket_only: true`). |
 | `PATCH /projects/{project_id}/tickets/{number}` | `updateTicket` | Any field below. A new `description` is guarded (see [Replacing content](#replacing-content)). |
 | `POST /projects/{project_id}/tickets/{number}/links` | `linkTicket` | `target_type` (`insight`, `study`, `document`, `ticket`) with `target_id`, or `target_number` for a ticket; `relation` defaults to `related` |
 | `POST /projects/{project_id}/tickets/{number}/comments` | `commentOnTicket` | `body`. Always an internal comment; it is never emailed to whoever reported the ticket. `@Full Name` tags a person. |

@@ -156,6 +156,15 @@ test("assignments and @mentions in comments since the last open", { skip }, asyn
   assert.deepEqual(b.news.mentions.items.map((n: any) => [n.number, n.excerpt]), [[t.number, "@Mara Díaz can you look?"]]);
 });
 
+test("a mention on a project where I have no tickets section shows once it let me read that ticket", { skip }, async () => {
+  const t = await ticket(P.research, "Ask Mara", { assign: false });
+  const hidden = await ticket(P.hidden, "Not my project", { assign: false });
+  await call("owner", "POST", `/api/projects/${P.research}/tickets/${t.number}/comments`, { body: "@Mara Díaz what do the interviews say?", visibility: "internal" });
+  await call("owner", "POST", `/api/projects/${P.hidden}/tickets/${hidden.number}/comments`, { body: "@Mara Díaz not for you", visibility: "internal" });
+  const b = await brief();
+  assert.deepEqual(b.news.mentions.items.map((n: any) => [n.number, n.project_id]), [[t.number, P.research]], "the hidden project's mention granted nothing");
+});
+
 test("opening the brief clears the dot until something new arrives", { skip }, async () => {
   const s = await study(P.research, "Diary");
   assert.equal(await dot(), false);

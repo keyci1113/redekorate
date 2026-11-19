@@ -11,7 +11,11 @@ export type TicketPriority = (typeof PRIORITIES)[number];
 export type TicketSource = "manual" | "insight" | "widget";
 
 export interface PersonRef { id: string; name: string; avatar: string | null }
-export interface Person extends PersonRef { email: string; role: ProjectRole }
+export interface Person extends PersonRef {
+  email: string; role: ProjectRole;
+  /** Can open the project but not its tickets: an @mention lets them read that one ticket only. */
+  ticket_only?: boolean;
+}
 export interface Milestone { id: string; name: string }
 
 /** A column of the project's board. Built-in columns use their status as id and have no name of their own. */
@@ -47,7 +51,7 @@ export interface TicketLink {
 }
 export interface TicketActivity { id: string; action: string; from_value: string | null; to_value: string | null; created_at: string; actor_id: string | null; actor_name: string | null; actor_avatar: string | null }
 export type CommentVisibility = "internal" | "email_to_reporter" | "reply_from_reporter";
-export interface TicketComment { id: string; body: string; created_at: string; user_id: string | null; name: string | null; avatar: string | null; visibility: CommentVisibility }
+export interface TicketComment { id: string; body: string; created_at: string; edited_at?: string | null; user_id: string | null; name: string | null; avatar: string | null; visibility: CommentVisibility }
 export interface ReporterMeta {
   page_url?: string; page_title?: string; os?: string; browser?: string; window_size?: string; screen_resolution?: string;
   pixel_ratio?: number | string; color_depth?: string; language?: string; timezone?: string; approx_location?: string; sent_at?: string;
@@ -64,7 +68,7 @@ export interface TicketDetail extends Ticket {
   watchers: PersonRef[]; links: TicketLink[]; activity: TicketActivity[]; comments: TicketComment[]; reporters: Reporter[];
   similar: { number: number; title: string } | null;
 }
-export interface TicketList { tickets: Ticket[]; columns?: Column[]; people: Person[]; milestones: Milestone[]; next_number: number; role: ProjectRole }
+export interface TicketList { tickets: Ticket[]; columns?: Column[]; people: Person[]; mention_only?: Person[]; milestones: Milestone[]; next_number: number; role: ProjectRole }
 
 // ── Filters ─────────────────────────────────────────────────────
 export const DUE_FILTERS = ["overdue", "week", "month", "none"] as const;

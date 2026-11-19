@@ -9,7 +9,7 @@ import path from "node:path";
 import { z } from "zod";
 import { pool, one, query } from "../lib/db.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { atLeast, projectIn, type ProjectRole } from "../lib/access.js";
+import { accessJoins, accessWhere, areasSql, atLeast, projectIn, roleSql, type ProjectRole } from "../lib/access.js";
 import { sendMail } from "../lib/mail.js";
 import { flushEmails, notify, ticketPeople } from "../lib/notify.js";
 import { MAX_COLUMNS, builtInColumns, builtInName, columnLabel, columnsProblem, fallbackColumn, findColumn, type Column } from "../lib/board.js";
@@ -39,17 +39,64 @@ const RANK: Record<ProjectRole, number> = { viewer: 1, commenter: 2, editor: 3, 
 
 /** Everyone who can open the project's tickets (owner, collaborators and organization members with that section): the people a ticket can be assigned to. */
 export async function projectPeople(projectId: string, db: Db = pool): Promise<Person[]> {
+  // Role and sections come from the same SQL that guards every request (lib/access.ts), so this list is exactly
+  // the people the tickets route lets in: the role is the highest of all their ways in, and the sections add up
+  // (e.g. a collaborator for research only who reaches every project's tickets through the organization).
   const { rows } = await db.query(
-    `select u.id, u.name, u.email, u.avatar, x.role from (
-       select p.owner_id as user_id, 'owner' as role from projects p where p.id = $1
-       union all select m.user_id, m.role from project_members m where m.project_id = $1 and 'tickets' = any(m.areas)
-       union all select om.user_id, case when om.role in ('owner','admin') then 'owner' else om.project_role end
-         from organization_members om join projects p on p.organization_id = om.organization_id
-         where p.id = $1 and (om.role in ('owner','admin') or (om.all_projects and 'tickets' = any(om.areas)))
-     ) x join users u on u.id = x.user_id where u.disabled_at is null`, [projectId]);
-  const best = new Map<string, Person>();
-  for (const r of rows as Person[]) { const cur = best.get(r.id); if (!cur || RANK[r.role] > RANK[cur.role]) best.set(r.id, r); }
-  return [...best.values()].sort((a, b) => RANK[b.role] - RANK[a.role] || a.name.localeCompare(b.name));
+    `select u.id, u.name, u.email, u.avatar, a.role from users u
+     cross join lateral (select ${roleSql("u.id")} as role ${accessJoins("u.id")} where p.id = $1 and ${accessWhere("u.id", "tickets")}) a
+     where u.disabled_at is null and u.id in (
+       select owner_id from projects where id = $1
+       union select user_id from project_members where project_id = $1
+       union select om.user_id from organization_members om join projects p on p.organization_id = om.organization_id where p.id = $1)`, [projectId]);
+  return (rows as Person[]).sort((a, b) => RANK[b.role] - RANK[a.role] || a.name.localeCompare(b.name));
+}
+
+/**
+ * Collaborators and organization members who can open the project but not its Tickets section. They can still be
+ * @mentioned in a ticket comment: the mention lets them read that one ticket (ticket_mention_access), nothing more.
+ * Never anyone outside the project's people, so a mention cannot reach an arbitrary account.
+ */
+export async function ticketOnlyPeople(projectId: string, db: Db = pool): Promise<Person[]> {
+  const { rows } = await db.query(
+    `select u.id, u.name, u.email, u.avatar, 'viewer' as role from users u
+     where u.disabled_at is null and u.id in (
+       select owner_id from projects where id = $1
+       union select user_id from project_members where project_id = $1
+       union select om.user_id from organization_members om join projects p on p.organization_id = om.organization_id where p.id = $1)
+     and exists (select 1 ${accessJoins("u.id")} where p.id = $1 and ${accessWhere("u.id")} and not ('tickets' = any(${areasSql("u.id")})))`, [projectId]);
+  return (rows as Person[]).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/**
+ * Who may read one ticket: anyone the Tickets section is open to, or someone @mentioned on this ticket
+ * (ticket_mention_access) who can still open the project. Project access is checked first, so a grant never
+ * lets in someone who lost the project. A grant reads as a viewer of this ticket only (`ticketOnly`).
+ */
+async function ticketReader(projectId: string, userId: string, number: number): Promise<{ id: string; role: ProjectRole; ticketOnly: boolean }> {
+  try {
+    const p = await requireProject(projectId, userId);
+    return { id: p.id, role: p.role, ticketOnly: false };
+  } catch (e) {
+    // 404 = no access to the project at all: a grant changes nothing. 403 = the project, but not its Tickets section.
+    if (!(e instanceof HttpError) || e.status !== 403) throw e;
+    const g = await one<{ project_id: string }>(
+      `select t.project_id from ticket_mention_access g join tickets t on t.id = g.ticket_id
+       where t.project_id = $1 and t.number = $2 and g.user_id = $3`, [projectId, number, userId]);
+    if (!g) throw e;
+    return { id: g.project_id, role: "viewer", ticketOnly: true };
+  }
+}
+
+/** People @mentioned in a comment start following the ticket; those without the Tickets section also get to read it. */
+async function tagMentioned(db: Db, ticketId: string, actor: string, mentioned: string[], everyone: Person[], ticketOnly: Person[]) {
+  for (const u of mentioned) {
+    if (ticketOnly.some((x) => x.id === u)) {
+      await db.query("insert into ticket_mention_access(ticket_id, user_id, granted_by) values ($1,$2,$3) on conflict do nothing", [ticketId, u, actor]);
+    }
+    const r = await db.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing returning user_id", [ticketId, u]);
+    if (r.rows[0]) await log(db, ticketId, actor, "tagged", null, everyone.find((x) => x.id === u)?.name ?? null);
+  }
 }
 
 // ── Reads ───────────────────────────────────────────────────────
@@ -86,7 +133,7 @@ export async function ticketRow(projectId: string, number: number, db: Db = pool
   return rows[0] as Record<string, any> & { id: string; number: number; title: string; status: TicketStatus };
 }
 
-const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.user_id, coalesce(u.name, c.author_name) as name, u.avatar, c.visibility
+const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.edited_at, c.user_id, coalesce(u.name, c.author_name) as name, u.avatar, c.visibility
   from comments c left join users u on u.id = c.user_id where c.ticket_id = $1 order by c.created_at`;
 
 /** Links stored on this ticket plus tickets that link to it, each with the title of the other side. Deleted targets are left out. */
@@ -162,7 +209,7 @@ async function milestoneFor(db: Db, projectId: string, p: Patch): Promise<{ id: 
   return rows[0];
 }
 
-function requirePeople(ids: string[] | undefined, people: Person[]) {
+function requirePeople(ids: string[] | undefined, people: { id: string }[]) {
   if (!ids) return;
   const known = new Set(people.map((p) => p.id));
   if (ids.some((id) => !known.has(id))) throw new HttpError(400, "Solo se puede asignar o etiquetar a colaboradores del proyecto");
@@ -206,8 +253,11 @@ const STATUS_FIELDS = ["type", "priority"] as const;
 async function applyPatch(db: Db, projectId: string, t: Record<string, any>, p: Patch, actor: string, people: Person[], lang = "es") {
   const tell = (users: (string | null | undefined)[], kind: "assigned" | "tagged" | "status", data?: Record<string, unknown>) => notify(db, { users, actor, projectId, ticketId: t.id, kind, data, lang });
   requirePeople(p.assignees, people);
-  requirePeople(p.watchers, people);
-  const nameOf = (id: string) => people.find((x) => x.id === id)?.name ?? "";
+  // Someone @mentioned without the Tickets section is on this ticket through their grant: editing the
+  // watchers must keep (or drop) them like anyone else, not refuse the whole list.
+  const granted = p.watchers ? (await db.query("select u.id, u.name from ticket_mention_access g join users u on u.id = g.user_id where g.ticket_id = $1", [t.id])).rows as { id: string; name: string }[] : [];
+  requirePeople(p.watchers, [...people, ...granted]);
+  const nameOf = (id: string) => people.find((x) => x.id === id)?.name ?? granted.find((x) => x.id === id)?.name ?? "";
   const set: string[] = [], vals: unknown[] = [t.id];
   const col = (name: string, v: unknown) => { vals.push(v); set.push(`${name} = $${vals.length}`); };
 
@@ -260,12 +310,13 @@ const ticketsArea = (actor: Actor, projectId: string, min: ProjectRole = "viewer
 /** The whole board: every ticket, the columns, the people, the milestones and the next number. */
 export async function listTickets(actor: Actor, projectId: string) {
   const p = await ticketsArea(actor, projectId);
-  const [rows, people, ms, next, columns] = await Promise.all([
-    listRows(p.id), projectPeople(p.id), milestones(p.id),
+  const [rows, people, ticketOnly, ms, next, columns] = await Promise.all([
+    listRows(p.id), projectPeople(p.id), ticketOnlyPeople(p.id), milestones(p.id),
     one<{ n: number }>("select greatest(coalesce((select last from ticket_counters where project_id = $1), 0), coalesce((select max(number) from tickets where project_id = $1), 0)) + 1 as n", [p.id]),
     boardColumns(p.id),
   ]);
-  return { tickets: rows, columns, people, milestones: ms, next_number: next!.n, role: p.role };
+  // mention_only: people who can be @mentioned in a comment and then read that ticket only.
+  return { tickets: rows, columns, people, mention_only: ticketOnly, milestones: ms, next_number: next!.n, role: p.role };
 }
 
 /** One page of the board's tickets, filtered (see filterTickets), with the columns, people and milestones to read them by. */
@@ -278,8 +329,12 @@ export async function searchTickets(actor: Actor, projectId: string, input: unkn
 }
 
 export async function getTicket(actor: Actor, projectId: string, number: unknown) {
-  const p = await ticketsArea(actor, projectId);
-  return { ticket: await detail(p.id, ticketNumber(number)), role: p.role, columns: await boardColumns(p.id) };
+  const n = ticketNumber(number);
+  const r = await ticketReader(projectId, actor.id, n);
+  const ticket = await detail(r.id, n);
+  // Someone who reads this ticket through a mention sees nothing of the project's other tickets.
+  if (r.ticketOnly) return { ticket: { ...ticket, similar: null, links: ticket.links.filter((l) => l.target_type !== "ticket") }, role: r.role, columns: await boardColumns(r.id), ticket_only: true };
+  return { ticket, role: r.role, columns: await boardColumns(r.id), ticket_only: false };
 }
 
 export const TicketCreate = TicketFields.partial().required({ title: true }).extend({ links: z.array(LinkInput).max(10).default([]) });
@@ -489,16 +544,22 @@ export const ToInsightInput = z.object({
 
 /**
  * Turns the ticket into an insight of the project, linked with relation "converted" (a ticket created
- * FROM an insight uses "evidence"). A ticket converts once: a second call is refused, so no duplicate insight.
+ * FROM an insight uses "evidence"). A ticket converts once: a repeated call (double click, retry) creates nothing
+ * and answers with the ticket and the insight it already produced. A research request asks for research; it is
+ * not a finding, so it cannot become an insight.
  */
 export async function convertToInsight(actor: Actor, projectId: string, number: unknown, input: unknown) {
   const p = await ticketsArea(actor, projectId, "editor");
   const n = ticketNumber(number);
   const b = parse(ToInsightInput, input ?? {});
   await tx(async (c) => {
+    // Lock the ticket BEFORE reading it: two calls at once then run one after the other, and the second
+    // one sees the insight the first created (reading first let both see "not converted yet").
+    const { rows: [locked] } = await c.query("select id from tickets where project_id = $1 and number = $2 for update", [p.id, n]);
+    if (!locked) throw notFound("Ticket");
     const t = await ticketRow(p.id, n, c);
-    await c.query("select id from tickets where id = $1 for update", [t.id]);
-    if (t.converted_insight_id) throw new HttpError(409, "Este ticket ya se convirtió en un insight");
+    if (t.converted_insight_id) return;
+    if (t.type === "research_request") throw new HttpError(400, "Un pedido de investigación no se puede convertir en insight");
     const title = b.title ?? t.title;
     const { rows: [i] } = await c.query(
       "insert into insights(project_id, created_by, title, body, tags, severity) values ($1,$2,$3,$4,$5,$6) returning id",
@@ -523,16 +584,13 @@ export async function commentOnTicket(actor: Actor, projectId: string, number: u
     try { await sendMail(r.email, `Re: ${t.title} (#${t.number})`, b.body); }
     catch { throw new HttpError(502, "No se pudo enviar el correo. Inténtalo de nuevo."); }
   }
-  const people = await projectPeople(p.id);
+  const [people, ticketOnly] = await Promise.all([projectPeople(p.id), ticketOnlyPeople(p.id)]);
+  const everyone = [...people, ...ticketOnly];
   await tx(async (c) => {
     await c.query("insert into comments(project_id, ticket_id, user_id, body, visibility) values ($1,$2,$3,$4,$5)", [p.id, t.id, actor.id, b.body, b.visibility]);
     const before = await ticketPeople(c, t.id);
-    const mentioned = b.visibility === "internal" ? mentionedIds(b.body, people) : [];
-    // People mentioned with @ start following the ticket.
-    for (const u of mentioned) {
-      const r = await c.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing returning user_id", [t.id, u]);
-      if (r.rows[0]) await log(c, t.id, actor.id, "tagged", null, people.find((x) => x.id === u)?.name ?? null);
-    }
+    const mentioned = b.visibility === "internal" ? mentionedIds(b.body, everyone) : [];
+    await tagMentioned(c, t.id, actor.id, mentioned, everyone, ticketOnly);
     // A mention is its own notice; everyone else already on the ticket hears there is a new comment.
     const base = { actor: actor.id, projectId: p.id, ticketId: t.id, lang: actor.lang };
     // `comment: true` tells a mention in a comment apart from being tagged in the fields; the daily brief lists only the first.
@@ -555,6 +613,30 @@ export async function deleteComment(actor: Actor, projectId: string, number: unk
   return { ticket: await detail(p.id, t.number) };
 }
 
+/** Edits an internal comment. Only its author can, and mentions added in the edit tag those people as a new comment would. */
+export async function editComment(actor: Actor, projectId: string, number: unknown, commentId: string, input: unknown) {
+  const p = await ticketsArea(actor, projectId, "commenter");
+  const t = await ticketRow(p.id, ticketNumber(number));
+  const b = parse(CommentInput.pick({ body: true }), input);
+  const c = await one<{ user_id: string | null; body: string; visibility: string }>("select user_id, body, visibility from comments where id = $1 and ticket_id = $2", [commentId, t.id]);
+  if (!c) throw notFound("Comentario");
+  if (c.user_id !== actor.id) throw new HttpError(403, "Solo puedes editar tus propios comentarios");
+  // An email already went out as it was written; changing it here would misstate what the reporter received.
+  if (c.visibility !== "internal") throw new HttpError(400, "Solo se pueden editar los comentarios internos");
+  if (b.body === c.body) return { ticket: await detail(p.id, t.number) };
+  const [people, ticketOnly] = await Promise.all([projectPeople(p.id), ticketOnlyPeople(p.id)]);
+  const everyone = [...people, ...ticketOnly];
+  await tx(async (db) => {
+    await db.query("update comments set body = $2, edited_at = now() where id = $1", [commentId, b.body]);
+    const before = new Set(mentionedIds(c.body, everyone));
+    const added = mentionedIds(b.body, everyone).filter((u) => !before.has(u));
+    await tagMentioned(db, t.id, actor.id, added, everyone, ticketOnly);
+    await notify(db, { actor: actor.id, projectId: p.id, ticketId: t.id, lang: actor.lang, users: added, kind: "tagged", data: { comment: true, excerpt: b.body.replace(/\s+/g, " ").slice(0, 160) } });
+  });
+  emailLater(actor);
+  return { ticket: await detail(p.id, t.number) };
+}
+
 /** Merges this ticket into another: its conversation, people, links and reporter move there, and this one is removed. */
 export async function mergeTicket(actor: Actor, projectId: string, number: unknown, input: unknown) {
   const p = await ticketsArea(actor, projectId, "editor");
@@ -566,6 +648,8 @@ export async function mergeTicket(actor: Actor, projectId: string, number: unkno
     await c.query("update comments set ticket_id = $2 where ticket_id = $1", [from.id, into.id]);
     await c.query("update ticket_reporters set ticket_id = $2 where ticket_id = $1", [from.id, into.id]);
     await c.query("insert into ticket_watchers(ticket_id, user_id) select $2, user_id from ticket_watchers where ticket_id = $1 on conflict do nothing", [from.id, into.id]);
+    // The comments that mentioned them move too, so read access granted by a mention follows.
+    await c.query("insert into ticket_mention_access(ticket_id, user_id, granted_by, created_at) select $2, user_id, granted_by, created_at from ticket_mention_access where ticket_id = $1 on conflict do nothing", [from.id, into.id]);
     await c.query("insert into ticket_assignees(ticket_id, user_id) select $2, user_id from ticket_assignees where ticket_id = $1 on conflict do nothing", [from.id, into.id]);
     await c.query("insert into ticket_labels(ticket_id, label) select $2, label from ticket_labels where ticket_id = $1 on conflict do nothing", [from.id, into.id]);
     await c.query(`insert into ticket_links(ticket_id, target_type, target_id, relation)
