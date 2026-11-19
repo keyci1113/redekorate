@@ -10,16 +10,12 @@ import { SeverityBadge, cx } from "../ui";
 import { CompletionBar, LowChip, Section, SectionState, TrendBars, completionSr, fmtDay } from "./bits";
 import type { Dash, Draft, HomeInsight, Load, RecentOpen } from "./types";
 import { responsesByStudy, type Drill, type DrillRow } from "../../dashboards/drill";
+import { greeting } from "../../lib/brief";
 
 const methodName = (m: string) => templateByKey(m)?.name ?? m;
 const longDay = (d: string) => new Date(`${d}T12:00`).toLocaleDateString(locale(), { weekday: "long", day: "numeric", month: "long" });
 
 // ── Encabezado ──────────────────────────────────────────────────────
-function greeting(hour: number) {
-  if (hour < 12) return "Buenos días, {a}";
-  if (hour < 19) return "Buenas tardes, {a}";
-  return "Buenas noches, {a}";
-}
 
 export function HomeHeader({ name, draft, loading }: { name: string; draft: Draft | undefined; loading: boolean }) {
   const now = new Date();
