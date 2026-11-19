@@ -50,6 +50,13 @@ export const api = {
     return (await handle<{ url: string }>(res)).url;
   },
   /** Prototipo HTML (p. ej. descargado de Claude): el servidor le agrega el script de seguimiento. */
+  /** Adds a file to a project's Documents tab and returns the refreshed list. */
+  async uploadProjectFile<T>(projectId: string, file: File): Promise<T> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/projects/${projectId}/files`, { method: "POST", credentials: "same-origin", headers: BASE_HEADERS(), body: fd });
+    return handle<T>(res);
+  },
   async uploadPrototype(file: File): Promise<string> {
     const fd = new FormData();
     fd.append("file", file);

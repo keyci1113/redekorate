@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ChevronDown, Download, Eye, EyeOff, ExternalLink, Link2, Lock, PenLine, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Download, Eye, EyeOff, ExternalLink, Link2, Lock, PenLine, Play, Plus, Trash2, Video } from "lucide-react";
 import { participantFields } from "../lib/participantFields";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
@@ -15,7 +15,7 @@ import type { StudySettings } from "../lib/settings";
 import { isDirect, screenName, type PrototypeTaskValue } from "../blocks/prototype";
 import { blockDef } from "../blocks/registry";
 import { susScore, answeredBlocks } from "../lib/analytics";
-import { BackLink, Button, Card, Empty, ErrorNote, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
+import { BackLink, Button, Card, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
 import { BlockResults, Overview } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
@@ -27,7 +27,9 @@ import { CommentsPanel } from "../components/CommentsPanel";
 
 import { t } from "../lib/i18n";
 import { AccessNotice } from "../components/AccessNotice";
-interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; role?: ProjectRole; tickets?: { number: number; title: string }[] }
+interface Recording { session_id: string; events: number; bytes: number; duration_ms: number }
+const RecordingPlayer = lazy(() => import("../components/RecordingPlayer"));
+interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; recordings?: Recording[]; role?: ProjectRole; tickets?: { number: number; title: string }[] }
 type TabId = "summary" | "responses" | "insights" | "comments" | "share";
 
 export function ResultsPage() {
@@ -93,7 +95,7 @@ export function ResultsPage() {
       </div>
       <div className="mt-6">
         {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings} />}
-        {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} onChange={reload} canEdit={canEdit} />}
+        {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} recordings={data.recordings ?? []} onChange={reload} canEdit={canEdit} />}
         {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} canEdit={canEdit} />}
         {tab === "comments" && <CommentsPanel projectId={study.project_id} studyId={study.id} role={data.role} />}
         {tab === "share" && canEdit && <SharePanel study={study} />}
@@ -142,11 +144,17 @@ export function formatAnswer(block: Block, value: unknown, settings?: StudySetti
   }
 }
 
-function Responses({ study, sessions, answers, onChange, canEdit }: { study: Study; sessions: Session[]; answers: Answer[]; onChange: () => void; canEdit: boolean }) {
+function Responses({ study, sessions, answers, recordings, onChange, canEdit }: { study: Study; sessions: Session[]; answers: Answer[]; recordings: Recording[]; onChange: () => void; canEdit: boolean }) {
   const [open, setOpen] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());   // rows whose email/phone are shown in full
   const toggleReveal = (id: string) => setRevealed((r) => { const n = new Set(r); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const [replay, setReplay] = useState<{ id: string; number: number } | null>(null);
+  const recorded = new Map(recordings.map((r) => [r.session_id, r]));
   const qs = answeredBlocks(study.blocks);
+  const discard = async (id: string) => {
+    if (!confirm(t("¿Eliminar esta respuesta? Úsalo para descartar pruebas o respuestas inválidas."))) return;
+    await api.del(`/studies/${study.id}/sessions/${id}`); onChange();
+  };
   if (!sessions.length) return <Empty icon={<Plus size={20} />} title={t("Aún no hay participantes")} text={t("Comparte el link del estudio para empezar a recibir respuestas.")} />;
   return (
     <div className="overflow-hidden rounded-xl border border-line bg-surface">
@@ -157,7 +165,8 @@ function Responses({ study, sessions, answers, onChange, canEdit }: { study: Stu
         const shown = revealed.has(s.id);
         return (
           <div key={s.id} className={cx(idx > 0 && "border-t border-line")}>
-            <button onClick={() => setOpen(open === s.id ? null : s.id)} className="flex w-full items-center gap-4 px-5 py-3.5 text-left hover:bg-paper/50">
+            <div className="flex items-center hover:bg-paper/50">
+            <button onClick={() => setOpen(open === s.id ? null : s.id)} aria-expanded={open === s.id} className={cx("flex min-w-0 flex-1 items-center gap-4 py-3.5 pl-5 text-left", canEdit ? "pr-2" : "pr-5")}>
               <span className="w-24 text-sm font-medium tabular-nums">#{sessions.length - idx}</span>
               <span className="flex-1 text-sm text-ink-2">{timeAgo(s.started_at)}{s.device && <span className="ml-2 text-xs text-ink-3">· {s.device === "mobile" ? t("Móvil") : s.device === "tablet" ? t("Tablet") : t("Escritorio")}</span>}
                 {fields.length > 0 && (
@@ -171,11 +180,15 @@ function Responses({ study, sessions, answers, onChange, canEdit }: { study: Stu
                   </span>
                 )}
               </span>
+              {recorded.has(s.id) && <span className="hidden items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-ink sm:inline-flex"><Video size={12} aria-hidden />{t("Grabación")}</span>}
               <span className="hidden text-sm tabular-nums text-ink-3 sm:block">{mine.length}/{qs.length} {t("respuestas")}</span>
               <span className="w-24 text-right text-sm tabular-nums text-ink-3">{dur ? `${Math.round(dur / 1000)} s` : ""}</span>
               <span className={cx("w-24 rounded-full px-2 py-0.5 text-center text-xs font-medium", s.completed_at ? "bg-good-soft text-good" : "bg-ink/5 text-ink-3")}>{s.completed_at ? t("Completa") : t("Incompleta")}</span>
               <ChevronDown size={16} className={cx("text-ink-3 transition", open === s.id && "rotate-180")} />
             </button>
+            {canEdit && <button type="button" onClick={() => discard(s.id)} title={t("Eliminar respuesta")} aria-label={t("Eliminar respuesta #{n}", { n: sessions.length - idx })}
+              className="focus-ring mr-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"><Trash2 size={16} /></button>}
+            </div>
             {open === s.id && (
               <div className="border-t border-line bg-paper/40 px-5 py-4">
                 {fields.length > 0 && (
@@ -209,17 +222,27 @@ function Responses({ study, sessions, answers, onChange, canEdit }: { study: Stu
                     );
                   })}
                 </dl>
-                <div className="mt-4 flex justify-end">
-                  {canEdit && <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {
-                    if (!confirm(t("¿Eliminar esta respuesta? Úsalo para descartar pruebas o respuestas inválidas."))) return;
-                    await api.del(`/studies/${study.id}/sessions/${s.id}`); onChange();
-                  }}>{t("Descartar respuesta")}</Button>}
+                <div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+                  {recorded.has(s.id) && <>
+                    <Button size="sm" icon={<Play size={14} />} onClick={() => setReplay({ id: s.id, number: sessions.length - idx })}>{t("Ver grabación")} · {Math.max(1, Math.round(recorded.get(s.id)!.duration_ms / 1000))} s</Button>
+                    {canEdit && <Button size="sm" variant="ghost" icon={<Trash2 size={14} />} onClick={async () => {
+                      if (!confirm(t("¿Eliminar la grabación de esta sesión? Las respuestas se conservan."))) return;
+                      await api.del(`/studies/${study.id}/recordings/${s.id}`); onChange();
+                    }}>{t("Eliminar grabación")}</Button>}
+                  </>}
+                  {canEdit && <Button size="sm" variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={() => discard(s.id)}>{t("Eliminar respuesta")}</Button>}
                 </div>
               </div>
             )}
           </div>
         );
       })}
+      {replay && (
+        <Modal open title={t("Grabación del participante #{n}", { n: replay.number })} onClose={() => setReplay(null)} width={1040}>
+          <p className="-mt-1 mb-3 text-sm text-ink-3">{t("Lo que se escribió aparece oculto.")}</p>
+          <Suspense fallback={<Spinner />}><RecordingPlayer studyId={study.id} sessionId={replay.id} /></Suspense>
+        </Modal>
+      )}
     </div>
   );
 }

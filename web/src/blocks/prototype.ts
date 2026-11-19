@@ -54,15 +54,17 @@ export function matchStep(step: FlowStep, _screen: string | null | undefined, la
 export const stepsComplete = (v: PrototypeTaskValue, steps: FlowStep[] | undefined) => !steps?.length || (v.steps?.length ?? 0) >= steps.length;
 
 /** Convierte el flujo en campos de tarea: meta (pantalla o toque), ruta esperada (pantallas en orden), toques requeridos y descripción. */
-export function flowToTask(p: Prototype | undefined): { startScreen: string; goalScreens: string[]; expectedPath: string[]; steps: FlowStep[]; goalClick?: FlowStep; description?: string } | null {
+export function flowToTask(p: Prototype | undefined): { startScreen: string; startTap?: FlowStep; goalScreens: string[]; expectedPath: string[]; steps: FlowStep[]; goalClick?: FlowStep; description?: string } | null {
   const f = normalizeFlow(p?.flow);
   if (!f.items.length) return null;
   const goal = f.items.find((i) => i.id === f.goalId);
   const start = f.items.find((i) => i.id === f.startId);
   const screens = f.items.flatMap((i) => (i.kind === "screen" ? [i.screen] : [])).filter((x, i, a) => a.indexOf(x) === i);
-  const steps = f.items.flatMap((i) => (i.kind === "tap" && i.id !== f.goalId ? [{ label: i.label, ...(i.screen ? { screen: i.screen } : {}) }] : []));
+  // El toque de inicio lo hace el prototipo al cargar (la tarea arranca con ese paso ya dado), así que no se le exige al participante.
+  const steps = f.items.flatMap((i) => (i.kind === "tap" && i.id !== f.goalId && i.id !== f.startId ? [{ label: i.label, ...(i.screen ? { screen: i.screen } : {}) }] : []));
   return {
-    startScreen: start?.kind === "screen" ? start.screen : "",
+    startScreen: start?.screen ?? "",   // si el inicio es un toque, se empieza en la pantalla donde ocurre…
+    ...(start?.kind === "tap" ? { startTap: { label: start.label, ...(start.screen ? { screen: start.screen } : {}) } } : {}),   // …y con ese toque ya hecho
     goalScreens: goal?.kind === "screen" ? [goal.screen] : [],
     expectedPath: screens.length >= 2 ? screens : [],
     steps,
@@ -88,22 +90,26 @@ export const screenName = (p: Prototype | undefined, id: string) =>
 export type TrackerMsg =
   | { rk: 1; type: "ready" }
   | { rk: 1; type: "screen"; name: string; route?: string | null; trail?: string[] }
+  | { rk: 1; type: "goto"; name: string; ok: boolean }   // terminó de ir a la pantalla pedida (ok = llegó)
   | { rk: 1; type: "click"; screen: string | null; x: number; y: number; hit: boolean; label: string };
 export const asTrackerMsg = (d: unknown): TrackerMsg | null =>
   d && typeof d === "object" && (d as { rk?: unknown }).rk === 1 && typeof (d as { type?: unknown }).type === "string" ? (d as TrackerMsg) : null;
 
 /** Sandbox del iframe: scripts sí, mismo origen no (el HTML no puede tocar la sesión ni la API). */
 /** Pide al prototipo HTML que muestre una pantalla (al empezar una tarea). Mejor esfuerzo: por ruta o tocando el elemento con ese nombre. */
-/** Pantalla de inicio del flujo del prototipo (si es una pantalla y no un toque). */
-export function flowStartScreen(p: Prototype | undefined): string | undefined {
-  const f = normalizeFlow(p?.flow); const s = f.items.find((i) => i.id === f.startId);
-  return s?.kind === "screen" ? s.screen : undefined;
-}
-
-export function gotoScreen(frame: HTMLIFrameElement | null, proto: Prototype, screenId: string) {
+/** Lleva el prototipo HTML al punto de inicio: una pantalla (por ruta, por nombre o repitiendo los clics que llevaron a ella) y, si el inicio es un toque, ese toque. */
+export function gotoScreen(frame: HTMLIFrameElement | null, proto: Prototype, screenId: string, tap?: string) {
+  if (!frame?.contentWindow || (!screenId && !tap)) return;
   const s = proto.screens.find((x) => x.id === screenId);
-  if (!s || !frame?.contentWindow) return;
-  frame.contentWindow.postMessage({ rk: 1, type: "goto", name: s.name, route: s.route ?? null, trail: s.trail ?? [] }, "*");
+  const name = s?.name ?? (screenId.startsWith("h:") ? screenId.slice(2) : "");
+  frame.contentWindow.postMessage({ rk: 1, type: "goto", name, route: s?.route ?? null, trail: s?.trail ?? [], ...(tap ? { tap } : {}) }, "*");
+}
+/** Instrucciones para el participante escritas en el flujo del prototipo (HTML). */
+export const flowInstructions = (p: Prototype | undefined) => (isHtml(p) ? normalizeFlow(p?.flow).instructions?.trim() ?? "" : "");
+/** Lo que lee el participante: la descripción de la tarea y, si dicen otra cosa, las instrucciones del prototipo. */
+export function taskInstructions(description: string | undefined, p: Prototype | undefined): string {
+  const own = description?.trim() ?? "", flow = flowInstructions(p);
+  return [own, flow && flow !== own ? flow : ""].filter(Boolean).join("\n\n");
 }
 
 export const HTML_SANDBOX = "allow-scripts allow-forms allow-modals allow-popups";
@@ -127,5 +133,5 @@ export function resolveTask(block: PrototypeTaskBlock, proto: Prototype | undefi
   if (!isHtml(proto) || hasOwnFlow(block)) return block;
   const f = flowToTask(proto);
   if (!f) return block;
-  return { ...block, startScreen: f.startScreen, goalScreens: f.goalScreens, expectedPath: f.expectedPath, steps: f.steps, goalClick: f.goalClick, description: block.description || f.description || "" };
+  return { ...block, startScreen: f.startScreen, startTap: f.startTap, goalScreens: f.goalScreens, expectedPath: f.expectedPath, steps: f.steps, goalClick: f.goalClick, description: block.description || f.description || "" };
 }

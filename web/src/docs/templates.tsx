@@ -566,6 +566,7 @@ const timeStudy: DocTemplate = {
     "Durante la observación, registra una fila por actividad: empieza una nueva cada vez que cambia la actividad, la herramienta o el asunto, aunque dure 2 minutos",
     "Elige solo una herramienta principal por fila y anota las demás en Otras herramientas",
     "Revisa el Resumen: horas por persona, por actividad y por herramienta, y la estimación semanal",
+    "Para medir un cambio, agrega una ronda «Después» desde el Resumen, observa otra vez y revisa Antes y después",
   ],
   sections: [
     { id: "meta", type: "fields", span: 12, cols: 3, fields: [{ id: "org", label: "Equipo u organización" }, { id: "dates", label: "Fechas", date: "many" }, { id: "goal", label: "Qué queremos saber" }] },
@@ -581,7 +582,7 @@ const timeStudy: DocTemplate = {
     const row = (start: string, end: string, bucket: string, tool: string, other: string, ref: string, notes: string) =>
       ({ id: uid(), person: "p", date: "2026-11-02", start, end, bucket, tool, other, ref, notes });
     const study: TimeStudyData = {
-      people: [{ id: "p", name: L(lang, "Ejemplo", "Example") }], workdays: 5, keyLabel: "", buckets, tools, schedule: [],
+      people: [{ id: "p", name: L(lang, "Ejemplo", "Example") }], workdays: 5, keyLabel: "", buckets, tools, schedule: [], rounds: [],
       rows: [
         row("09:00", "09:08", prep.id, main.id, email.name, L(lang, "Cliente A", "Client A"), L(lang, "Leyó el último correo y el historial antes de la llamada", "Read the last email and history before the call")),
         row("09:08", "09:19", call.id, phone.id, main.name, L(lang, "Cliente A", "Client A"), L(lang, "Llamada; enviarán una contrapropuesta el viernes", "Call; they will send a counteroffer by Friday")),

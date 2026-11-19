@@ -356,3 +356,10 @@ article .bg-accent :is(input, textarea)::placeholder { color: color-mix(in srgb,
 .rk-diagram .react-flow__node:hover .rk-handle, .rk-diagram .react-flow__node.selected .rk-handle, .rk-diagram.is-connecting .rk-handle { opacity: 1; }
 .rk-diagram.is-readonly .rk-handle { opacity: 0 !important; pointer-events: none; }
 .rk-diagram .rk-handle:hover { box-shadow: 0 0 0 4px color-mix(in oklab, var(--color-accent) 25%, transparent); }
+
+/* Every dropdown in the app: the browser's own arrow sits flush against the edge and differs per browser, so it is replaced
+   by ours, with room around it. One rule for all of them, so a new select needs no class to look right. */
+select:not([multiple]):not([size]) {
+  appearance: none; -webkit-appearance: none; padding-right: 2.25rem; background-repeat: no-repeat; background-position: right 0.7rem center; background-size: 14px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237B8190' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}

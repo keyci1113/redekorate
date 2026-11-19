@@ -9,12 +9,18 @@ export interface TSPerson { id: string; name: string }
 export interface TSBucket { id: string; name: string; what: string }
 /** A tool. `key` marks the tools whose time the study is measuring (the "key tools" group). */
 export interface TSTool { id: string; name: string; key: boolean }
+/**
+ * A round of observation: the baseline, then the same people watched again after a change (an AI rollout, a new
+ * tool). Rounds share the buckets and tools, so their summaries line up and can be compared.
+ */
+export interface TSRound { id: string; name: string }
 export interface TSDay { id: string; person: string; date: string; observer: string; notes: string }
 export interface TSRow {
   id: string; person: string; date: string;
   start: string; end: string;          // "HH:MM"
   bucket: string; tool: string;        // ids
   other: string; ref: string; notes: string;
+  round?: string;                      // id; missing or unknown = the first round
 }
 export interface TimeStudyData {
   people: TSPerson[];
@@ -24,6 +30,8 @@ export interface TimeStudyData {
   tools: TSTool[];
   schedule: TSDay[];
   rows: TSRow[];
+  /** Empty or one round = a single observation; two or more turn on the before-and-after comparison. */
+  rounds: TSRound[];
 }
 
 export const DEFAULT_WORKDAYS = 5;
@@ -56,14 +64,14 @@ export function defaultLists(lang: Lang): Pick<TimeStudyData, "buckets" | "tools
 }
 
 export function emptyTimeStudy(lang: Lang): TimeStudyData {
-  return { people: [1, 2].map(() => ({ id: uid(), name: "" })), workdays: DEFAULT_WORKDAYS, keyLabel: "", ...defaultLists(lang), schedule: [], rows: [] };
+  return { people: [1, 2].map(() => ({ id: uid(), name: "" })), workdays: DEFAULT_WORKDAYS, keyLabel: "", ...defaultLists(lang), schedule: [], rows: [], rounds: [] };
 }
 
 /** Fills in whatever an older or partial document is missing, so every reader can trust the shape. */
 export function normalize(d: Partial<TimeStudyData> | undefined): TimeStudyData {
   return {
     people: d?.people ?? [], workdays: d?.workdays && d.workdays > 0 ? d.workdays : DEFAULT_WORKDAYS, keyLabel: d?.keyLabel ?? "",
-    buckets: d?.buckets ?? [], tools: d?.tools ?? [], schedule: d?.schedule ?? [], rows: d?.rows ?? [],
+    buckets: d?.buckets ?? [], tools: d?.tools ?? [], schedule: d?.schedule ?? [], rows: d?.rows ?? [], rounds: d?.rounds ?? [],
   };
 }
 
@@ -97,9 +105,10 @@ export const UNSET = "";
  * main tool and its weekly estimate, then hours, share of logged time and weekly estimate per bucket and per tool.
  * Weekly estimates are hours / days observed × workdays per week, per person.
  */
-export function summarize(raw: Partial<TimeStudyData> | undefined): TSSummary {
+export function summarize(raw: Partial<TimeStudyData> | undefined, round?: string): TSSummary {
   const d = normalize(raw);
-  const counted = d.rows.map((r) => ({ r, min: duration(r) })).filter((x) => x.r.person && x.r.date && x.min !== null) as { r: TSRow; min: number }[];
+  const inScope = round === undefined ? d.rows : d.rows.filter((r) => roundOf(d, r) === round);
+  const counted = inScope.map((r) => ({ r, min: duration(r) })).filter((x) => x.r.person && x.r.date && x.min !== null) as { r: TSRow; min: number }[];
   const keyTools = new Set(d.tools.filter((t) => t.key).map((t) => t.id));
   const peopleIds = new Set(d.people.map((p) => p.id));
 
@@ -129,7 +138,7 @@ export function summarize(raw: Partial<TimeStudyData> | undefined): TSSummary {
   const byTool = d.tools.map((t) => line(t.id, t.name, (r) => r.tool === t.id, t.key));
   if (mine.some((x) => !toolIds.has(x.r.tool))) byTool.push(line(UNSET, "", (r) => !toolIds.has(r.tool)));
 
-  return { people, total, byBucket, byTool, rowsCounted: mine.length, rowsSkipped: d.rows.length - mine.length };
+  return { people, total, byBucket, byTool, rowsCounted: mine.length, rowsSkipped: inScope.length - mine.length };
 }
 
 /** The log as a table, oldest first, with names instead of ids: for CSV, Word and Markdown exports. */
@@ -137,17 +146,88 @@ export function logTable(raw: Partial<TimeStudyData> | undefined) {
   const d = normalize(raw);
   const name = <T extends { id: string; name: string }>(xs: T[], id: string) => xs.find((x) => x.id === id)?.name ?? "";
   const rows = [...d.rows].sort((a, b) => `${a.date} ${a.start}`.localeCompare(`${b.date} ${b.start}`));
-  return rows.map((r) => [name(d.people, r.person), r.date, r.start, r.end, duration(r)?.toString() ?? "", name(d.buckets, r.bucket), name(d.tools, r.tool), r.other, r.ref, r.notes]);
+  const rounds = d.rounds.length > 1;
+  return rows.map((r) => [name(d.people, r.person), r.date, r.start, r.end, duration(r)?.toString() ?? "", name(d.buckets, r.bucket), name(d.tools, r.tool), r.other, r.ref, r.notes, ...(rounds ? [name(d.rounds, roundOf(d, r))] : [])]);
 }
 
 /** The next row starts where the last one ended, for the same person and day: logging a day is one long chain. */
-export function nextRow(d: TimeStudyData): TSRow {
-  const last = d.rows[d.rows.length - 1];
-  return { id: uid(), person: last?.person ?? d.people[0]?.id ?? "", date: last?.date ?? today(), start: last?.end ?? "", end: "", bucket: "", tool: "", other: "", ref: "", notes: "" };
+export function nextRow(d: TimeStudyData, round?: string): TSRow {
+  const mine = round === undefined ? d.rows : d.rows.filter((r) => roundOf(d, r) === round);
+  const last = mine[mine.length - 1];
+  return {
+    id: uid(), person: last?.person ?? d.people[0]?.id ?? "", date: last?.date ?? today(), start: last?.end ?? "", end: "", bucket: "", tool: "", other: "", ref: "", notes: "",
+    ...(round ? { round } : {}),
+  };
 }
 
 /** Today in the observer's own time zone (toISOString would give tomorrow's date in the evening west of UTC). */
 export function today(now = new Date()) {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+}
+
+// ---------- rounds: before and after ----------
+
+/** The round a row belongs to: its own when it still exists, otherwise the first one (rows logged before rounds existed). */
+export function roundOf(d: TimeStudyData, r: Pick<TSRow, "round">): string {
+  return r.round && d.rounds.some((x) => x.id === r.round) ? r.round : d.rounds[0]?.id ?? "";
+}
+
+/**
+ * Adds a round to observe again. The first time, everything logged so far becomes the first round (`first`), so
+ * nothing is lost, and the new round (`next`) follows it.
+ */
+export function addRound(d: TimeStudyData, names: { first: string; next: string }): { data: TimeStudyData; round: string } {
+  const id = uid();
+  if (d.rounds.length === 0) {
+    const base = uid();
+    return { data: { ...d, rounds: [{ id: base, name: names.first }, { id, name: names.next }], rows: d.rows.map((r) => ({ ...r, round: base })) }, round: id };
+  }
+  return { data: { ...d, rounds: [...d.rounds, { id, name: names.next }] }, round: id };
+}
+
+/** A round can go only while no row is logged in it, so removing one never deletes observation work. */
+export function roundInUse(d: TimeStudyData, id: string): boolean {
+  return d.rows.some((r) => roundOf(d, r) === id);
+}
+
+export interface TSDelta { before: number; after: number; change: number; ratio: number | null }
+export interface TSCompareLine { id: string; name: string; key?: boolean; delta: TSDelta }
+export interface TSComparison {
+  before: TSSummary; after: TSSummary;
+  /** Per person in either round: their key-tool hours per week before and after (null where not observed). */
+  people: { person: TSPerson; before: number | null; after: number | null }[];
+  perDay: TSDelta; keyPerWeek: TSDelta;
+  byBucket: TSCompareLine[]; byTool: TSCompareLine[];
+  /** The activity whose hours per week moved most, either way; null while nothing moved. */
+  biggest: TSCompareLine | null;
+}
+
+const delta = (before: number, after: number): TSDelta => ({ before, after, change: after - before, ratio: before ? (after - before) / before : null });
+
+/**
+ * Before and after on the same scale: hours per person per week (hours ÷ days observed × workdays), so rounds
+ * with different numbers of days or people still compare. Buckets and tools match by id, as rounds share them.
+ */
+export function compare(raw: Partial<TimeStudyData> | undefined, beforeId: string, afterId: string): TSComparison {
+  const d = normalize(raw);
+  const before = summarize(d, beforeId), after = summarize(d, afterId);
+  const lines = (a: TSLine[], b: TSLine[]): TSCompareLine[] => {
+    const ids = [...new Set([...a.map((l) => l.id), ...b.map((l) => l.id)])];
+    return ids.map((id) => {
+      const x = a.find((l) => l.id === id), y = b.find((l) => l.id === id);
+      return { id, name: (y ?? x)!.name, key: (y ?? x)!.key, delta: delta(x?.total.perWeek ?? 0, y?.total.perWeek ?? 0) };
+    });
+  };
+  const byBucket = lines(before.byBucket, after.byBucket);
+  const people = d.people.map((p, i) => {
+    const x = before.people[i], y = after.people[i];
+    return { person: p, before: x.days ? x.keyPerWeek : null, after: y.days ? y.keyPerWeek : null };
+  }).filter((p) => p.before !== null || p.after !== null);
+  const moved = byBucket.filter((l) => Math.abs(l.delta.change) >= 0.05).sort((a, b) => Math.abs(b.delta.change) - Math.abs(a.delta.change));
+  return {
+    before, after, people,
+    perDay: delta(before.total.perDay, after.total.perDay), keyPerWeek: delta(before.total.keyPerWeek, after.total.keyPerWeek),
+    byBucket, byTool: lines(before.byTool, after.byTool), biggest: moved[0] ?? null,
+  };
 }

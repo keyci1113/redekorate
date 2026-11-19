@@ -97,7 +97,7 @@ function ProjectStudies({ project: p }: { project: Project }) {
 
 function ProjectContents({ project: p }: { project: Project }) {
   const rows: [LucideIcon, string, number, string][] = [
-    [FileText, t("Documentos"), p.document_count ?? 0, "docs"],
+    [FileText, t("Documentos UX"), p.document_count ?? 0, "docs"],
     [Lightbulb, t("Insights"), p.insight_count ?? 0, "insights"],
     [UsersRound, t("Participantes"), p.participant_count ?? 0, "participants"],
     [Share2, t("Reportes compartidos"), p.share_count ?? 0, "report"],

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
+import { removeStored } from "./files.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
 import { AREAS, ORG_COLS, accessJoins, accessWhere, areasSql, atLeast, requireProject, roleSql, type Area, type ProjectRole } from "../lib/access.js";
 import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
@@ -90,7 +91,9 @@ projects.patch("/:id", async (req, res) => {
 
 projects.delete("/:id", async (req, res) => {
   await ownProject(req.params.id, req.user!.id, "owner");
+  const kept = await query<{ stored: string }>("select stored from project_files where project_id = $1", [req.params.id]);
   await query("delete from projects where id = $1", [req.params.id]);
+  await removeStored(kept.map((f) => f.stored));
   res.json({ ok: true });
 });
 

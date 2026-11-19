@@ -89,6 +89,9 @@ const EN: Record<string, string> = {
   "La sesión ya fue completada": "This session is already completed",
   "No autenticado": "Not authenticated",
   "No se recibió ningún archivo": "No file received",
+  "Archivo no encontrado": "File not found",
+  "Formato no permitido. Sube PDF, Word, Excel, PowerPoint, Markdown, texto o CSV.": "Format not allowed. Upload PDF, Word, Excel, PowerPoint, Markdown, text or CSV.",
+  "Escribe un nombre para el archivo": "Type a name for the file",
   "Origen no permitido": "Origin not allowed",
   "Recurso no encontrado": "Resource not found",
   "Respuesta demasiado grande": "Response too large",
@@ -124,5 +127,7 @@ export function translate(msg: string, lang: string | undefined): string {
   if (EN[msg]) return EN[msg];
   const m = msg.match(/^La imagen supera (\d+) MB$/);
   if (m) return `Image exceeds ${m[1]} MB`;
+  const f = msg.match(/^El archivo supera (\d+) MB$/);
+  if (f) return `The file exceeds ${f[1]} MB`;
   return msg;
 }

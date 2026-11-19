@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { boardDirections, dominantColors, hostOf, normalizeHex, safeImageSrc, safeUrl, swatchRow, withScheme, type DiagramData, type DNode } from "./model";
-import { SITEMAP, isDiagramKind, layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, starter, alignedLine, onOutline, HANDLE_HALF, ALIGN_SNAP } from "./model";
+import { boardDirections, dominantColors, hostOf, normalizeHex, safeImageSrc, safeUrl, swatchRow, withScheme } from "./model";
+import { SITEMAP, isDiagramKind, layoutSitemap, normalizeDiagram, outlineStats, parseOutline, sitemapToDiagram, starter, STARTER_IDS, alignedLine, onOutline, HANDLE_HALF, ALIGN_SNAP, type DiagramData, type DNode } from "./model";
 
 describe("parseOutline", () => {
   test("indent puts a line under the nearest less-indented line above it", () => {
@@ -76,7 +76,7 @@ describe("normalizeDiagram", () => {
 
 describe("starters", () => {
   test("every starter is a valid diagram or sitemap, with no dangling arrows", () => {
-    for (const id of ["blank", "flowchart", "user_flow", "system", "sitemap"] as const) {
+    for (const id of STARTER_IDS) {
       for (const lang of ["es", "en"] as const) {
         const s = starter(id, lang);
         expect(isDiagramKind(s.kind)).toBe(true);
@@ -86,6 +86,21 @@ describe("starters", () => {
     }
   });
 
+  test("shapes in a starter never overlap, and what sits in a section fits inside it", () => {
+    for (const id of STARTER_IDS) {
+      const s = starter(id, "en");
+      if (s.kind === "sitemap") continue;
+      const { nodes } = s.data as DiagramData;
+      const shapes = nodes.filter((x) => x.shape !== "frame" && x.shape !== "text");
+      const hit = (a: DNode, b: DNode) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+      for (const a of shapes) for (const b of shapes) if (a !== b) expect(hit(a, b), `${id}: ${a.id} overlaps ${b.id}`).toBe(false);
+      for (const f of nodes.filter((x) => x.shape === "frame")) {
+        for (const a of shapes.filter((x) => hit(x, f))) {
+          expect(a.x >= f.x && a.y >= f.y + 30 && a.x + a.w <= f.x + f.w && a.y + a.h <= f.y + f.h, `${id}: ${a.id} spills out of ${f.id}`).toBe(true);
+        }
+      }
+    }
+  });
 
   test("a sitemap opened as a diagram keeps every page and line", () => {
     const outline = (starter("sitemap", "en").data as { outline: string }).outline;
