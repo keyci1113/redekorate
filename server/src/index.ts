@@ -89,7 +89,7 @@ app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no e
 // The feedback widget script other sites load with one <script> tag. Short cache: a setting or a fix reaches every site within minutes.
 const WIDGET_JS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../widget/widget.js");
 app.get("/widget.js", (_req, res) => {
-  res.type("application/javascript").set({ "Cache-Control": "public, max-age=300", "Cross-Origin-Resource-Policy": "cross-origin", "Access-Control-Allow-Origin": "*" }).sendFile(WIDGET_JS);
+  res.type("application/javascript").set({ "Cache-Control": "public, max-age=300", "Cross-Origin-Resource-Policy": "cross-origin", "Access-Control-Allow-Origin": "*" }).sendFile(WIDGET_JS, { dotfiles: "allow" });   // the path is fixed; allow installs under a dot folder
 });
 
 // Script de seguimiento de los prototipos HTML (lo cargan desde su sandbox). Sin caché larga: cambia con cada deploy.
