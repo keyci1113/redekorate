@@ -1,6 +1,21 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { ANSWERS_PER_BLOCK, TOOLS, shapeResults, type Api } from "./tools.js";
+import { ANSWERS_PER_BLOCK, TOOLS, shapeResults, toolCatalog, toolsFor, type Api } from "./tools.js";
+
+test("the Connect AI apps page lists exactly the tools apps get, with their write flag and inputs", () => {
+  const catalog = toolCatalog();
+  assert.deepEqual(catalog.map((t) => t.name), TOOLS.map((t) => t.name));
+  for (const [i, t] of TOOLS.entries()) {
+    assert.equal(catalog[i].writes, t.writes, t.name);
+    assert.deepEqual(catalog[i].params, Object.keys(t.input), t.name);
+    assert.ok(catalog[i].description.length > 0, t.name);
+  }
+  // a read-only token gets exactly the tools the page marks as reading
+  assert.deepEqual(toolsFor("read").map((t) => t.name), catalog.filter((t) => !t.writes).map((t) => t.name));
+  assert.equal(toolsFor("write"), TOOLS);
+  // nothing that runs or validates leaks into the JSON the page loads
+  assert.deepEqual(Object.keys(catalog[0]).sort(), ["description", "name", "params", "title", "writes"]);
+});
 
 test("tool names are unique and every tool says whether it writes", () => {
   const names = TOOLS.map((t) => t.name);

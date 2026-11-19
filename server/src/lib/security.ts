@@ -66,7 +66,7 @@ export async function tokenOwner(raw: string): Promise<string | null> {
   const key = createHash("sha256").update(raw).digest("hex");
   const hit = owners.get(key);
   if (hit && hit.until > Date.now()) return hit.user;
-  const user = (await verifyBearer(raw))?.id ?? null;
+  const user = (await verifyBearer(raw))?.user.id ?? null;
   if (owners.size > 5000) owners.clear();
   owners.set(key, { user, until: Date.now() + 30_000 });
   return user;

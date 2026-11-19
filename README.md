@@ -129,12 +129,23 @@ Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL
 - **Safe edits.** `update_study` and `update_document` replace content: they need the `updated_at` the assistant read (`base_updated_at`), so a newer edit is never overwritten (409); they refuse to empty existing content; and every version they replace is saved (migration 019, last 30 per item), so `list_versions` and `restore_version` undo a bad write. Study blocks, diagrams and document sections an assistant sends are checked before saving, and a misspelled argument is refused by name.
 - **Asking first.** Tools that replace content or change what participants see are marked `destructiveHint`, so Claude asks before running them. Launching a live study again or publishing an unchanged draft changes nothing.
 - **Outside text is data.** Study answers carry an `untrusted_content` notice, and the server's instructions tell assistants never to act on requests written in them.
-- **Rate limit.** 240 calls a minute per account (all of its tokens together); calls without a valid token count per address.
+- **Rate limit.** 240 calls a minute per account (all of its tokens together, over `/mcp` and `/api/v1/tools`); calls without a valid token count per address.
 
 - **Claude.ai or ChatGPT:** add a custom connector with the address shown under *My account → Outside access (MCP)* and sign in. You approve the app on a consent screen; *My account* lists connected apps and removes their access.
-- **Claude Code, Claude Desktop, Cursor or scripts:** create an access token in the same section (shown once, 30 days to no expiry) and send it as a bearer token, e.g. `claude mcp add --transport http redekorate https://research.yourdomain.com/mcp --header "Authorization: Bearer rdk_pat_…"`. Clients that support OAuth can skip the token and sign in instead.
+- **Claude Code, Claude Desktop, Cursor or scripts:** create an access token in the same section (shown once, 30 days to no expiry, read and edit or read only) and send it as a bearer token, e.g. `claude mcp add --transport http redekorate https://research.yourdomain.com/mcp --header "Authorization: Bearer rdk_pat_…"`. Clients that support OAuth can skip the token and sign in instead.
 
-Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for public clients, one-hour access tokens and rotating 60-day refresh tokens, discovery through `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` (migration 015). Only SHA-256 hashes of tokens are stored. Each tool calls the app's own API as you, so access rules are exactly the app's. Bearer tokens open `/mcp` only, never the REST API.
+Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for public clients, one-hour access tokens and rotating 60-day refresh tokens, discovery through `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` (migration 015). A personal token can be read only (migration 060): it gets only the tools that read, and the API it calls refuses anything else. Only SHA-256 hashes of tokens are stored. Each tool calls the app's own API as you, so access rules are exactly the app's. Bearer tokens open `/mcp` and `/api/v1/tools` only, never the app's internal API.
+
+### AI operations over HTTP (OpenAPI)
+
+For apps that don't speak MCP (ChatGPT GPT actions, Gemini, n8n, Zapier, your own scripts and agents), the same tools are plain HTTP calls under `<APP_URL>/api/v1/tools`, described by an OpenAPI 3.1 document at `<APP_URL>/api/v1/tools/openapi.json`. It is the MCP tools over HTTP, not a second API: one `POST /api/v1/tools/<tool>` per tool with the tool's input as a JSON body, the same tokens and the same rules (no deletes, project roles, no participant details). Input is strict: an unknown field is refused by name. A read-only token gets `403` on operations that write. The document is generated from the tool list, so it can't describe an operation that isn't there.
+
+```sh
+curl -X POST https://research.yourdomain.com/api/v1/tools/whoami \
+  -H "Authorization: Bearer rdk_pat_…" -H "Content-Type: application/json" -d '{}'
+```
+
+Errors are JSON `{ "error": "…" }`: `400` with `issues` for invalid input, `401` missing, bad or revoked token, `403` read-only token or not allowed by your role, `404` not found or no access, `409` changed since you read it, `429` rate limited. Operations that write carry `x-openai-isConsequential: true`, so a GPT asks before running them and runs reads without asking. In a GPT: *Actions → Import from URL* with the OpenAPI address, then *Authentication → API key → Bearer* with a token.
 
 ## Security and privacy
 

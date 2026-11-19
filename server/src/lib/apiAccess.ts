@@ -64,16 +64,23 @@ export function redirectMatches(registered: string[], given: string): boolean {
 
 // ---------- bearer tokens ----------
 
+/** What a token may do: "write" reads, creates and edits; "read" only gets what reads. */
+export type Scope = "read" | "write";
+export const SCOPES: readonly Scope[] = ["read", "write"];
+
+/** Who a bearer token acts as, and what it may do. */
+export interface BearerAccess { user: AuthUser; scope: Scope }
+
 interface TokenUserRow {
-  token_id: string; last_used_at: string | null;
+  token_id: string; last_used_at: string | null; scope: Scope;
   id: string; email: string; name: string; role: Role; avatar: string | null; onboarded_at: string | null;
 }
 
-/** The user a bearer token acts as, or null when it is unknown, revoked, expired or the account is disabled. */
-export async function verifyBearer(raw: string | undefined): Promise<AuthUser | null> {
+/** The user a bearer token acts as and its scope, or null when it is unknown, revoked, expired or the account is disabled. */
+export async function verifyBearer(raw: string | undefined): Promise<BearerAccess | null> {
   if (!raw || !raw.startsWith("rdk_pat_") && !raw.startsWith("rdk_oat_")) return null;
   const r = await one<TokenUserRow>(
-    `select t.id as token_id, t.last_used_at, u.id, u.email, u.name, u.role, u.avatar, u.onboarded_at
+    `select t.id as token_id, t.last_used_at, t.scope, u.id, u.email, u.name, u.role, u.avatar, u.onboarded_at
      from api_tokens t join users u on u.id = t.user_id left join oauth_grants g on g.id = t.grant_id
      where t.token_hash = $1 and t.revoked_at is null and (t.expires_at is null or t.expires_at > now())
        and u.disabled_at is null and (t.grant_id is null or g.revoked_at is null)`, [hashToken(raw)]);
@@ -83,25 +90,25 @@ export async function verifyBearer(raw: string | undefined): Promise<AuthUser | 
     await query("update api_tokens set last_used_at = now() where id = $1", [r.token_id]);
     await query("update oauth_grants g set last_used_at = now() from api_tokens t where t.id = $1 and g.id = t.grant_id", [r.token_id]);
   }
-  return { id: r.id, email: r.email, name: r.name, role: r.role, avatar: r.avatar, onboarded_at: r.onboarded_at };
+  return { user: { id: r.id, email: r.email, name: r.name, role: r.role, avatar: r.avatar, onboarded_at: r.onboarded_at }, scope: r.scope };
 }
 
 // ---------- personal access tokens ----------
 
-export async function createPat(userId: string, name: string, expiresDays: number | null) {
+export async function createPat(userId: string, name: string, expiresDays: number | null, scope: Scope = "write") {
   const token = newToken("pat");
   const row = await one(
-    `insert into api_tokens(user_id, name, token_hash, hint, expires_at)
-     values ($1,$2,$3,$4, case when $5::int is null then null else now() + make_interval(days => $5::int) end)
-     returning id, name, hint, created_at, last_used_at, expires_at`,
-    [userId, name, hashToken(token), tokenHint(token), expiresDays]);
+    `insert into api_tokens(user_id, name, token_hash, hint, expires_at, scope)
+     values ($1,$2,$3,$4, case when $5::int is null then null else now() + make_interval(days => $5::int) end, $6)
+     returning id, name, hint, scope, created_at, last_used_at, expires_at`,
+    [userId, name, hashToken(token), tokenHint(token), expiresDays, scope]);
   return { token, row };
 }
 
 /** What the Account page lists: the person's own tokens and the apps they allowed. */
 export async function listAccess(userId: string) {
   const tokens = await query(
-    `select id, name, hint, created_at, last_used_at, expires_at from api_tokens
+    `select id, name, hint, scope, created_at, last_used_at, expires_at from api_tokens
      where user_id = $1 and grant_id is null and revoked_at is null and (expires_at is null or expires_at > now())
      order by created_at desc`, [userId]);
   const apps = await query(
