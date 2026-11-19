@@ -5,6 +5,7 @@ import helmet from "helmet";
 import { HttpError } from "./http.js";
 import { translate } from "./i18n.js";
 import { verifyBearer } from "./apiAccess.js";
+import { brokenPasswordRule, type PasswordRuleId } from "./passwordRules.js";
 
 const prod = process.env.NODE_ENV === "production";
 
@@ -89,10 +90,13 @@ export const perAccount = (limit: number, ownerOf: (raw: string) => Promise<stri
 });
 export const mcpLimiter = perAccount(240);
 
-/** Política de contraseñas: mínimo 10 caracteres, con letras y números. */
+/** Password policy (passwordRules.ts, shared with the web app): the message for the first rule it breaks. */
 export function passwordProblem(pw: string): string | null {
-  if (pw.length < 10) return "La contraseña debe tener al menos 10 caracteres";
-  if (!/[A-Za-zÀ-ÿ]/.test(pw) || !/\d/.test(pw)) return "La contraseña debe combinar letras y números";
-  if (/^(.)\1+$/.test(pw)) return "La contraseña es demasiado simple";
-  return null;
+  const broken = brokenPasswordRule(pw);
+  return broken ? PASSWORD_MESSAGES[broken] : null;
 }
+const PASSWORD_MESSAGES: Record<PasswordRuleId, string> = {
+  length: "La contraseña debe tener al menos 10 caracteres",
+  letters_and_digits: "La contraseña debe combinar letras y números",
+  not_one_repeated_char: "La contraseña es demasiado simple",
+};
