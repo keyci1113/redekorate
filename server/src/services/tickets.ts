@@ -9,7 +9,7 @@ import path from "node:path";
 import { z } from "zod";
 import { pool, one, query } from "../lib/db.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { atLeast, projectIn, type ProjectRole } from "../lib/access.js";
+import { accessJoins, accessWhere, atLeast, projectIn, roleSql, type ProjectRole } from "../lib/access.js";
 import { sendMail } from "../lib/mail.js";
 import { flushEmails, notify, ticketPeople } from "../lib/notify.js";
 import { MAX_COLUMNS, builtInColumns, builtInName, columnLabel, columnsProblem, fallbackColumn, findColumn, type Column } from "../lib/board.js";
@@ -39,17 +39,17 @@ const RANK: Record<ProjectRole, number> = { viewer: 1, commenter: 2, editor: 3, 
 
 /** Everyone who can open the project's tickets (owner, collaborators and organization members with that section): the people a ticket can be assigned to. */
 export async function projectPeople(projectId: string, db: Db = pool): Promise<Person[]> {
+  // Role and sections come from the same SQL that guards every request (lib/access.ts), so this list is exactly
+  // the people the tickets route lets in: the role is the highest of all their ways in, and the sections add up
+  // (e.g. a collaborator for research only who reaches every project's tickets through the organization).
   const { rows } = await db.query(
-    `select u.id, u.name, u.email, u.avatar, x.role from (
-       select p.owner_id as user_id, 'owner' as role from projects p where p.id = $1
-       union all select m.user_id, m.role from project_members m where m.project_id = $1 and 'tickets' = any(m.areas)
-       union all select om.user_id, case when om.role in ('owner','admin') then 'owner' else om.project_role end
-         from organization_members om join projects p on p.organization_id = om.organization_id
-         where p.id = $1 and (om.role in ('owner','admin') or (om.all_projects and 'tickets' = any(om.areas)))
-     ) x join users u on u.id = x.user_id where u.disabled_at is null`, [projectId]);
-  const best = new Map<string, Person>();
-  for (const r of rows as Person[]) { const cur = best.get(r.id); if (!cur || RANK[r.role] > RANK[cur.role]) best.set(r.id, r); }
-  return [...best.values()].sort((a, b) => RANK[b.role] - RANK[a.role] || a.name.localeCompare(b.name));
+    `select u.id, u.name, u.email, u.avatar, a.role from users u
+     cross join lateral (select ${roleSql("u.id")} as role ${accessJoins("u.id")} where p.id = $1 and ${accessWhere("u.id", "tickets")}) a
+     where u.disabled_at is null and u.id in (
+       select owner_id from projects where id = $1
+       union select user_id from project_members where project_id = $1
+       union select om.user_id from organization_members om join projects p on p.organization_id = om.organization_id where p.id = $1)`, [projectId]);
+  return (rows as Person[]).sort((a, b) => RANK[b.role] - RANK[a.role] || a.name.localeCompare(b.name));
 }
 
 // ── Reads ───────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export async function ticketRow(projectId: string, number: number, db: Db = pool
   return rows[0] as Record<string, any> & { id: string; number: number; title: string; status: TicketStatus };
 }
 
-const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.user_id, coalesce(u.name, c.author_name) as name, u.avatar, c.visibility
+const COMMENTS_SQL = `select c.id, c.body, c.created_at, c.edited_at, c.user_id, coalesce(u.name, c.author_name) as name, u.avatar, c.visibility
   from comments c left join users u on u.id = c.user_id where c.ticket_id = $1 order by c.created_at`;
 
 /** Links stored on this ticket plus tickets that link to it, each with the title of the other side. Deleted targets are left out. */
@@ -489,16 +489,22 @@ export const ToInsightInput = z.object({
 
 /**
  * Turns the ticket into an insight of the project, linked with relation "converted" (a ticket created
- * FROM an insight uses "evidence"). A ticket converts once: a second call is refused, so no duplicate insight.
+ * FROM an insight uses "evidence"). A ticket converts once: a repeated call (double click, retry) creates nothing
+ * and answers with the ticket and the insight it already produced. A research request asks for research; it is
+ * not a finding, so it cannot become an insight.
  */
 export async function convertToInsight(actor: Actor, projectId: string, number: unknown, input: unknown) {
   const p = await ticketsArea(actor, projectId, "editor");
   const n = ticketNumber(number);
   const b = parse(ToInsightInput, input ?? {});
   await tx(async (c) => {
+    // Lock the ticket BEFORE reading it: two calls at once then run one after the other, and the second
+    // one sees the insight the first created (reading first let both see "not converted yet").
+    const { rows: [locked] } = await c.query("select id from tickets where project_id = $1 and number = $2 for update", [p.id, n]);
+    if (!locked) throw notFound("Ticket");
     const t = await ticketRow(p.id, n, c);
-    await c.query("select id from tickets where id = $1 for update", [t.id]);
-    if (t.converted_insight_id) throw new HttpError(409, "Este ticket ya se convirtió en un insight");
+    if (t.converted_insight_id) return;
+    if (t.type === "research_request") throw new HttpError(400, "Un pedido de investigación no se puede convertir en insight");
     const title = b.title ?? t.title;
     const { rows: [i] } = await c.query(
       "insert into insights(project_id, created_by, title, body, tags, severity) values ($1,$2,$3,$4,$5,$6) returning id",
@@ -552,6 +558,32 @@ export async function deleteComment(actor: Actor, projectId: string, number: unk
   if (!c) throw notFound("Comentario");
   if (c.user_id !== actor.id && !atLeast(p.role, "owner")) throw new HttpError(403, "Solo puedes borrar tus propios comentarios");
   await query("delete from comments where id = $1", [commentId]);
+  return { ticket: await detail(p.id, t.number) };
+}
+
+/** Edits an internal comment. Only its author can, and mentions added in the edit tag those people as a new comment would. */
+export async function editComment(actor: Actor, projectId: string, number: unknown, commentId: string, input: unknown) {
+  const p = await ticketsArea(actor, projectId, "commenter");
+  const t = await ticketRow(p.id, ticketNumber(number));
+  const b = parse(CommentInput.pick({ body: true }), input);
+  const c = await one<{ user_id: string | null; body: string; visibility: string }>("select user_id, body, visibility from comments where id = $1 and ticket_id = $2", [commentId, t.id]);
+  if (!c) throw notFound("Comentario");
+  if (c.user_id !== actor.id) throw new HttpError(403, "Solo puedes editar tus propios comentarios");
+  // An email already went out as it was written; changing it here would misstate what the reporter received.
+  if (c.visibility !== "internal") throw new HttpError(400, "Solo se pueden editar los comentarios internos");
+  if (b.body === c.body) return { ticket: await detail(p.id, t.number) };
+  const people = await projectPeople(p.id);
+  await tx(async (db) => {
+    await db.query("update comments set body = $2, edited_at = now() where id = $1", [commentId, b.body]);
+    const before = new Set(mentionedIds(c.body, people));
+    const added = mentionedIds(b.body, people).filter((u) => !before.has(u));
+    for (const u of added) {
+      const r = await db.query("insert into ticket_watchers(ticket_id, user_id) values ($1,$2) on conflict do nothing returning user_id", [t.id, u]);
+      if (r.rows[0]) await log(db, t.id, actor.id, "tagged", null, people.find((x) => x.id === u)?.name ?? null);
+    }
+    await notify(db, { actor: actor.id, projectId: p.id, ticketId: t.id, lang: actor.lang, users: added, kind: "tagged", data: { comment: true, excerpt: b.body.replace(/\s+/g, " ").slice(0, 160) } });
+  });
+  emailLater(actor);
   return { ticket: await detail(p.id, t.number) };
 }
 

@@ -24,6 +24,7 @@ tickets.post("/:number/links", async (req, res) => { res.status(201).json(await 
 tickets.delete("/:number/links/:linkId", async (req, res) => { res.json(await svc.unlinkTicket(actorOf(req), pid(req), num(req), req.params.linkId)); });
 tickets.post("/:number/insight", async (req, res) => { res.status(201).json(await svc.convertToInsight(actorOf(req), pid(req), num(req), req.body)); });
 tickets.post("/:number/comments", async (req, res) => { res.status(201).json(await svc.commentOnTicket(actorOf(req), pid(req), num(req), req.body)); });
+tickets.patch("/:number/comments/:commentId", async (req, res) => { res.json(await svc.editComment(actorOf(req), pid(req), num(req), req.params.commentId, req.body)); });
 tickets.delete("/:number/comments/:commentId", async (req, res) => { res.json(await svc.deleteComment(actorOf(req), pid(req), num(req), req.params.commentId)); });
 tickets.post("/:number/merge", async (req, res) => { res.json(await svc.mergeTicket(actorOf(req), pid(req), num(req), req.body)); });
 tickets.delete("/:number/reporter", async (req, res) => { res.json(await svc.eraseReporter(actorOf(req), pid(req), num(req))); });

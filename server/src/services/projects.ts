@@ -114,6 +114,9 @@ export async function listProjectInsights(actor: Actor, projectId: string) {
     `select i.*, s.title as study_title,
        coalesce((select array_agg(t.number order by t.number) from ticket_links k join tickets t on t.id = k.ticket_id
                  where k.target_type = 'insight' and k.target_id = i.id), '{}') as ticket_numbers
+       ,(select json_build_object('number', t.number, 'title', t.title) from ticket_links k join tickets t on t.id = k.ticket_id
+          where k.target_type = 'insight' and k.target_id = i.id and k.relation = 'converted' and t.project_id = i.project_id
+          order by k.created_at limit 1) as source_ticket
      from insights i left join studies s on s.id = i.study_id
      where i.project_id = $1 order by i.created_at desc`,
     [projectId],

@@ -156,10 +156,12 @@ test("converting a ticket makes one insight with the edited fields and a severit
   assert.equal(ins.title, "Cajeros no encuentran descuentos");
   assert.equal(ins.severity, "critical");
   assert.deepEqual(ins.tags, ["POS"]);
+  assert.deepEqual(ins.source_ticket, { number: t.number, title: "Cajeros no encuentran descuentos" }, "the insight says which ticket it came from");
   assert.ok(x.activity.some((a: any) => a.action === "insight_created" && a.to_value === "Cajeros no encuentran descuentos"));
-  // A second conversion is refused instead of creating a duplicate.
+  // A second conversion (a retry) creates nothing and answers with the insight it already made.
   const again = await call("editor", "POST", tickets(`/${t.number}/insight`), {});
-  assert.equal(again.status, 409);
+  assert.equal(again.status, 201);
+  assert.equal(again.body.ticket.converted_insight_id, x.converted_insight_id);
   // The list shows it too.
   const listed = (await call("viewer", "GET", tickets())).body.tickets.find((k: any) => k.number === t.number);
   assert.equal(listed.converted_insight_id, x.converted_insight_id);
@@ -175,6 +177,23 @@ test("converting a ticket makes one insight with the edited fields and a severit
   assert.equal((await call("viewer", "POST", tickets(`/${u.number}/insight`), {})).status, 403);
 });
 
+test("a double click on Convert to insight makes one insight, and a research request cannot be converted", { skip }, async () => {
+  const t = await create("Doble clic");
+  const both = await Promise.all(Array.from({ length: 5 }, () => call("editor", "POST", tickets(`/${t.number}/insight`), {})));
+  assert.ok(both.every((r) => r.status === 201), JSON.stringify(both.map((r) => r.body)));
+  const made = (await sql("select k.target_id from ticket_links k join tickets x on x.id = k.ticket_id where x.project_id = $1 and x.number = $2 and k.target_type = 'insight'", [project, t.number])) as { rows: unknown[] };
+  assert.equal(made.rows.length, 1, "one link, so one insight");
+  const titled = (await sql("select id from insights where project_id = $1 and title = 'Doble clic'", [project])) as { rows: unknown[] };
+  assert.equal(titled.rows.length, 1);
+
+  const ask = await create("¿Por qué abandonan el checkout?", { type: "research_request" });
+  const r = await call("editor", "POST", tickets(`/${ask.number}/insight`), {});
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error, "A research request can't be turned into an insight");
+  const none = (await sql("select id from insights where project_id = $1 and title = $2", [project, ask.title])) as { rows: unknown[] };
+  assert.equal(none.rows.length, 0);
+});
+
 test("mentioning someone with @ in a comment adds them to Tagged", { skip }, async () => {
   const t = await create("Mentions");
   const r = await call("commenter", "POST", tickets(`/${t.number}/comments`), { body: "Necesito las citas, @ana rios. Gracias" });
@@ -184,6 +203,58 @@ test("mentioning someone with @ in a comment adds them to Tagged", { skip }, asy
   assert.ok(r.body.ticket.activity.some((x: any) => x.action === "tagged" && x.to_value === "Ana Ríos"));
   // Ticket comments stay out of the project's own comment list.
   assert.deepEqual((await call("viewer", "GET", `/api/projects/${project}/comments`)).body.comments, []);
+});
+
+test("the author can edit a comment: it is marked edited and new mentions tag people", { skip }, async () => {
+  const t = await create("Editar comentarios");
+  const first = await call("commenter", "POST", tickets(`/${t.number}/comments`), { body: "Primera versión" });
+  const c = first.body.ticket.comments[0];
+  assert.equal(c.edited_at, null);
+  const path = tickets(`/${t.number}/comments/${c.id}`);
+  // Only the author: not another person, not even the project owner.
+  assert.equal((await call("editor", "PATCH", path, { body: "No es mío" })).status, 403);
+  assert.equal((await call("owner", "PATCH", path, { body: "No es mío" })).status, 403);
+  assert.equal((await call("commenter", "PATCH", path, { body: "  " })).status, 400);
+  const r = await call("commenter", "PATCH", path, { body: "Segunda versión, @Ana Ríos" });
+  assert.equal(r.status, 200);
+  const edited = r.body.ticket.comments.find((x: any) => x.id === c.id);
+  assert.equal(edited.body, "Segunda versión, @Ana Ríos");
+  assert.ok(edited.edited_at);
+  assert.deepEqual(r.body.ticket.watchers.map((w: any) => w.id), [ids.editor]);
+  assert.equal((await call("commenter", "PATCH", tickets(`/${t.number}/comments/00000000-0000-0000-0000-000000000000`), { body: "x" })).status, 404);
+});
+
+test("people to assign and mention are everyone the access rules let into the project's tickets", { skip }, async () => {
+  const user = async (name: string, disabled = false) => ((await sql(
+    `insert into users(email, name, password_hash, onboarded_at, disabled_at) values ($1,$2,'x', now(), ${disabled ? "now()" : "null"}) returning id`,
+    [`${name.toLowerCase().replace(/\W+/g, ".")}@test.local`, name])) as { rows: { id: string }[] }).rows[0].id;
+  const org = ((await sql("insert into organizations(name, created_by) values ('Acme', $1) returning id", [ids.owner])) as { rows: { id: string }[] }).rows[0].id;
+  const p2 = ((await sql("insert into projects(owner_id, name, organization_id) values ($1,'Acme app',$2) returning id", [ids.owner, org])) as { rows: { id: string }[] }).rows[0].id;
+  const member = async (u: string, role: string, allProjects: boolean, areas: string[], projectRole = "commenter") =>
+    sql("insert into organization_members(organization_id, user_id, role, all_projects, areas, project_role) values ($1,$2,$3,$4,$5,$6)", [org, u, role, allProjects, areas, projectRole]);
+  const everyProject = await user("Olga Todo");        // org member on every project, both sections
+  const researchOnly = await user("Rita Research");    // org member on every project, research only: no tickets
+  const notHere = await user("Nadia Nada");            // org member on chosen projects only, and not on this one
+  const mixed = await user("Mario Mixto");             // collaborator (viewer, tickets) + org editor for research
+  const admin = await user("Ada Admin");
+  const gone = await user("Gil Gone", true);
+  await member(everyProject, "member", true, ["research", "tickets"]);
+  await member(researchOnly, "member", true, ["research"]);
+  await member(notHere, "member", false, ["research", "tickets"]);
+  await member(mixed, "member", true, ["research"], "editor");
+  await member(admin, "admin", true, ["research"]);
+  await member(gone, "member", true, ["research", "tickets"]);
+  await sql("insert into project_members(project_id, user_id, role, areas) values ($1,$2,'viewer','{tickets}')", [p2, mixed]);
+
+  const r = await call("owner", "GET", `/api/projects/${p2}/tickets`);
+  assert.equal(r.status, 200);
+  const people = Object.fromEntries(r.body.people.map((x: any) => [x.id, x.role]));
+  assert.deepEqual(people, { [ids.owner]: "owner", [admin]: "owner", [mixed]: "editor", [everyProject]: "commenter" });
+
+  // An organization member who sees the tickets can be mentioned, and is tagged.
+  const t = (await call("owner", "POST", `/api/projects/${p2}/tickets`, { title: "Menciones" })).body.ticket;
+  const c = await call("owner", "POST", `/api/projects/${p2}/tickets/${t.number}/comments`, { body: "Mira esto @Olga Todo" });
+  assert.deepEqual(c.body.ticket.watchers.map((w: any) => w.id), [everyProject]);
 });
 
 test("merging moves the conversation to the other ticket and removes this one", { skip }, async () => {
