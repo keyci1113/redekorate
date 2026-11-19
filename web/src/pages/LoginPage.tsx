@@ -15,7 +15,7 @@ import { SsoButtons, SsoDivider, ssoErrorMessage, useSsoProviders } from "../com
 import { t } from "../lib/i18n";
 // Tarjetas de ejemplo que caen en el panel del login, como un vistazo a los insights que genera cada método.
 const INSIGHT_CARDS = (): { icon: ReactNode; title: string; body: ReactNode }[] => [
-  { icon: <LayoutGrid size={14} />, title: t("Card sorting"), body: (
+  { icon: <LayoutGrid size={14} />, title: t("Card Sorting"), body: (
     <div className="mt-3 grid grid-cols-2 gap-2">{[t("Pagos"), t("Pedidos"), t("Perfil"), t("Ayuda")].map((c) => <span key={c} className="rounded-md border border-[#DDE0E6] px-2 py-1.5 text-[11px] text-[#454C58]">{c}</span>)}</div>
   ) },
   { icon: <MousePointerClick size={14} />, title: t("First click · 82% éxito"), body: <div className="mt-3 h-2 rounded-full bg-[#F3E9FD]"><div className="h-2 w-[82%] rounded-full bg-[#5902A1]" /></div> },
@@ -56,7 +56,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <FallingCards />
           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#201429] via-[#201429]/90 to-transparent p-16 pt-28 text-white">
             <p className="display text-5xl leading-[1.05]">{t("Cada estudio,")}<br /><span className="text-[#D0D4DD]">{t("una decisión mejor informada.")}</span></p>
-            <p className="mt-5 max-w-md text-[15px] text-white/90">{t("Encuestas, card sorting, tree testing, pruebas de preferencia y first click — organizado por proyecto y listo para compartir.")}</p>
+            <p className="mt-5 max-w-md text-[15px] text-white/90">{t("Encuestas, Card Sorting, Tree Testing, Preference Test y First Click — organizado por proyecto y listo para compartir.")}</p>
           </div>
         </Bubble>
       </div>

@@ -8,7 +8,7 @@ import { t } from "../../lib/i18n";
 const TASKS = (): Record<StartTask, { label: string; hint: string; to: string }> => ({
   project: { label: t("Crea un proyecto"), hint: t("Agrupa estudios por producto o cliente."), to: "/projects?crear=1" },
   study: { label: t("Crea tu primer estudio"), hint: t("Elige un método; el template trae los bloques."), to: "/projects" },
-  publish: { label: t("Publícalo y copia el link"), hint: t("Revisa el estudio en el builder y pulsa Publicar."), to: "/projects" },
+  publish: { label: t("Publícalo y copia el link"), hint: t("Revisa el estudio en el editor y pulsa Publicar."), to: "/projects" },
   response: { label: t("Recibe la primera respuesta"), hint: t("Envía el link; los resultados se actualizan en vivo."), to: "/studies" },
   share: { label: t("Comparte un reporte"), hint: t("Desde Resultados → Compartir, un link de solo lectura."), to: "/studies" },
 });

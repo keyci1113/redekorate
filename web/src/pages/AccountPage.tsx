@@ -64,7 +64,7 @@ export function AccountPage() {
           <form className="space-y-4" onSubmit={profile.run(async () => {
             const { user: u } = await api.patch<{ user: User }>("/auth/me", { name }); setUser(u); return t("Perfil actualizado");
           })}>
-            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Usuarios y en los colaboradores de cada proyecto. Arrástrala y acércala para encuadrarla en el círculo.")}>
+            <Field group label={t("Foto de perfil")} hint={t("Se ve en el menú, en Personas de tu organización y en los colaboradores de cada proyecto. Arrástrala y acércala para encuadrarla en el círculo.")}>
               <AvatarField name={user?.name ?? ""} avatar={user?.avatar} onSave={async (url) => {
                 const { user: u } = await api.patch<{ user: User }>("/auth/me", { avatar: url }); setUser(u);
               }} />
