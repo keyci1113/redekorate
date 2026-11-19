@@ -56,6 +56,7 @@ export interface PrototypeTaskBlock extends Base {
   type: "prototype_task"; prototypeId: string; startScreen: string;
   goalScreens: string[]; expectedPath: string[]; allowGiveUp: boolean;
   steps?: FlowStep[]; goalClick?: FlowStep;   // interacciones requeridas y meta por interacción (prototipos HTML)
+  startTap?: FlowStep;   // nunca se guarda: lo pone resolveTask cuando el flujo del prototipo empieza con un toque
 }
 
 export type Block =

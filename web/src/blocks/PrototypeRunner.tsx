@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Flag, Play, RotateCcw, Target } from "lucide-react";
+import { CheckCircle2, ChevronDown, Flag, Loader2, Play, RotateCcw, Target } from "lucide-react";
 import type { PrototypeTaskBlock } from "./types";
 import type { Prototype, ProtoClick, ProtoStep, PrototypeTaskValue } from "./prototype";
-import { HTML_SANDBOX, asTrackerMsg, gotoScreen, htmlScreenId, isEmbedded, isHtml, isLink, matchStep, resolveTask } from "./prototype";
+import { HTML_SANDBOX, asTrackerMsg, gotoScreen, htmlScreenId, isEmbedded, isHtml, isLink, matchStep, resolveTask, taskInstructions } from "./prototype";
 import { cx } from "../components/ui";
 
 import { t } from "../lib/i18n";
@@ -11,6 +11,8 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   onChange: (v: unknown) => void; onAdvance?: (v: unknown) => void; preview?: boolean;
 }) {
   const task = resolveTask(block, proto);   // sin ajustes propios, la tarea sigue el flujo del prototipo
+  const instructions = taskInstructions(block.description, proto);
+  const flowOnly = taskInstructions("", proto);   // lo que el encabezado del bloque (su descripción) no muestra
   const [phase, setPhase] = useState<"intro" | "running" | "done">(value ? "done" : "intro");
   const [hist, setHist] = useState<string[]>([]);
   const [flash, setFlash] = useState(false);
@@ -20,6 +22,10 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   const clicks = useRef<ProtoClick[]>([]);
   const stepsDone = useRef<{ i: number; t: number }[]>([]);
   const startTries = useRef(0);   // intentos de llevar el prototipo a la pantalla de inicio
+  // HTML con pantalla de inicio: el prototipo se carga tapado y se lleva hasta ahí; la tarea (y su reloj) empieza al llegar.
+  const [starting, setStarting] = useState(false);
+  const startingRef = useRef(false);
+  const arrive = () => { startingRef.current = false; setStarting(false); start.current = performance.now(); clicks.current = []; stepsDone.current = []; };
   const scroller = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const area = useRef<HTMLDivElement>(null);
@@ -44,16 +50,22 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
     const onMsg = (e: MessageEvent) => {
       if (e.source !== frameRef.current?.contentWindow) return;
       const m = asTrackerMsg(e.data); if (!m) return;
-      const t = Math.round(performance.now() - start.current);
-      if (m.type === "ready" && task.startScreen && proto) { startTries.current = 1; gotoScreen(frameRef.current, proto, task.startScreen); return; }
+      if (m.type === "ready") { if (startingRef.current && proto) { startTries.current++; gotoScreen(frameRef.current, proto, task.startScreen, task.startTap?.label); } return; }
+      if (m.type === "goto") {
+        if (!startingRef.current) return;
+        if (!m.ok && startTries.current < 2) setRun((r) => r + 1);   // no llegó: se recarga el prototipo y se intenta una vez más desde cero
+        else arrive();   // llegó (o no se pudo y empieza donde quedó); el prototipo anuncia enseguida su pantalla actual
+        return;
+      }
       if (m.type === "screen" && typeof m.name === "string" && m.name) {
+        if (startingRef.current) return;   // de camino al inicio: esas pantallas no son del participante
         const id = htmlScreenId(m.name.slice(0, 80));
-        // Si el prototipo abrió en otra pantalla, insistimos una vez más antes de empezar a registrar la ruta.
-        if (task.startScreen && path.current.length === 0 && id !== task.startScreen && startTries.current < 2 && proto) { startTries.current++; gotoScreen(frameRef.current, proto, task.startScreen); return; }
+        const t = Math.round(performance.now() - start.current);
         if (path.current[path.current.length - 1]?.s === id) return;
         path.current.push({ s: id, t: path.current.length ? t : 0 });
         if (task.goalScreens.includes(id)) finishRef.current("success");
-      } else if (m.type === "click" && clicks.current.length < 2000) {
+      } else if (m.type === "click" && !startingRef.current && clicks.current.length < 2000) {
+        const t = Math.round(performance.now() - start.current);
         const s = m.screen ? htmlScreenId(String(m.screen).slice(0, 80)) : path.current[path.current.length - 1]?.s ?? "";
         const n = (v: unknown) => (typeof v === "number" && isFinite(v) ? +Math.min(1, Math.max(0, v)).toFixed(4) : 0);
         const label = String(m.label ?? "").slice(0, 80);
@@ -66,8 +78,14 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
       }
     };
     window.addEventListener("message", onMsg); return () => window.removeEventListener("message", onMsg);
-  }, [html, phase, task.goalScreens, task.steps, task.goalClick, task.startScreen, proto]);
+  }, [html, phase, task.goalScreens, task.steps, task.goalClick, task.startScreen, task.startTap?.label, proto]);
   const finishRef = useRef<(o: PrototypeTaskValue["outcome"]) => void>(() => {});
+  // Si el prototipo nunca avisa (no cargó o no encontró la pantalla), no dejamos al participante esperando.
+  useEffect(() => {
+    if (!starting) return;
+    const id = setTimeout(arrive, 15000);
+    return () => clearTimeout(id);
+  }, [starting, run]);
 
   if (!proto || (html ? !proto.html?.url : link ? !proto.link?.url : !proto.screens.length || !proto.screens.some((s) => s.id === task.startScreen))) {
     return <p className="rounded-xl bg-warn-soft p-4 text-sm text-warn">{preview ? t("Configura el prototipo y la pantalla inicial de esta tarea en el panel derecho.") : t("Esta tarea no está disponible.")}</p>;
@@ -84,7 +102,8 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   const begin = () => {
     start.current = performance.now(); clicks.current = []; stepsDone.current = []; startTries.current = 0;
     path.current = embedded ? [] : [{ s: task.startScreen, t: 0 }];
-    setHist(embedded ? [] : [task.startScreen]); setRun((r) => r + 1); setPhase("running"); setShowTask(false);
+    startingRef.current = html && !!(task.startScreen || task.startTap); setStarting(startingRef.current);
+    setHist(embedded ? [] : [task.startScreen]); setRun((r) => r + 1); setPhase("running"); setShowTask(true);   // las instrucciones quedan a la vista al empezar
   };
   const hasGoal = task.goalScreens.length > 0 || !!task.goalClick;
   const finish = (outcome: PrototypeTaskValue["outcome"], claimed = false) => {
@@ -114,6 +133,7 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
     return (
       <div className="rounded-2xl border border-line bg-surface p-6 text-center sm:p-8">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-accent-soft text-accent"><Target size={22} /></span>
+        {flowOnly && flowOnly !== block.description?.trim() && <p className="mx-auto mt-4 max-w-md text-left text-[15px] leading-relaxed whitespace-pre-line text-ink">{flowOnly}</p>}
         <p className="mt-4 text-sm text-ink-2">{t("Lee la tarea con calma. Cuando estés listo/a, abre el prototipo y navégalo como si fuera la app real.")}</p>
         <ul className="mx-auto mt-4 max-w-sm space-y-1 text-left text-[13px] text-ink-2">
           <li>{t("• Toca los elementos como lo harías normalmente.")}</li>
@@ -144,21 +164,34 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
     <div className="fixed inset-0 z-40 flex flex-col bg-[#141518]">
       {/* Barra de la tarea */}
       <div className="flex shrink-0 items-center gap-3 bg-surface px-4 py-2.5 shadow">
-        <button onClick={() => setShowTask(!showTask)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           <Target size={16} className="shrink-0 text-accent" />
-          <span className={cx("text-sm font-medium", !showTask && "truncate")}>{task.title}</span>
-        </button>
+          <span className={cx("min-w-0 text-sm font-medium", !showTask && "truncate")}>{task.title}</span>
+          {instructions && (
+            <button type="button" onClick={() => setShowTask(!showTask)} aria-expanded={showTask} aria-controls="proto-task-instructions"
+              aria-label={showTask ? t("Ocultar instrucciones") : t("Mostrar instrucciones")}
+              className="focus-ring inline-flex shrink-0 items-center gap-1 rounded-lg border border-line px-2 py-1 text-xs font-medium text-ink-2 hover:text-ink">
+              <span className="hidden sm:inline">{showTask ? t("Ocultar instrucciones") : t("Mostrar instrucciones")}</span>
+              <ChevronDown size={14} className={cx("transition-transform", showTask && "rotate-180")} />
+            </button>
+          )}
+        </div>
         {preview && <button onClick={() => setPhase("intro")} className="shrink-0 rounded-lg px-2 py-1.5 text-xs font-medium text-ink-3 hover:text-ink">{t("Salir de la vista previa")}</button>}
-        <button onClick={() => finish("success", hasGoal)} className="focus-ring shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-on-accent">
+        <button onClick={() => finish("success", hasGoal)} disabled={starting} className="focus-ring shrink-0 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-on-accent disabled:opacity-50 sm:px-5 sm:py-2.5 sm:text-[15px]">
           {t("Terminé la tarea")}
         </button>
         {task.allowGiveUp && (
-          <button onClick={() => finish("gave_up")} className="focus-ring shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink-2 hover:border-bad hover:text-bad">
+          <button onClick={() => finish("gave_up")} disabled={starting} className="focus-ring shrink-0 rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-ink-2 hover:border-bad hover:text-bad disabled:opacity-50 sm:px-5 sm:py-2.5 sm:text-[15px]">
             {t("No puedo completarla")}
           </button>
         )}
       </div>
-      {showTask && task.description && <div className="bg-surface px-4 pb-3 text-[13px] text-ink-2">{task.description}</div>}
+      {showTask && instructions && (
+        <div id="proto-task-instructions" className="max-h-[30vh] shrink-0 overflow-y-auto border-t border-line bg-surface px-4 py-3 text-sm leading-relaxed whitespace-pre-line text-ink-2">
+          <p className="mb-1 text-[11px] font-semibold tracking-wide text-ink-3 uppercase">{t("Instrucciones")}</p>
+          {instructions}
+        </div>
+      )}
 
       {/* Prototipo */}
       <div ref={area} className={cx("flex min-h-0 flex-1 items-center justify-center", bare ? "p-0" : "p-3 sm:p-6")}>
@@ -168,6 +201,11 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
           {html && proto.html && (
             <iframe key={run} ref={frameRef} src={proto.html.url} sandbox={HTML_SANDBOX} title={proto.name}
               className="block h-full w-full border-0 bg-white" referrerPolicy="no-referrer" />
+          )}
+          {starting && (
+            <div role="status" className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white text-sm text-neutral-600">
+              <Loader2 size={22} className="animate-spin" /> {t("Cargando prototipo…")}
+            </div>
           )}
           {link && proto.link && (
             <iframe key={run} src={proto.link.url} title={proto.name} className="block h-full w-full border-0 bg-white" referrerPolicy="no-referrer" />
