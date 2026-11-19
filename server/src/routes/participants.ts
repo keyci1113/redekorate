@@ -21,6 +21,12 @@ const Fields = z.object({
 });
 export const ParticipantPatch = patchOf(Fields);
 
+/** Contact details (phone, email) are personal data: they are only kept for someone who gave informed consent. */
+const CONSENT_NEEDED = "Para guardar el teléfono o el correo, marca que dio su consentimiento informado";
+function requireConsentForContact(p: { email: string; phone: string; consent: boolean }) {
+  if ((p.email.trim() || p.phone.trim()) && !p.consent) throw new HttpError(400, CONSENT_NEEDED);
+}
+
 async function ownParticipant(id: string, userId: string) {
   const p = await one("select * from participants where id = $1", [id]);
   if (!p) throw notFound("Participante");
@@ -43,12 +49,21 @@ participants.get("/", async (req, res) => {
   const { project_id } = parse(z.object({ project_id: z.string().uuid() }), req.query);
   await ownProject(project_id, req.user!.id);
   const rows = await query("select * from participants where project_id = $1 order by created_at desc", [project_id]);
-  res.json({ participants: await withStudies(rows) });
+  // Responses are not linked to this list: count, per study, the ones whose link carried who answered
+  // (?pid=, ?name=, ?email=…), so the page can say where those people are. Counts only, never the values.
+  const identified = await query<{ study_id: string; title: string; count: number }>(
+    `select s.id as study_id, s.title, count(*)::int as count
+     from sessions se join studies s on s.id = se.study_id
+     where s.project_id = $1 and not (se.participant ? 'preview') and exists (
+       select 1 from jsonb_object_keys(se.participant) k where k not in ('preview', 'consent'))
+     group by s.id, s.title order by count(*) desc, s.title`, [project_id]);
+  res.json({ participants: await withStudies(rows), identified_responses: identified });
 });
 
 participants.post("/", async (req, res) => {
   const b = parse(Fields.extend({ project_id: z.string().uuid() }), req.body);
   await ownProject(b.project_id, req.user!.id, "editor");
+  requireConsentForContact(b);
   const p = await one(
     `insert into participants(project_id, owner_id, name, email, phone, tags, notes, consent, consent_at)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
@@ -60,6 +75,8 @@ participants.post("/", async (req, res) => {
 participants.patch("/:id", async (req, res) => {
   const before = await ownParticipant(req.params.id, req.user!.id);
   const b = ParticipantPatch.parse(req.body);   // .partial() would keep the defaults and wipe email, phone, notes and consent
+  // Checked on the record as it will be after the change, so a patch cannot drop consent and keep the contact details.
+  requireConsentForContact({ email: b.email ?? before.email, phone: b.phone ?? before.phone, consent: b.consent ?? before.consent });
   const touchConsentAt = b.consent !== undefined;
   const consentAt = b.consent ? (before.consent ? before.consent_at : new Date()) : null;
   const p = await one(

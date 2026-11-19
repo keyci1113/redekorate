@@ -18,7 +18,7 @@ import { DocsPanel } from "../components/DocsPanel";
 import { ArchitecturePanel } from "../architecture/ArchitecturePanel";
 import { isDiagramKind } from "../architecture/model";
 import { FilesPanel } from "../components/FilesPanel";
-import { ParticipantsPanel } from "../components/ParticipantsPanel";
+import { ParticipantsPanel, type IdentifiedResponses } from "../components/ParticipantsPanel";
 import { ReportsPanel } from "../components/ReportsPanel";
 import { MembersPanel, sharedLabel } from "../components/MembersPanel";
 import type { DocRecord } from "../docs/types";
@@ -52,7 +52,7 @@ export function ProjectPage() {
   const studies = useLoad(() => api.get<{ studies: Study[] }>(`/projects/${id}/studies`), [id]);
   const insights = useLoad(() => api.get<{ insights: Insight[] }>(`/projects/${id}/insights`), [id]);
   const docs = useLoad(() => api.get<{ documents: DocRecord[] }>(`/documents?project_id=${id}`), [id]);
-  const participants = useLoad(() => api.get<{ participants: Participant[] }>(`/participants?project_id=${id}`), [id]);
+  const participants = useLoad(() => api.get<{ participants: Participant[]; identified_responses: IdentifiedResponses[] }>(`/participants?project_id=${id}`), [id]);
   const shares = useLoad(() => api.get<{ shares: ProjectShare[] }>(`/projects/${id}/shares`), [id]);
   const members = useLoad(() => api.get<{ members: ProjectMember[]; via_org?: OrgAccessMember[] }>(`/projects/${id}/members`), [id]);
   const orgs = useLoad(() => (editOpen ? api.get<{ organizations: Organization[] }>("/orgs") : Promise.resolve({ organizations: [] as Organization[] })), [editOpen]);
@@ -137,7 +137,7 @@ export function ProjectPage() {
         {tab === "roadmap" && <RoadmapTab projectId={p.id} />}
         {tab === "tickets" && <TicketsTab projectId={p.id} projectName={p.name} onCount={setTicketCount} onLinksChange={insights.reload} />}
         {tab === "participants" && (
-          <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} onChange={participants.reload} canEdit={canEdit} />
+          <ParticipantsPanel projectId={p.id} studies={list} participants={participants.data?.participants ?? []} identified={participants.data?.identified_responses ?? []} onChange={participants.reload} canEdit={canEdit} />
         )}
         {tab === "members" && (members.loading ? <Spinner /> : <MembersPanel projectId={p.id} myRole={role ?? "viewer"} members={members.data?.members ?? []} viaOrg={members.data?.via_org ?? []} onChange={members.reload} />)}
         {tab === "comments" && <CommentsPanel projectId={p.id} role={role} />}

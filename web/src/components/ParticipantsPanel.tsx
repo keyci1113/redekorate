@@ -1,16 +1,24 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
+import { Link } from "react-router-dom";
 import { Check, Mail, Phone, Plus, Pencil, Search, ShieldCheck, Trash2, UsersRound, X } from "lucide-react";
 import { api } from "../lib/api";
+import { EMAIL_RE } from "../lib/loginForm";
 import { timeAgo } from "../lib/hooks";
 import type { Participant, ParticipantStudyStatus, Study } from "../lib/types";
 import { Button, Card, Empty, ErrorNote, Field, Modal, Tag, cx } from "./ui";
 
-import { t } from "../lib/i18n";
+import { plural, t } from "../lib/i18n";
 const STATUSES = (): [ParticipantStudyStatus, string][] => [["invited", t("Invitado")], ["completed", t("Completó")], ["no_show", t("No asistió")], ["declined", t("Rechazó")]];
 const statusTone = (s: ParticipantStudyStatus) => s === "completed" ? "border-good/30 bg-good-soft text-good" : s === "declined" || s === "no_show" ? "border-bad/30 bg-bad-soft text-bad" : "border-line text-ink-2";
 
-export function ParticipantsPanel({ projectId, studies, participants, onChange, canEdit = true }: {
-  projectId: string; studies: Pick<Study, "id" | "title">[]; participants: Participant[]; onChange: () => void; canEdit?: boolean;
+/** Per study, how many responses came with who answered in the link (?pid=, ?name=, ?email=…). */
+export interface IdentifiedResponses { study_id: string; title: string; count: number }
+
+/** Contact details are only kept with informed consent; the server enforces the same rule. */
+export const contactNeedsConsent = (v: { email: string; phone: string; consent: boolean }) => !v.consent && !!(v.email.trim() || v.phone.trim());
+
+export function ParticipantsPanel({ projectId, studies, participants, identified = [], onChange, canEdit = true }: {
+  projectId: string; studies: Pick<Study, "id" | "title">[]; participants: Participant[]; identified?: IdentifiedResponses[]; onChange: () => void; canEdit?: boolean;
 }) {
   const [editing, setEditing] = useState<Participant | "new" | null>(null);
   const [q, setQ] = useState("");
@@ -33,9 +41,12 @@ export function ParticipantsPanel({ projectId, studies, participants, onChange, 
       </div>
 
       {participants.length === 0 ? (
-        <Empty icon={<UsersRound size={20} />} title={t("Aún no hay participantes")}
-          text={t("Lleva aquí tu base de reclutamiento: contacto, consentimiento y en qué estudios ha participado cada quién.")}
-          action={canEdit ? <Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button> : undefined} />
+        <>
+          <Empty icon={<UsersRound size={20} />} title={t("Aún no hay participantes")}
+            text={t("Lleva aquí tu base de reclutamiento: contacto, consentimiento y a qué estudios invitaste a cada quién. La lista se llena a mano: las respuestas de los estudios no se agregan solas.")}
+            action={canEdit ? <Button icon={<Plus size={16} />} onClick={() => setEditing("new")}>{t("Agregar el primero")}</Button> : undefined} />
+          {identified.length > 0 && <IdentifiedNote identified={identified} />}
+        </>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {list.map((p) => (
@@ -89,6 +100,28 @@ export function ParticipantsPanel({ projectId, studies, participants, onChange, 
   );
 }
 
+/** Responses that say who answered live in each study's Results, not here: say how many and where. */
+function IdentifiedNote({ identified }: { identified: IdentifiedResponses[] }) {
+  const total = identified.reduce((n, s) => n + s.count, 0);
+  return (
+    <div className="mt-4 rounded-xl border border-line bg-surface p-4 text-sm">
+      <p className="text-ink-2">{plural(total, {
+        one: "{n} respuesta de este proyecto trae nombre, correo o ID en el link del estudio. No aparece aquí: la ves en Resultados.",
+        other: "{n} respuestas de este proyecto traen nombre, correo o ID en el link del estudio. No aparecen aquí: las ves en Resultados.",
+      })}</p>
+      <ul className="mt-2 flex flex-wrap gap-2">
+        {identified.map((s) => (
+          <li key={s.study_id}>
+            <Link to={`/studies/${s.study_id}/results`} className="focus-ring inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1 text-[13px] font-medium hover:border-line-2">
+              {t("Resultados de {a}", { a: s.title })} <span className="text-ink-3 tabular-nums">· {plural(s.count, { one: "{n} respuesta", other: "{n} respuestas" })}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function ParticipantForm({ studies, initial, onSubmit, onLinkChange }: {
   studies: Pick<Study, "id" | "title">[]; initial?: Participant;
   onSubmit: (v: Record<string, unknown>) => Promise<void>; onLinkChange: () => void;
@@ -98,6 +131,8 @@ function ParticipantForm({ studies, initial, onSubmit, onLinkChange }: {
     tags: initial?.tags.join(", ") ?? "", notes: initial?.notes ?? "", consent: initial?.consent ?? false,
   });
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; consent?: string }>({});
+  const ids = { name: useId(), email: useId(), consent: useId() };
   const [studyId, setStudyId] = useState("");
   const [status, setStatus] = useState<ParticipantStudyStatus>("invited");
   const linked = new Set((initial?.studies ?? []).map((s) => s.study_id));
@@ -105,6 +140,14 @@ function ParticipantForm({ studies, initial, onSubmit, onLinkChange }: {
 
   async function submit(e: FormEvent) {
     e.preventDefault(); setError(null);
+    // Our own messages in the app's language instead of the browser's (noValidate on the form).
+    const errs: typeof fieldErrors = {};
+    if (!v.name.trim()) errs.name = t("Escribe el nombre del participante.");
+    if (v.email.trim() && !EMAIL_RE.test(v.email.trim())) errs.email = t("Escribe un correo válido, como nombre@empresa.com.");
+    if (contactNeedsConsent(v)) errs.consent = t("Para guardar el teléfono o el correo, marca que dio su consentimiento informado.");
+    setFieldErrors(errs);
+    const first = (["name", "email", "consent"] as const).find((k) => errs[k]);
+    if (first) { document.getElementById(ids[first])?.focus(); return; }
     try {
       await onSubmit({ name: v.name, email: v.email, phone: v.phone, notes: v.notes, consent: v.consent, tags: v.tags.split(",").map((x) => x.trim().replace(/^#/, "")).filter(Boolean) });
     } catch (err) { setError((err as Error).message); }
@@ -121,19 +164,29 @@ function ParticipantForm({ studies, initial, onSubmit, onLinkChange }: {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} noValidate className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label={t("Nombre")}><input autoFocus required className="field font-medium" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></Field>
-        <Field label={t("Teléfono")}><input className="field" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} /></Field>
-        <Field label={t("Correo")}><input type="email" className="field" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} /></Field>
+        <Field label={t("Nombre")} required error={fieldErrors.name} errorId={`${ids.name}-error`}>
+          <input id={ids.name} autoFocus required className="field font-medium" value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })}
+            aria-invalid={fieldErrors.name ? true : undefined} aria-describedby={fieldErrors.name ? `${ids.name}-error` : undefined} />
+        </Field>
+        <Field label={t("Teléfono")} hint={t("Solo con consentimiento informado")}><input type="tel" className="field" value={v.phone} onChange={(e) => setV({ ...v, phone: e.target.value })} /></Field>
+        <Field label={t("Correo")} hint={t("Solo con consentimiento informado")} error={fieldErrors.email} errorId={`${ids.email}-error`}>
+          <input id={ids.email} type="email" className="field" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })}
+            aria-invalid={fieldErrors.email ? true : undefined} aria-describedby={fieldErrors.email ? `${ids.email}-error` : undefined} />
+        </Field>
         <Field label={t("Etiquetas")} hint={t("Separadas por comas: VIP, móvil, remoto")}><input className="field" value={v.tags} onChange={(e) => setV({ ...v, tags: e.target.value })} /></Field>
       </div>
       <Field label={t("Notas")}><textarea className="field min-h-24" value={v.notes} onChange={(e) => setV({ ...v, notes: e.target.value })} /></Field>
-      <label className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-line bg-paper/60 px-3 py-2.5 text-sm">
-        <input type="checkbox" className="h-4 w-4 accent-accent" checked={v.consent} onChange={(e) => setV({ ...v, consent: e.target.checked })} />
-        <span>{t("Dio su consentimiento informado")}</span>
-        {initial?.consent_at && <span className="ml-auto text-xs text-ink-3">{timeAgo(initial.consent_at)}</span>}
-      </label>
+      <div className="space-y-1.5">
+        <label className={cx("flex cursor-pointer items-center gap-2.5 rounded-lg border bg-paper/60 px-3 py-2.5 text-sm", fieldErrors.consent ? "border-bad/40" : "border-line")}>
+          <input id={ids.consent} type="checkbox" className="h-4 w-4 accent-accent" checked={v.consent} onChange={(e) => setV({ ...v, consent: e.target.checked })}
+            aria-invalid={fieldErrors.consent ? true : undefined} aria-describedby={fieldErrors.consent ? `${ids.consent}-error` : undefined} />
+          <span>{t("Dio su consentimiento informado")}</span>
+          {initial?.consent_at && <span className="ml-auto text-xs text-ink-3">{timeAgo(initial.consent_at)}</span>}
+        </label>
+        {fieldErrors.consent && <p id={`${ids.consent}-error`} className="text-sm text-bad">{fieldErrors.consent}</p>}
+      </div>
 
       {initial && (
         <div className="rounded-xl border border-line p-3">
