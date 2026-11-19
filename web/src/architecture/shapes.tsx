@@ -25,6 +25,7 @@ export function textBox(shape: Shape, w: number, h: number): { top: number; righ
     case "note": return { top: 14, right: 14, bottom: 14, left: 14 };
     case "frame": return { top: 8, right: 12, bottom: h - 34, left: 12 };
     case "text": return { top: 2, right: 2, bottom: 2, left: 2 };
+    case "card": return { top: 12, right: 14, bottom: 10, left: 14 };
     // Mood board items: the caption or name sits in a strip at the bottom, the link title fills the card.
     case "image": return { top: Math.max(0, h - 30), right: 8, bottom: 4, left: 8 };
     case "swatch": return { top: Math.max(0, h - 46), right: 10, bottom: 22, left: 10 };
@@ -74,9 +75,10 @@ export function ShapeSvg({ shape, w, h, color, selected = false, strokeWidth = 1
       break;
     }
     case "note": body = <rect x={s} y={s} width={W - s} height={H - s} rx={2} fill={fill} stroke={selected ? stroke : "none"} strokeWidth={strokeWidth} />; break;
+    case "card": body = <rect x={s} y={s} width={W - s} height={H - s} rx={8} {...p} />; break;
     case "frame": body = <rect x={s} y={s} width={W - s} height={H - s} rx={Math.min(12, w / 6, h / 6)} fill={fill} stroke={selected ? stroke : strokeOf(color)} strokeWidth={1} strokeDasharray={color === "none" ? "6 5" : undefined} />; break;
   }
-  return <svg width={w} height={h} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden style={shape === "note" ? { filter: "drop-shadow(0 2px 3px rgb(22 25 31 / 0.18))" } : undefined}>{body}</svg>;
+  return <svg width={w} height={h} className="pointer-events-none absolute inset-0 overflow-visible" aria-hidden style={shape === "note" ? { filter: "drop-shadow(0 2px 3px rgb(22 25 31 / 0.18))" } : shape === "card" ? { filter: "drop-shadow(0 1px 2px rgb(22 25 31 / 0.10))" } : undefined}>{body}</svg>;
 }
 
 /** Small icon of a shape for the toolbar. */

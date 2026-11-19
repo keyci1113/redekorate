@@ -35,19 +35,19 @@ const SIDE_POS: Record<Side, Position> = { top: Position.Top, right: Position.Ri
 
 export const SHAPE_NAMES: Record<Shape, string> = {
   rect: "Rectángulo", rounded: "Proceso", ellipse: "Elipse", diamond: "Decisión", triangle: "Triángulo", parallelogram: "Entrada / salida",
-  hexagon: "Hexágono", cylinder: "Base de datos", page: "Página", pages: "Grupo de páginas", note: "Nota adhesiva", text: "Texto", frame: "Sección",
+  hexagon: "Hexágono", cylinder: "Base de datos", page: "Página", pages: "Grupo de páginas", note: "Nota adhesiva", text: "Texto", frame: "Sección", card: "Tarjeta",
   image: "Imagen", swatch: "Muestra de color", link: "Enlace",
 };
-const SHORTCUT: Partial<Record<Shape, string>> = { rect: "r", ellipse: "o", diamond: "d", page: "p", note: "s", text: "t", frame: "f" };
+const SHORTCUT: Partial<Record<Shape, string>> = { rect: "r", ellipse: "o", diamond: "d", page: "p", note: "s", text: "t", frame: "f", card: "c" };
 const TOOL_GROUPS: { label: string; shapes: Shape[] }[] = [
   { label: "Figuras", shapes: ["rect", "rounded", "ellipse", "diamond", "triangle", "parallelogram", "hexagon", "cylinder"] },
   { label: "Arquitectura de información", shapes: ["page", "pages"] },
-  { label: "Pizarra", shapes: ["note", "text", "frame"] },
+  { label: "Pizarra", shapes: ["note", "card", "text", "frame"] },
 ];
 /** A mood board's toolbar: its own items first, then the whiteboard pieces and a few plain shapes. */
 const BOARD_GROUPS: { label: string; shapes: Shape[] }[] = [
   { label: "Tablero", shapes: ["image", "swatch", "link"] },
-  { label: "Pizarra", shapes: ["note", "text", "frame"] },
+  { label: "Pizarra", shapes: ["note", "card", "text", "frame"] },
   { label: "Figuras", shapes: ["rect", "rounded", "ellipse"] },
 ];
 const MEDIA_ICON: Partial<Record<Shape, ReactNode>> = { image: <ImageIcon size={16} />, swatch: <Palette size={16} />, link: <Link2 size={16} /> };
@@ -139,16 +139,18 @@ function Segs({ segs }: { segs: Seg[] }) {
   })}</>;
 }
 
-/** Formatted text as lines, bulleted lists and numbered lines. */
-function RichText({ text }: { text: string }) {
+/** A card's first line is its title; a later line such as "Who: Sales" keeps its label bold, like a field. */
+function RichText({ text, card }: { text: string; card?: boolean }) {
   const lines = parseRich(text);
   const out: ReactNode[] = [];
   for (let i = 0; i < lines.length;) {
     const l = lines[i];
-    // A numbered line shows the number exactly as written, so "1. Set up" in older diagrams looks as before.
+    // A numbered line shows the number exactly as written, so "1. Set up" in older diagrams and card titles looks as before.
     if (l.kind === "p" || l.kind === "ol") {
-      const segs = l.kind === "ol" ? [{ ...l.segs[0], t: `${"\u2003".repeat(l.depth)}${l.n}. ` }, ...l.segs] : l.segs;
-      out.push(<div key={i}>{segs.length ? <Segs segs={segs} /> : "\u00a0"}</div>);
+      let segs = l.kind === "ol" ? [{ ...l.segs[0], t: `${"\u2003".repeat(l.depth)}${l.n}. ` }, ...l.segs] : l.segs;
+      const label = card && i > 0 && segs[0] ? /^([^:]{1,16}:)(\s[\s\S]*)$/.exec(segs[0].t) : null;
+      if (label) segs = [{ ...segs[0], t: label[1], b: true }, { ...segs[0], t: label[2] }, ...segs.slice(1)];
+      out.push(<div key={i} className={card ? (i === 0 ? "font-semibold" : "mt-0.5 text-[0.86em] leading-snug") : undefined}>{segs.length ? <Segs segs={segs} /> : "\u00a0"}</div>);
       i++; continue;
     }
     const kind = l.kind, start = i, items: ReactNode[] = [];
@@ -194,9 +196,9 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
   const w = width ?? DEFAULT_SIZE[data.shape][0], h = height ?? DEFAULT_SIZE[data.shape][1];
   const box = textBox(data.shape, w, h);
   const editing = ctx.editing === id;
-  const frame = data.shape === "frame", note = data.shape === "note", text = data.shape === "text";
+  const frame = data.shape === "frame", note = data.shape === "note", text = data.shape === "text", card = data.shape === "card";
   const image = data.shape === "image", swatch = data.shape === "swatch", link = data.shape === "link";
-  const left = note || text || frame || link || swatch;
+  const left = note || text || frame || card || link || swatch;
   const align = data.align ?? (left ? "left" : "center"), valign = data.valign ?? (left ? "top" : "middle");
   const color = data.textColor && data.textColor !== "auto" ? TEXT_COLOR_CSS[data.textColor] : image ? "#FFFFFF" : frame || text || swatch || link ? "var(--color-ink)" : textOf(data.color);
   const style: CSSProperties = { fontSize: SIZE_PX[data.size ?? (frame ? "s" : "m")], color, lineHeight: 1.3, textAlign: align, justifyContent: JUSTIFY[valign] };
@@ -220,7 +222,7 @@ const ShapeNode = memo(function ShapeNode({ id, data, selected, width, height }:
         style={{ top: box.top, right: box.right, bottom: box.bottom, left: box.left, ...style, ...(swatch || link ? { fontSize: SIZE_PX[data.size ?? "s"] } : {}) }}>
         {editing
           ? <RichEditor value={data.text} onChange={(v) => ctx.setText(id, v)} onDone={ctx.endEdit} onGrow={grow} />
-          : data.text ? <RichText text={data.text} />
+          : data.text ? <RichText text={data.text} card={card} />
           : !ctx.readOnly && (note || text) ? <span className="opacity-40">{t("Escribe algo")}</span>
           : link && data.url ? <span>{hostOf(data.url)}</span> : null}
       </div>
@@ -932,7 +934,7 @@ function LinkField({ data, set, snapshot }: { data: ShapeData; set: (p: Partial<
   );
 }
 
-const LEFT_SHAPES = new Set<Shape>(["note", "text", "frame", "link", "swatch"]);
+const LEFT_SHAPES = new Set<Shape>(["note", "text", "frame", "card", "link", "swatch"]);
 
 /** Size, alignment and color of the text as a whole: in the inspector, and in the bar shown while typing. */
 function TextSettings({ datas, patch, keepFocus }: { datas: ShapeData[]; patch: (p: Partial<ShapeData>) => void; keepFocus?: boolean }) {

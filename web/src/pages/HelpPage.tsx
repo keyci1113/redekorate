@@ -56,7 +56,7 @@ const HOW_TOS = (): HowTo[] => [
     t("Se guarda solo mientras escribes. Exporta a Word, PDF, Markdown o CSV, o comparte un link de lectura."),
   ] },
   { id: "architecture", title: t("Dibujar un diagrama o un mapa del sitio"), where: t("Proyecto → Arquitectura"), steps: [
-    t("Elige un lienzo en blanco, un mapa del sitio, un flujo de usuario, un diagrama de flujo o una arquitectura del sistema."),
+    t("Elige un lienzo en blanco o un punto de partida: mapa del sitio, flujo de usuario, diagrama de flujo, arquitectura del sistema, vista general de la app, proceso por roles, integración de IA u organigrama."),
     t("En el lienzo, agrega figuras desde la barra de la izquierda, haz doble clic para escribir y arrastra desde uno de sus puntos hasta otra figura para unirlas con una flecha."),
     t("En un mapa del sitio, escribe una página por línea y usa Tab para ponerla dentro de la de arriba: el árbol se dibuja solo. «Abrir como diagrama» lo pasa al lienzo para acomodarlo a mano."),
     t("Se guarda solo. Exporta a PNG o SVG, o comparte un link de lectura."),

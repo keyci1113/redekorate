@@ -1,22 +1,28 @@
 import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { FolderTree as Sitemap, GitFork,  Network, Palette, Plus, Shapes, Workflow } from "lucide-react";
+import { Bot, FolderTree as Sitemap, GitFork, LayoutPanelTop, Network, Palette, Plus, Rows3, Shapes, Users, Workflow } from "lucide-react";
 import { api } from "../lib/api";
 import { getLang, t, tr, type Lang } from "../lib/i18n";
 import { Button, Empty, ErrorNote, Field, Modal, cx } from "../components/ui";
 import { Segmented } from "../components/editing";
 import type { DocRecord } from "../docs/types";
 import { DocCard } from "../docs/DocCard";
-import { starter, type StarterId } from "./model";
+import { STARTER_IDS, starter, type StarterId } from "./model";
 
-const STARTERS: { id: StarterId; name: string; text: string; icon: ReactNode }[] = [
-  { id: "blank", name: "Lienzo en blanco", text: "Figuras, notas adhesivas, texto y flechas, como en una pizarra.", icon: <Shapes size={18} /> },
-  { id: "moodboard", name: "Mood board", text: "Imágenes, colores, notas y enlaces de una dirección visual. Compara direcciones con participantes en una prueba de preferencia.", icon: <Palette size={18} /> },
-  { id: "sitemap", name: "Mapa del sitio", text: "Arquitectura de información: escribe las páginas como un esquema y se dibuja el árbol.", icon: <Sitemap size={18} /> },
-  { id: "user_flow", name: "Flujo de usuario", text: "Las pantallas y decisiones por las que pasa una persona para lograr algo.", icon: <Workflow size={18} /> },
-  { id: "flowchart", name: "Diagrama de flujo", text: "Pasos y decisiones de un proceso, de inicio a fin.", icon: <GitFork size={18} /> },
-  { id: "system", name: "Arquitectura del sistema", text: "Las partes de un producto (apps, servicios, bases de datos) y cómo se conectan.", icon: <Network size={18} /> },
-];
+// A record, so a starter added to the model cannot be left out of the dialog.
+const STARTER_INFO: Record<StarterId, { name: string; text: string; icon: ReactNode }> = {
+  blank: { name: "Lienzo en blanco", text: "Figuras, notas adhesivas, texto y flechas, como en una pizarra.", icon: <Shapes size={18} /> },
+  moodboard: { name: "Mood board", text: "Imágenes, colores, notas y enlaces de una dirección visual. Compara direcciones con participantes en una prueba de preferencia.", icon: <Palette size={18} /> },
+  sitemap: { name: "Mapa del sitio", text: "Arquitectura de información: escribe las páginas como un esquema y se dibuja el árbol.", icon: <Sitemap size={18} /> },
+  user_flow: { name: "Flujo de usuario", text: "Las pantallas y decisiones por las que pasa una persona para lograr algo.", icon: <Workflow size={18} /> },
+  flowchart: { name: "Diagrama de flujo", text: "Pasos y decisiones de un proceso, de inicio a fin.", icon: <GitFork size={18} /> },
+  system: { name: "Arquitectura del sistema", text: "Las partes de un producto (apps, servicios, bases de datos) y cómo se conectan.", icon: <Network size={18} /> },
+  app_overview: { name: "Vista general de la app", text: "Las partes de una app por carriles: sistemas externos, el ciclo principal en orden y lo de todo el año, con quién usa cada una.", icon: <LayoutPanelTop size={18} /> },
+  swimlane: { name: "Proceso por roles", text: "Un proceso en carriles, uno por persona o equipo, para ver quién hace cada paso y dónde cambia de manos.", icon: <Rows3 size={18} /> },
+  ai_integration: { name: "Integración de IA", text: "Sistemas de origen, el agente de IA, la revisión humana para decisiones de alto impacto y los resultados.", icon: <Bot size={18} /> },
+  org_chart: { name: "Organigrama", text: "Quién reporta a quién: dirección, áreas y personas con su rol.", icon: <Users size={18} /> },
+};
+const STARTERS = STARTER_IDS.map((id) => ({ id, ...STARTER_INFO[id] }));
 const kindLabel = (kind: string) => (kind === "sitemap" ? t("Mapa del sitio") : kind === "moodboard" ? t("Mood board") : t("Diagrama"));
 
 export function ArchitecturePanel({ projectId, diagrams, onChange, canEdit = true }: { projectId: string; diagrams: DocRecord[]; onChange: () => void; canEdit?: boolean }) {
