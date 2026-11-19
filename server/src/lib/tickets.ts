@@ -1,4 +1,5 @@
 // Pure ticket helpers: no database, no HTTP, so they can be tested on their own.
+import { z } from "zod";
 
 export const TICKET_TYPES = ["task", "bug", "research_request", "design_change"] as const;
 export const TICKET_STATUSES = ["todo", "in_progress", "in_review", "done"] as const;
@@ -83,3 +84,47 @@ export function mostSimilar<T extends { id: string; title: string }>(ticket: { i
 /** The severity an insight made from a ticket starts with: the ticket's priority, with urgent meaning critical. */
 export const severityFromPriority = (p: TicketPriority): "critical" | "high" | "medium" | "low" =>
   ({ urgent: "critical", high: "high", medium: "medium", low: "low" } as const)[p] ?? "medium";
+
+// ── Filtering and paging a board for scripts and AI apps ───────
+export const TICKET_SORTS = ["updated_desc", "number_asc", "number_desc"] as const;
+/** Filters for one page of tickets. Query values arrive as strings, so numbers are coerced. */
+export const TicketFilterInput = z.object({
+  status: z.enum(TICKET_STATUSES).optional(),
+  column: z.string().trim().min(1).max(60).optional().describe("A board column by name (any case) or id"),
+  label: z.string().trim().min(1).max(60).optional(),
+  type: z.enum(TICKET_TYPES).optional(),
+  priority: z.enum(TICKET_PRIORITIES).optional(),
+  assignee_id: z.string().uuid().optional(),
+  query: z.string().trim().min(1).max(200).optional().describe("Text the title contains, any case"),
+  sort: z.enum(TICKET_SORTS).default("updated_desc"),
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  page: z.coerce.number().int().min(1).default(1),
+});
+export type TicketFilter = z.infer<typeof TicketFilterInput>;
+export interface TicketListRow { number: number; title: string; type: string; status: string; column: string; priority: string; labels: string[]; assignees: { id: string }[]; updated_at: string | Date }
+
+/**
+ * One page of a board's tickets. Each ticket also carries its column's name, which a script or an assistant can
+ * read and send back. A page past the end gives the last page.
+ */
+export function filterTickets<T extends TicketListRow>(rows: T[], columns: { id: string; name: string }[], f: TicketFilter) {
+  const colName = new Map(columns.map((c) => [c.id, c.name]));
+  const col = f.column ? columns.find((c) => c.id === f.column || fold(c.name) === fold(f.column!)) : undefined;
+  const q = f.query ? fold(f.query) : null;
+  const hits = rows.filter((t) =>
+    (!f.status || t.status === f.status)
+    && (!f.column || (col ? t.column === col.id : false))
+    && (!f.label || t.labels.some((l) => fold(l) === fold(f.label!)))
+    && (!f.type || t.type === f.type)
+    && (!f.priority || t.priority === f.priority)
+    && (!f.assignee_id || t.assignees.some((a) => a.id === f.assignee_id))
+    && (!q || fold(t.title).includes(q)));
+  const time = (t: T) => new Date(t.updated_at).getTime();
+  hits.sort(f.sort === "number_asc" ? (a, b) => a.number - b.number : f.sort === "number_desc" ? (a, b) => b.number - a.number : (a, b) => time(b) - time(a) || b.number - a.number);
+  const pages = Math.max(1, Math.ceil(hits.length / f.limit));
+  const page = Math.min(f.page, pages);
+  return {
+    total: hits.length, page, pages, limit: f.limit,
+    tickets: hits.slice((page - 1) * f.limit, page * f.limit).map((t) => ({ ...t, column_name: colName.get(t.column) ?? t.column })),
+  };
+}

@@ -15,7 +15,7 @@ import { atLeast, projectIn } from "../lib/access.js";
 
 const requireProject = projectIn("tickets");
 import { KINDS, Settings, cleanDomain, domainAllowed, identityVerified, newPublicKey, newSecret, normalizeSettings, publicConfig, titleFrom, type Kind, type WidgetSettings } from "../lib/widget.js";
-import { createTicket, projectPeople, tx } from "./tickets.js";
+import { insertTicket, projectPeople, tx } from "../services/tickets.js";
 import { UPLOAD_DIR, sniff } from "./uploads.js";
 import { FileRejected, scanUpload } from "../lib/fileScan.js";
 
@@ -135,7 +135,7 @@ async function ingest(w: WidgetRow, input: FeedbackInput, saved: Saved, verified
   return tx(async (c) => {
     const { rows: [{ seq }] } = await c.query("update feedback_widgets set seq = seq + 1 where project_id = $1 returning seq", [w.project_id]);
     const ref = `FB-${seq}`;
-    const t = await createTicket(c, w.project_id, null, {
+    const t = await insertTicket(c, w.project_id, null, {
       title: titleFrom(input.message), description: input.message, type: s.types[input.kind as Kind], status: "todo", source: "widget", labels: ["feedback"],
       assignees: s.assignee_id && people.some((p) => p.id === s.assignee_id) ? [s.assignee_id] : [],
     }, people);

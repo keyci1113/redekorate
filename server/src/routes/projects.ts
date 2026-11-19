@@ -3,125 +3,28 @@ import { z } from "zod";
 import { customAlphabet } from "nanoid";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
-import { removeStored } from "./files.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { AREAS, ORG_COLS, accessJoins, accessWhere, areasSql, atLeast, documentAccess, requireProject, roleSql, type Area, type ProjectRole } from "../lib/access.js";
-import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
+import { AREAS, atLeast, documentAccess, requireProject, type Area, type ProjectRole } from "../lib/access.js";
+import * as svc from "../services/projects.js";
+import { actorOf } from "../services/actor.js";
 
 export const projects = Router();
 projects.use(requireAuth);
 
 const tokenId = customAlphabet("abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789", 24);
 
-const ProjectInput = z.object({
-  name: z.string().trim().min(1).max(160),
-  description: z.string().max(4000).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  category: z.enum(PROJECT_CATEGORIES).optional(),
-  archived: z.boolean().optional(),
-  organization_id: z.string().uuid().nullable().optional(),   // null = personal project
-});
-
-/** The caller must belong to the organization a project is placed in. */
-async function requireOrgMember(orgId: string | null | undefined, userId: string) {
-  if (!orgId) return;
-  if (!(await one("select 1 from organization_members where organization_id = $1 and user_id = $2", [orgId, userId]))) throw new HttpError(403, "No perteneces a esa organización");
-}
-
 /** Proyecto accesible con al menos `min` (viewer < commenter < editor < owner). Lanza 404/403. */
 export const ownProject = (id: string, userId: string, min: ProjectRole = "viewer", area?: Area) => requireProject(id, userId, min, area);
 const AreasInput = z.array(z.enum(["research", "tickets"])).min(1).max(2).transform((v) => AREAS.filter((a) => v.includes(a)));
 
-const ProjectListQuery = z.object({ category: z.enum(PROJECT_CATEGORIES).optional() });
-
-/** Every project the person can open; `?category=` narrows the list to one kind of work. */
-projects.get("/", async (req, res) => {
-  const filter = parse(ProjectListQuery, req.query);
-  const rows = await query(
-    `select p.*, ${roleSql("$1")} as role, ${areasSql("$1")} as areas, u.name as owner_name, ${ORG_COLS},
-       (select count(*)::int from studies s where s.project_id = p.id) as study_count,
-       (select count(*)::int from studies s where s.project_id = p.id and s.status = 'live') as live_count,
-       (select count(*)::int from sessions se join studies s on s.id = se.study_id
-          where s.project_id = p.id and se.completed_at is not null) as response_count,
-       (select count(*)::int from sessions se join studies s on s.id = se.study_id where s.project_id = p.id) as started_count,
-       (select count(*)::int from participants pa where pa.project_id = p.id) as participant_count,
-       (select count(*)::int from report_shares rs where rs.project_id = p.id and rs.revoked_at is null) as share_count,
-       (select count(*)::int from insights i where i.project_id = p.id) as insight_count,
-       (select count(*)::int from documents d where d.project_id = p.id) as document_count
-     ${accessJoins("$1")}
-       join users u on u.id = p.owner_id
-     where ${accessWhere("$1")} and ($2::text is null or p.category = $2) order by p.updated_at desc`,
-    [req.user!.id, filter.category ?? null],
-  );
-  res.json({ projects: rows });
-});
-
-projects.post("/", async (req, res) => {
-  const b = parse(ProjectInput, req.body);
-  await requireOrgMember(b.organization_id, req.user!.id);
-  const p = await one(
-    "insert into projects(owner_id, name, description, color, organization_id, category) values ($1,$2,$3,coalesce($4,'#5B5BD6'),$5,coalesce($6,'ux_research')) returning *",
-    [req.user!.id, b.name, b.description ?? "", b.color ?? null, b.organization_id ?? null, b.category ?? null],
-  );
-  res.status(201).json({ project: p });
-});
-
-projects.get("/:id", async (req, res) => {
-  res.json({ project: await ownProject(req.params.id, req.user!.id) });
-});
-
-projects.patch("/:id", async (req, res) => {
-  const b = parse(ProjectInput.partial(), req.body);
-  // Name, description, color and category: editors. Archiving, unarchiving or moving it to another space: the owner only.
-  const moves = b.organization_id !== undefined;
-  const cur = await ownProject(req.params.id, req.user!.id, b.archived === undefined && !moves ? "editor" : "owner");
-  if (moves && cur.owner_id !== req.user!.id) throw new HttpError(403, "Solo quien es dueño del proyecto puede moverlo de espacio");
-  if (moves) await requireOrgMember(b.organization_id, req.user!.id);
-  const p = await one(
-    `update projects set
-       name = coalesce($2, name), description = coalesce($3, description),
-       color = coalesce($4, color), archived = coalesce($5, archived),
-       organization_id = case when $6::boolean then $7 else organization_id end,
-       category = coalesce($8, category), updated_at = now()
-     where id = $1 returning *`,
-    [req.params.id, b.name ?? null, b.description ?? null, b.color ?? null, b.archived ?? null, moves, b.organization_id ?? null, b.category ?? null],
-  );
-  res.json({ project: p });
-});
-
-projects.delete("/:id", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "owner");
-  const kept = await query<{ stored: string }>("select stored from project_files where project_id = $1", [req.params.id]);
-  await query("delete from projects where id = $1", [req.params.id]);
-  await removeStored(kept.map((f) => f.stored));
-  res.json({ ok: true });
-});
-
-projects.get("/:id/studies", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "viewer", "research");
-  const rows = await query(
-    `select s.id, s.title, s.method, s.status, s.public_slug, s.created_at, s.updated_at, s.published_at,
-       jsonb_array_length(s.blocks) as block_count,
-       (select count(*)::int from sessions se where se.study_id = s.id and se.completed_at is not null) as response_count,
-       (select count(*)::int from sessions se where se.study_id = s.id) as started_count
-     from studies s where s.project_id = $1 order by s.updated_at desc`,
-    [req.params.id],
-  );
-  res.json({ studies: rows });
-});
-
-projects.get("/:id/insights", async (req, res) => {
-  await ownProject(req.params.id, req.user!.id, "viewer", "research");
-  const rows = await query(
-    `select i.*, s.title as study_title,
-       coalesce((select array_agg(t.number order by t.number) from ticket_links k join tickets t on t.id = k.ticket_id
-                 where k.target_type = 'insight' and k.target_id = i.id), '{}') as ticket_numbers
-     from insights i left join studies s on s.id = i.study_id
-     where i.project_id = $1 order by i.created_at desc`,
-    [req.params.id],
-  );
-  res.json({ insights: rows });
-});
+// The project itself: services/projects.ts.
+projects.get("/", async (req, res) => { res.json(await svc.listProjects(actorOf(req), req.query)); });
+projects.post("/", async (req, res) => { res.status(201).json(await svc.createProject(actorOf(req), req.body)); });
+projects.get("/:id", async (req, res) => { res.json(await svc.getProject(actorOf(req), req.params.id)); });
+projects.patch("/:id", async (req, res) => { res.json(await svc.updateProject(actorOf(req), req.params.id, req.body)); });
+projects.delete("/:id", async (req, res) => { res.json(await svc.deleteProject(actorOf(req), req.params.id)); });
+projects.get("/:id/studies", async (req, res) => { res.json(await svc.listProjectStudies(actorOf(req), req.params.id)); });
+projects.get("/:id/insights", async (req, res) => { res.json(await svc.listProjectInsights(actorOf(req), req.params.id)); });
 
 // Project report: one link with the studies, documents and project-wide parts you pick.
 /** What a report link may hold besides studies and documents. */
