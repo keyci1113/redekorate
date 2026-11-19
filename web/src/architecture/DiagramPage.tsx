@@ -8,7 +8,7 @@ import type { Project } from "../lib/types";
 import { canEdit } from "../lib/roles";
 import { BackLink, Button, Modal } from "../components/ui";
 import { CommentsPanel } from "../components/CommentsPanel";
-import { SaveAsModal, ShareModal } from "../docs/DocModals";
+import { SaveAsModal, ShareModal, isTeam } from "../docs/DocModals";
 import type { DocData, DocRecord } from "../docs/types";
 import { DiagramCanvas, type CanvasHandle } from "./DiagramCanvas";
 import { BoardTestModal } from "./BoardTestModal";
@@ -29,7 +29,9 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
   const board = doc.kind === "moodboard";
   const first = useRef(true);
   const readOnly = !canEdit(project.role);
-  const back = `/projects/${project.id}?tab=architecture`;
+  // Sharing, copying and deleting stay with the project team; someone the diagram was shared with only works on it.
+  const team = isTeam(project);
+  const back = team ? `/projects/${project.id}?tab=architecture` : "/projects";
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -60,12 +62,12 @@ export function DiagramPage({ doc, project, onDoc }: { doc: DocRecord; project: 
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
         </span>
-        {board && !readOnly && <Button size="sm" variant="ghost" icon={<FlaskConical size={15} />} onClick={() => setTestOpen(true)}><span className="max-md:hidden">{t("Probar con participantes")}</span></Button>}
-        {doc.kind === "sitemap" && !readOnly && <Button size="sm" variant="ghost" icon={<Shapes size={15} />} onClick={openAsDiagram} className="max-lg:hidden">{t("Abrir como diagrama")}</Button>}
-        {!readOnly && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
+        {board && team && !readOnly && <Button size="sm" variant="ghost" icon={<FlaskConical size={15} />} onClick={() => setTestOpen(true)}><span className="max-md:hidden">{t("Probar con participantes")}</span></Button>}
+        {doc.kind === "sitemap" && team && <Button size="sm" variant="ghost" icon={<Shapes size={15} />} onClick={openAsDiagram} className="max-lg:hidden">{t("Abrir como diagrama")}</Button>}
+        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
         <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)}><span className="hidden sm:inline">{t("Comentarios")}</span></Button>
-        {!readOnly && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
-        {!readOnly && <>
+        {team && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
+        {team && <>
           <button type="button" title={t("Duplicar")} aria-label={t("Duplicar")} className="focus-ring hidden h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-ink/5 hover:text-ink sm:flex"
             onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}><Copy size={15} /></button>
           <button type="button" title={t("Eliminar")} aria-label={t("Eliminar")} className="focus-ring flex h-8 w-8 items-center justify-center rounded-lg text-ink-3 hover:bg-bad-soft hover:text-bad"

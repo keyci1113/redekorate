@@ -72,3 +72,52 @@ export async function projectAccess(projectId: string, userId: string): Promise<
   const r = await one<{ role: ProjectRole; areas: Area[] }>(`select ${roleSql("$2")} as role, ${areasSql("$2")} as areas ${accessJoins("$2")} where p.id = $1 and ${accessWhere("$2")}`, [projectId, userId]);
   return r ? { role: r.role, areas: AREAS.filter((a) => r.areas.includes(a)) } : null;
 }
+
+// ── One document shared with a person ───────────────────────────
+// A document can be shared by email with someone outside the project (document_shares): view, comment or edit
+// on that document only. Their role on it is the higher of their project role (when the research section is
+// open to them) and the share. Deleting, duplicating and sharing the document stay with the project's editors.
+
+export type ShareRole = Exclude<ProjectRole, "owner">;
+export const SHARE_ROLES: ShareRole[] = ["viewer", "commenter", "editor"];
+
+/** The higher of two roles; null when neither gives access. */
+export function higherRole(a: ProjectRole | null | undefined, b: ProjectRole | null | undefined): ProjectRole | null {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return RANK[a] >= RANK[b] ? a : b;
+}
+
+type DocRow = Record<string, unknown> & { id: string; project_id: string };
+export interface DocAccess {
+  doc: DocRow;
+  /** What the person can do on this document. */
+  role: ProjectRole;
+  /** Their role in the project (research section), or null when they only reach the document through a share. */
+  projectRole: ProjectRole | null;
+}
+
+/** The document with the person's role on it. 404 without access, 403 when the role is too low. */
+export async function documentAccess(docId: string, userId: string, min: ProjectRole = "viewer"): Promise<DocAccess> {
+  const doc = await one<DocRow>("select * from documents where id = $1", [docId]);
+  if (!doc) throw notFound("Documento");
+  const [pa, share] = await Promise.all([
+    projectAccess(doc.project_id, userId),
+    one<{ role: ShareRole }>("select role from document_shares where document_id = $1 and user_id = $2", [docId, userId]),
+  ]);
+  const projectRole = pa?.areas.includes("research") ? pa.role : null;
+  const role = higherRole(projectRole, share?.role);
+  if (!role) {
+    if (pa) throw new HttpError(403, "No tienes acceso a esta sección del proyecto");
+    throw notFound("Documento");
+  }
+  if (!atLeast(role, min)) throw new HttpError(403, min === "editor" ? "Tu rol en este documento es de solo lectura" : "Tu rol en este documento no permite comentar");
+  return { doc, role, projectRole };
+}
+
+/** What stays with the project: deleting, duplicating and sharing a document need a project editor. */
+export async function documentForTeam(docId: string, userId: string): Promise<DocAccess> {
+  const a = await documentAccess(docId, userId);
+  if (!atLeast(a.projectRole, "editor")) throw new HttpError(403, "Solo el equipo del proyecto puede hacer esto con el documento");
+  return a;
+}

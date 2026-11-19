@@ -38,6 +38,8 @@ export interface Project extends OrgRef {
   /** What kind of work the project holds; older answers may lack it (then it is UX research). */
   category?: ProjectCategory;
   role?: ProjectRole; areas?: Area[]; owner_name?: string;   // rol de quien consulta; owner_name para proyectos compartidos
+  /** Next to a document: the person's project role, or null when the document was shared with them by email (role is then their role on it). */
+  project_role?: ProjectRole | null;
   created_at: string; updated_at: string;
   study_count?: number; live_count?: number; response_count?: number; insight_count?: number;
   started_count?: number; document_count?: number; participant_count?: number; share_count?: number;

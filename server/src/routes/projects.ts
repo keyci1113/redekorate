@@ -5,7 +5,7 @@ import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { removeStored } from "./files.js";
 import { HttpError, notFound, parse } from "../lib/http.js";
-import { AREAS, ORG_COLS, accessJoins, accessWhere, areasSql, atLeast, requireProject, roleSql, type Area, type ProjectRole } from "../lib/access.js";
+import { AREAS, ORG_COLS, accessJoins, accessWhere, areasSql, atLeast, documentAccess, requireProject, roleSql, type Area, type ProjectRole } from "../lib/access.js";
 import { PROJECT_CATEGORIES } from "../lib/projectCategories.js";
 
 export const projects = Router();
@@ -240,15 +240,22 @@ async function requireTarget(projectId: string, t: { study_id?: string; document
   if (t.document_id && !(await one("select 1 from documents where id = $1 and project_id = $2", [t.document_id, projectId]))) throw new HttpError(400, "El estudio o documento no pertenece a este proyecto");
 }
 
+/** Comments on a document go by the person's role on that document, so someone it was shared with can read or write them. */
+async function canComment(projectId: string, userId: string, t: { study_id?: string; document_id?: string }, min: ProjectRole) {
+  if (!t.document_id) return ownProject(projectId, userId, min, targetArea(t));
+  const a = await documentAccess(t.document_id, userId, min);
+  if (a.doc.project_id !== projectId) throw new HttpError(400, "El estudio o documento no pertenece a este proyecto");
+}
+
 projects.get("/:id/comments", async (req, res) => {
   const target = parse(CommentTarget, { study_id: req.query.study_id, document_id: req.query.document_id });
-  await ownProject(req.params.id, req.user!.id, "viewer", targetArea(target));
+  await canComment(req.params.id, req.user!.id, target, "viewer");
   res.json({ comments: await comments(req.params.id, target) });
 });
 
 projects.post("/:id/comments", async (req, res) => {
   const b = parse(CommentTarget.and(z.object({ body: z.string().trim().min(1).max(4000) })), req.body);
-  await ownProject(req.params.id, req.user!.id, "commenter", targetArea(b));
+  await canComment(req.params.id, req.user!.id, b, "commenter");
   await requireTarget(req.params.id, b);
   await query("insert into comments(project_id, study_id, document_id, user_id, body) values ($1,$2,$3,$4,$5)",
     [req.params.id, b.study_id ?? null, b.document_id ?? null, req.user!.id, b.body]);
@@ -256,11 +263,12 @@ projects.post("/:id/comments", async (req, res) => {
 });
 
 projects.delete("/:id/comments/:commentId", async (req, res) => {
-  const p = await ownProject(req.params.id, req.user!.id);
   const c = await one<{ user_id: string | null; study_id: string | null; document_id: string | null }>(
     "select user_id, study_id, document_id from comments where id = $1 and project_id = $2", [req.params.commentId, req.params.id]);
+  // Someone a document was shared with reaches its comments without the project; the project owner still moderates.
+  const role = c?.document_id ? (await documentAccess(c.document_id, req.user!.id)).projectRole : (await ownProject(req.params.id, req.user!.id)).role;
   if (!c) throw notFound("Comentario");
-  if (c.user_id !== req.user!.id && !atLeast(p.role, "owner")) throw new HttpError(403, "Solo puedes borrar tus propios comentarios");
+  if (c.user_id !== req.user!.id && !atLeast(role, "owner")) throw new HttpError(403, "Solo puedes borrar tus propios comentarios");
   await query("delete from comments where id = $1", [req.params.commentId]);
   res.json({ comments: await comments(req.params.id, { study_id: c.study_id ?? undefined, document_id: c.document_id ?? undefined }) });
 });

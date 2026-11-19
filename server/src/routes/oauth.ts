@@ -113,7 +113,10 @@ oauth.get("/:provider/callback", authLimiter, async (req, res) => {
       user = await one<U>(
         "insert into users(name, email, password_hash, role, last_login_at) values ($1,$2,null,$3,now()) returning id, email, name, role, avatar, onboarded_at, token_version, disabled_at",
         [name, email, role]);
-      if (inviteId) await acceptInvite(inviteId, user!.id);
+      if (inviteId) {
+        await acceptInvite(inviteId, user!.id);
+        user = await one<U>(`select ${COLS} from users u where u.id = $1`, [user!.id]);
+      }
     }
     if (user!.disabled_at) return fail(res, "disabled");
     await query("insert into user_identities(provider, subject, user_id, email, last_login_at) values ($1,$2,$3,$4,now())", [id, sub, user!.id, email]);

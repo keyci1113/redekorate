@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 // The canvas (React Flow) is only downloaded when a diagram or sitemap is opened.
 const DiagramPage = lazy(() => import("../architecture/DiagramPage").then((m) => ({ default: m.DiagramPage })));
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Check, Copy, Gauge, Link2, MessageSquare, Save, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { copy, timeAgo, uid, useLoad } from "../lib/hooks";
@@ -14,7 +14,7 @@ import { docTemplate } from "../docs/templates";
 import type { DocData, DocRecord, Entry } from "../docs/types";
 import { canEdit } from "../lib/roles";
 import { CommentsPanel } from "../components/CommentsPanel";
-import { SaveAsModal, ShareModal } from "../docs/DocModals";
+import { SaveAsModal, ShareModal, isTeam } from "../docs/DocModals";
 import { isDiagramKind } from "../architecture/model";
 import { AccessNotice } from "../components/AccessNotice";
 
@@ -42,6 +42,8 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   const [commentsOpen, setCommentsOpen] = useState(false);
   const first = useRef(true);
   const readOnly = !canEdit(project.role);
+  // Sharing, copying and deleting stay with the project team; someone the document was shared with only works on it.
+  const team = isTeam(project);
 
   useEffect(() => {
     if (first.current) { first.current = false; return; }
@@ -73,22 +75,22 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
   return (
     <div className="rk-page-in min-h-full bg-paper-2">
       <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-line bg-surface/95 px-(--page-gutter) backdrop-blur print:hidden">
-        <BackLink compact to={`/projects/${project.id}?tab=docs`} color={project.color} label={project.name} section={t("Documentos")} />
+        <BackLink compact to={team ? `/projects/${project.id}?tab=docs` : "/projects"} color={project.color} label={project.name} section={t("Documentos")} />
         <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} aria-label={t("Título del documento")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
+        <input value={title} onChange={(e) => setTitle(e.target.value)} readOnly={readOnly} aria-label={t("Título del documento")} className="focus-ring min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 font-semibold hover:bg-paper" />
         <span className="hidden text-xs text-ink-3 md:block">
           {saving === "saving" ? t("Guardando…") : saving === "saved" ? <span className="flex items-center gap-1"><Check size={12} />{t("Guardado")}</span> : saving === "error" ? <span className="text-bad">{t("Error al guardar")}</span> : t("Editado {a}", { a: timeAgo(doc.updated_at) })}
         </span>
-        <div className="flex rounded-lg bg-ink/5 p-0.5 text-xs font-semibold" title={t("Idioma del documento")}>
+        <div className={cx("flex rounded-lg bg-ink/5 p-0.5 text-xs font-semibold", readOnly && "hidden")} title={t("Idioma del documento")}>
           {(["es", "en"] as const).map((l) => (
             <button key={l} type="button" onClick={() => setLangDoc(l)} className={cx("rounded-md px-2 py-1 uppercase", lang === l ? "bg-surface shadow-sm" : "text-ink-3")}>{l}</button>
           ))}
         </div>
-        {doc.kind === "usability_script" && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript} className="max-lg:hidden">{t("Crear matriz de resultados")}</Button>}
-        <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>
+        {doc.kind === "usability_script" && team && <Button size="sm" variant="ghost" icon={<Gauge size={15} />} onClick={resultsFromScript} className="max-lg:hidden">{t("Crear matriz de resultados")}</Button>}
+        {team && <Button size="sm" variant="ghost" icon={<Save size={15} />} onClick={() => setSaveAsOpen(true)} className="max-sm:hidden">{t("Guardar como…")}</Button>}
         <ExportMenu tpl={tpl} title={title} data={content} lang={lang} projectName={project.name} />
         <Button size="sm" variant="ghost" icon={<MessageSquare size={15} />} onClick={() => setCommentsOpen(true)} aria-label={t("Comentarios")}><span className="max-sm:hidden">{t("Comentarios")}</span></Button>
-        {!readOnly && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
+        {team && <Button size="sm" icon={<Link2 size={15} />} onClick={() => setShareOpen(true)} aria-label={t("Compartir")}><span className="max-sm:hidden">{t("Compartir")}</span></Button>}
       </header>
 
       <main className="page print:p-0">
@@ -97,13 +99,13 @@ function Editor({ doc, project, onDoc }: { doc: DocRecord; project: Project; onD
         </div>
         {readOnly && <AccessNotice role={project.role} className="mb-4 print:hidden" />}
         <DocumentView readOnly={readOnly} tpl={tpl} title={title} data={content} lang={lang} onChange={setContent} showGuide={guide} />
-        <div className="mt-10 flex justify-between border-t border-line pt-4 print:hidden">
+        {team && <div className="mt-10 flex justify-between border-t border-line pt-4 print:hidden">
           <Button variant="ghost" icon={<Copy size={14} />} onClick={async () => { const { document } = await api.post<{ document: DocRecord }>(`/documents/${doc.id}/duplicate`); nav(`/docs/${document.id}`); }}>{t("Duplicar")}</Button>
           <Button variant="ghost" className="text-bad hover:bg-bad-soft hover:text-bad" icon={<Trash2 size={14} />} onClick={async () => {
             if (!confirm(t("¿Eliminar este documento?"))) return;
             await api.del(`/documents/${doc.id}`); nav(`/projects/${project.id}?tab=docs`);
           }}>{t("Eliminar documento")}</Button>
-        </div>
+        </div>}
       </main>
 
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} doc={doc} onDoc={onDoc} />

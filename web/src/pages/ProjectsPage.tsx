@@ -12,6 +12,7 @@ import { sharedLabel } from "../components/MembersPanel";
 import { templateByKey } from "../templates/catalog";
 import { useAuth } from "../lib/auth";
 import { categoryCounts, categoryLabel, categoryOf, filterByCategory, readCategory } from "../lib/projectCategories";
+import { SharedWithMe } from "../docs/SharedWithMe";
 
 import { t } from "../lib/i18n";
 
@@ -211,6 +212,8 @@ export function ProjectsPage() {
           </>
         )}
       </div>
+
+      <SharedWithMe />
 
       <Modal open={open} onClose={() => setOpen(false)} title={t("Nuevo proyecto")}>
         <ProjectForm key={`${space}-${category}`} orgs={orgList} initial={{ organization_id: space !== "all" && space !== "personal" ? space : null, ...(category ? { category } : {}) }} submitLabel={t("Crear proyecto")} onSubmit={async (v) => {

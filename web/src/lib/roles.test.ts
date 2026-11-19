@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ASSIGNABLE_PROJECT_ROLES, assignableOrgRoles, atLeast, canComment, canEdit, canManageOrg, editLimit, isOwner } from "./roles";
+import { ASSIGNABLE_PROJECT_ROLES, assignableOrgRoles, atLeast, canComment, canEdit, canManageOrg, editLimit, isDocTeam, isOwner } from "./roles";
+
+describe("document team", () => {
+  it("only project editors share, copy or delete a document; a share alone never does", () => {
+    expect(isDocTeam({ role: "editor", project_role: null })).toBe(false);
+    expect(isDocTeam({ role: "editor", project_role: "viewer" })).toBe(false);
+    expect(isDocTeam({ role: "editor", project_role: "editor" })).toBe(true);
+    expect(isDocTeam({ role: "owner", project_role: "owner" })).toBe(true);
+    // a project read without project_role (not next to a document) falls back to its role
+    expect(isDocTeam({ role: "editor" })).toBe(true);
+    expect(isDocTeam({ role: "commenter" })).toBe(false);
+  });
+});
 
 describe("project roles", () => {
   it("ranks viewer < commenter < editor < owner", () => {
