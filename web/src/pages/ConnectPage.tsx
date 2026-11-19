@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { BookOpenText, Eye, KeyRound, Pencil, Plug, ShieldCheck, Wrench } from "lucide-react";
+import { BookOpenText, Braces, Eye, KeyRound, Pencil, Plug, ShieldCheck, Wrench } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import { t } from "../lib/i18n";
@@ -25,6 +25,7 @@ const ERRORS: [string, string][] = [
   ["401", "El token no existe, venció o fue revocado."],
   ["403", "El token es de solo lectura y la llamada escribe, o tu rol en el proyecto no lo permite."],
   ["404", "No existe, o no tienes acceso a ello."],
+  ["405", "Esa dirección existe, pero no con ese método (solo API REST); el encabezado Allow dice cuáles acepta."],
   ["409", "Cambió desde que lo leíste: vuelve a leerlo y envía tu cambio sobre esa versión."],
   ["429", "Demasiadas solicitudes: más de 240 por minuto. Espera un momento."],
 ];
@@ -42,7 +43,7 @@ export function ConnectPage() {
   const d = access.data;
 
   if (!d) return <div className="page">{access.error ? <ErrorNote>{access.error}</ErrorNote> : <Spinner />}</div>;
-  const list = guides(d.mcp_url, d.openapi_url, created);
+  const list = guides(d.mcp_url, d.openapi_url, created, d.rest_url);
   const g = list.find((x) => x.id === guide) ?? list[0];
   const reads = tools.data?.tools.filter((x) => !x.writes) ?? [];
   const writes = tools.data?.tools.filter((x) => x.writes) ?? [];
@@ -53,10 +54,10 @@ export function ConnectPage() {
     <div className="page space-y-6">
       <div>
         <h1 className="page-title">{t("Conectar apps de IA")}</h1>
-        <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-ink-2">{t("Claude, ChatGPT, Cursor y otras apps pueden trabajar en tus proyectos: listar proyectos y estudios, leer resultados, crear y editar estudios, y escribir insights y documentos. También pueden lanzar, cerrar y publicar estudios, y eso lo ven los participantes al momento. Lo hacen como tú, con tus mismos permisos, y nunca pueden borrar nada. Cuando reemplazan el contenido de un estudio o un documento, la versión anterior queda guardada y se puede restaurar.")}</p>
+        <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-ink-2">{t("Claude, ChatGPT, Cursor, tus scripts y otras apps pueden trabajar en tus proyectos: listar proyectos y estudios, leer resultados, crear y editar estudios, escribir insights y documentos, y llevar tickets y milestones. También pueden lanzar, cerrar y publicar estudios, y eso lo ven los participantes al momento. Lo hacen como tú, con tus mismos permisos, y nunca pueden borrar nada. Cuando reemplazan el contenido de un estudio, un documento o la descripción de un ticket, la versión anterior queda guardada y se puede restaurar.")}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Card className="p-5">
           <p className="flex items-center gap-2 font-semibold"><Plug size={16} className="text-accent" /> {t("Servidor MCP")}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-2">{t("MCP es un estándar abierto para que los asistentes de IA usen herramientas de otras apps. Agregas redekorate como conector y el asistente ve sus herramientas y las usa cuando le pides algo.")}</p>
@@ -64,10 +65,16 @@ export function ConnectPage() {
           <p className="mt-2 text-xs text-ink-3">{t("Para Claude, ChatGPT, Claude Code, Cursor y cualquier cliente MCP.")}</p>
         </Card>
         <Card className="p-5">
-          <p className="flex items-center gap-2 font-semibold"><BookOpenText size={16} className="text-accent" /> {t("API REST (OpenAPI)")}</p>
+          <p className="flex items-center gap-2 font-semibold"><BookOpenText size={16} className="text-accent" /> {t("Operaciones de IA (OpenAPI)")}</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-2">{t("Las mismas herramientas como llamadas HTTP normales, descritas en un documento OpenAPI: una llamada POST por herramienta, con su entrada en JSON. Es para apps que no hablan MCP.")}</p>
           <div className="mt-3"><CopyField value={d.openapi_url} label={t("Copiar dirección de la API")} /></div>
-          <p className="mt-2 text-xs text-ink-3">{t("Para acciones de un GPT, Gemini, n8n, Zapier o tus propios scripts y agentes.")}</p>
+          <p className="mt-2 text-xs text-ink-3">{t("Para acciones de un GPT, Gemini y agentes de IA.")}</p>
+        </Card>
+        <Card className="p-5 md:col-span-2 xl:col-span-1">
+          <p className="flex items-center gap-2 font-semibold"><Braces size={16} className="text-accent" /> {t("API REST")}</p>
+          <p className="mt-1 text-sm leading-relaxed text-ink-2">{t("Recursos normales para scripts e integraciones: GET lee, POST crea y PATCH edita proyectos, estudios, insights, documentos, tickets y milestones. Nunca borra.")}</p>
+          <div className="mt-3"><CopyField value={d.rest_url} label={t("Copiar dirección de la API REST")} /></div>
+          <p className="mt-2 text-xs text-ink-3">{t("Para n8n, Zapier, Postman y tus propios scripts. La descripción OpenAPI está en /openapi.json.")}</p>
         </Card>
       </div>
 

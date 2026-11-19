@@ -17,13 +17,24 @@ describe("connect guides", () => {
     expect(g.chatgpt.snippet?.text).toBe(MCP);
     expect(g.gpt.snippet?.text).toBe(OPENAPI);
     expect(g.claude_code.snippet?.text).toBe(`claude mcp add --transport http redekorate ${MCP} --header "Authorization: Bearer ${TOKEN_PLACEHOLDER}"`);
-    expect(g.curl.snippet?.text).toContain("curl -X POST https://research.example.com/api/v1/tools/whoami");
+    expect(g.agents.snippet?.text).toContain("curl -X POST https://research.example.com/api/v1/tools/whoami");
+  });
+
+  it("the REST guide calls /api/v1 itself, not the AI operations", () => {
+    const g = by(null);
+    expect(g.rest.snippet?.text).toContain("curl https://research.example.com/api/v1/me");
+    expect(g.rest.snippet?.text).toContain("-X PATCH https://research.example.com/api/v1/projects/");
+    expect(g.rest.snippet?.text).not.toContain("/api/v1/tools");
+    expect(g.rest.note).toContain("https://research.example.com/api/v1/openapi.json");
+    const other = Object.fromEntries(guides(MCP, OPENAPI, null, "https://other.example/api/v1").map((x) => [x.id, x]));
+    expect(other.rest.snippet?.text).toContain("curl https://other.example/api/v1/me");
   });
 
   it("a token just created is filled into every command that needs one, and the Cursor config stays valid JSON", () => {
     const g = by("rdk_pat_abc123");
     expect(g.claude_code.snippet?.text).toContain("Bearer rdk_pat_abc123");
-    expect(g.curl.snippet?.text).toContain("Bearer rdk_pat_abc123");
+    expect(g.agents.snippet?.text).toContain("Bearer rdk_pat_abc123");
+    expect(g.rest.snippet?.text).toContain("Bearer rdk_pat_abc123");
     expect(JSON.parse(g.cursor.snippet!.text)).toEqual({ mcpServers: { redekorate: { url: MCP, headers: { Authorization: "Bearer rdk_pat_abc123" } } } });
     // Cursor: only the user-wide file, never a project file that may be committed
     expect(g.cursor.steps.join(" ")).not.toContain("en tu proyecto");

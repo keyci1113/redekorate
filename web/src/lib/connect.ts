@@ -2,7 +2,7 @@
 // token just created, while it is on screen) filled into every command. Pure, so the commands are tested.
 import { t } from "./i18n";
 
-export type GuideId = "claude" | "chatgpt" | "gpt" | "claude_code" | "cursor" | "curl";
+export type GuideId = "claude" | "chatgpt" | "gpt" | "claude_code" | "cursor" | "agents" | "rest";
 export interface Guide {
   id: GuideId;
   name: string;
@@ -20,7 +20,8 @@ export const TOKEN_PLACEHOLDER = "rdk_pat_…";
 /** The operations' base (`…/api/v1/tools`) is where their OpenAPI document lives. */
 export const restBase = (openapiUrl: string) => openapiUrl.replace(/\/openapi\.json$/, "");
 
-export function guides(mcpUrl: string, openapiUrl: string, token: string | null): Guide[] {
+/** `restUrl` is the public REST API's base (`…/api/v1`); its OpenAPI document is `${restUrl}/openapi.json`. */
+export function guides(mcpUrl: string, openapiUrl: string, token: string | null, restUrl = openapiUrl.replace(/\/tools\/openapi\.json$/, "")): Guide[] {
   const tk = token ?? TOKEN_PLACEHOLDER;
   const base = restBase(openapiUrl);
   return [
@@ -61,10 +62,18 @@ export function guides(mcpUrl: string, openapiUrl: string, token: string | null)
     ], snippet: { label: "mcp.json", text: JSON.stringify({ mcpServers: { redekorate: { url: mcpUrl, headers: { Authorization: `Bearer ${tk}` } } } }, null, 2) },
     note: t("No lo pongas en el .cursor/mcp.json de un proyecto: ese archivo suele subirse al repositorio y tu token quedaría a la vista de cualquiera con acceso. Sirve igual para otros clientes MCP que aceptan una dirección y encabezados.") },
 
-    { id: "curl", name: t("Scripts y otras apps (REST)"), auth: "token", steps: [
+    { id: "agents", name: t("Otras apps de IA (HTTP)"), auth: "token", steps: [
       t("Crea un token en Tokens de acceso, más abajo."),
       t("Cada herramienta es una llamada POST a la API con su entrada en JSON. Esta pregunta quién eres."),
-      t("n8n, Zapier, Gemini o tus agentes pueden importar la dirección de la API (OpenAPI) para ver todas las llamadas."),
+      t("Gemini, n8n o tus propios agentes pueden importar la dirección de las operaciones de IA (OpenAPI) para ver todas las herramientas."),
     ], snippet: { label: "curl", text: `curl -X POST ${base}/whoami \\\n  -H "Authorization: Bearer ${tk}" \\\n  -H "Content-Type: application/json" \\\n  -d '{}'` } },
+
+    { id: "rest", name: t("Scripts y otras apps (REST)"), auth: "token", steps: [
+      t("Crea un token en Tokens de acceso, más abajo. Para leer basta uno de solo lectura."),
+      t("La API REST tiene recursos normales: GET lee, POST crea y PATCH edita. Proyectos, estudios y resultados, insights, documentos, tickets y milestones. No hay DELETE."),
+      t("Un PATCH solo cambia los campos que envías, y un campo que no existe responde 400. Para reemplazar bloques, contenido o la descripción de un ticket, envía base_updated_at con el updated_at que leíste: si cambió desde entonces responde 409 y no pisa nada."),
+      t("Importa la descripción OpenAPI en n8n, Zapier, Postman o tu generador de clientes para ver todas las operaciones."),
+    ], snippet: { label: "curl", text: `curl ${restUrl}/me \\\n  -H "Authorization: Bearer ${tk}"\n\ncurl -X PATCH ${restUrl}/projects/<project_id>/tickets/12 \\\n  -H "Authorization: Bearer ${tk}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"priority": "high", "labels": ["checkout"]}'` },
+    note: t("Las respuestas no traen datos de participantes ni de quien envió feedback por el widget, ni los enlaces públicos. Los errores llegan en inglés, como JSON. Descripción OpenAPI:") + ` ${restUrl}/openapi.json` },
   ];
 }

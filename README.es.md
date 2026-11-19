@@ -157,6 +157,10 @@ No cambies `DB_PASSWORD` después del primer despliegue: PostgreSQL solo la lee 
 
 Después de crear tu cuenta, cambia `ALLOW_REGISTRATION=false` y reinicia. Las imágenes y la base de datos viven en volúmenes de Docker (`uploads`, `pgdata`); inclúyelos en tus respaldos.
 
+### API REST y MCP
+
+Redekorate tiene un servidor MCP en `<APP_URL>/mcp` (Claude, ChatGPT, Cursor), las mismas herramientas como llamadas HTTP en `<APP_URL>/api/v1/tools` y una API REST para scripts e integraciones en `<APP_URL>/api/v1`, con su descripción OpenAPI en `/api/v1/openapi.json`. Leen, crean y editan proyectos, estudios, resultados, insights, documentos, tickets y milestones; nunca borran. Se configuran desde **Conectar apps de IA** (`/connect`). Referencia (en inglés): [docs/api.md](docs/api.md), [docs/mcp.md](docs/mcp.md) y [docs/architecture.md](docs/architecture.md).
+
 ## Desarrollo local
 
 ```bash

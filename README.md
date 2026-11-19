@@ -147,19 +147,19 @@ Owners and admins act as owners of every organization project. When a project ha
 
 ## Connect AI apps (MCP)
 
-Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL>/mcp`, so Claude, ChatGPT, Cursor and other AI apps can work in your projects: list projects and studies, read results, draft or edit studies, launch or close them, and write insights and documents. They act as you, with your role in each project, and can never delete anything. Results reach them without the participant details a link may carry, and without emails or phone numbers participants typed into their answers.
+Redekorate is also an [MCP](https://modelcontextprotocol.io) server at `<APP_URL>/mcp`, so Claude, ChatGPT, Cursor and other AI apps can work in your projects: list projects and studies, read results, draft or edit studies, launch or close them, write insights and documents, and search, create, edit, move, link and comment on tickets and milestones. They act as you, with your role in each project, and can never delete anything. Results reach them without the participant details a link may carry, and without emails or phone numbers participants typed into their answers.
 
-- **Safe edits.** `update_study` and `update_document` replace content: they need the `updated_at` the assistant read (`base_updated_at`), so a newer edit is never overwritten (409); they refuse to empty existing content; and every version they replace is saved (migration 019, last 30 per item), so `list_versions` and `restore_version` undo a bad write. Study blocks, diagrams and document sections an assistant sends are checked before saving, and a misspelled argument is refused by name.
+- **Safe edits.** `update_study`, `update_document` and `update_ticket` (its description) replace content: they need the `updated_at` the assistant read (`base_updated_at`), so a newer edit is never overwritten (409); they refuse to empty existing content; and every version they replace is saved (migrations 019 and 023, last 30 per item), so `list_versions` and `restore_version` undo a bad write. Study blocks, diagrams and document sections an assistant sends are checked before saving, and a misspelled argument is refused by name.
 - **Asking first.** Tools that replace content or change what participants see are marked `destructiveHint`, so Claude asks before running them. Launching a live study again or publishing an unchanged draft changes nothing.
-- **Outside text is data.** Study answers carry an `untrusted_content` notice, and the server's instructions tell assistants never to act on requests written in them.
-- **Rate limit.** 240 calls a minute per account (all of its tokens together, over `/mcp` and `/api/v1/tools`); calls without a valid token count per address.
+- **Outside text is data.** Study answers and tickets sent through the feedback widget (`from_feedback_widget`) carry an `untrusted_content` notice, and the server's instructions tell assistants never to act on requests written in them. Tickets come without the widget reporter's details; `get_ticket_screenshot` shows a widget screenshot to editors and owners only.
+- **Rate limit.** 240 calls a minute per account (all of its tokens together, over `/mcp`, `/api/v1/tools` and `/api/v1`); calls without a valid token count per address.
 
 Everything is set up from **Connect AI apps** (account menu, `/connect`; *My account* and *Help* link to it). The page explains MCP and the AI operations over HTTP in plain words, shows both addresses with copy buttons, has step-by-step guides for Claude, ChatGPT (connector and GPT actions), Claude Code, Cursor (in the user-wide `~/.cursor/mcp.json`, never a project file that may be committed) and scripts whose commands carry the install's real addresses and a token just created, manages access tokens and connected apps, lists the tools an app gets (read from the server's tool registry, so it never drifts) and spells out the rules and the error codes.
 
 - **Claude.ai or ChatGPT:** add a custom connector with the MCP address from *Connect AI apps* and sign in. You approve the app on a consent screen; the same page lists connected apps and removes their access.
 - **Claude Code, Claude Desktop, Cursor or scripts:** create an access token on the same page (shown once, 30 days to no expiry, read and edit or read only) and send it as a bearer token, e.g. `claude mcp add --transport http redekorate https://research.yourdomain.com/mcp --header "Authorization: Bearer rdk_pat_…"`. Clients that support OAuth can skip the token and sign in instead.
 
-Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for public clients, one-hour access tokens and rotating 60-day refresh tokens, discovery through `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` (migration 015). A personal token can be read only (migration 060): it gets only the tools that read, and the API it calls refuses anything else. Only SHA-256 hashes of tokens are stored. Each tool calls the app's own API as you, so access rules are exactly the app's. Bearer tokens open `/mcp` and `/api/v1/tools` only, never the app's internal API.
+Under the hood: OAuth 2.1 with dynamic client registration and PKCE (S256) for public clients, one-hour access tokens and rotating 60-day refresh tokens, discovery through `/.well-known/oauth-protected-resource` and `/.well-known/oauth-authorization-server` (migration 015). A personal token can be read only (migration 060): it gets only the tools that read, and the API it calls refuses anything else. Only SHA-256 hashes of tokens are stored. Each tool calls the app's own API as you, so access rules are exactly the app's. Bearer tokens open `/mcp`, `/api/v1/tools` and the REST API `/api/v1` only, never the app's internal API. The full tool list and rules are in [docs/mcp.md](docs/mcp.md).
 
 ### AI operations over HTTP (OpenAPI)
 
@@ -172,6 +172,16 @@ curl -X POST https://research.yourdomain.com/api/v1/tools/whoami \
 
 Errors are JSON `{ "error": "…" }`: `400` with `issues` for invalid input, `401` missing, bad or revoked token, `403` read-only token or not allowed by your role, `404` not found or no access, `409` changed since you read it, `429` rate limited. Operations that write carry `x-openai-isConsequential: true`, so a GPT asks before running them and runs reads without asking. In a GPT: *Actions → Import from URL* with the OpenAPI address, then *Authentication → API key → Bearer* with a token.
 
+### REST API (/api/v1)
+
+For scripts and integrations there is a plain REST API at `<APP_URL>/api/v1`: 36 operations that read (`GET`), create (`POST`) and edit (`PATCH`) projects, milestones, tickets, studies and their results, insights, documents and their earlier versions, described by an OpenAPI 3.1 document at `<APP_URL>/api/v1/openapi.json` generated from the same list the server enforces. There is no `DELETE`, and nothing about accounts, administration, sharing or members.
+
+```sh
+curl https://research.yourdomain.com/api/v1/projects -H "Authorization: Bearer rdk_pat_…"
+```
+
+The same bearer tokens (a read-only one gets `403` on anything that isn't a `GET`); the session cookie never opens it. A `PATCH` changes only what it sends and refuses unknown fields; replacing study blocks or settings, document content or a ticket's description saves a version, refuses to empty it and takes `base_updated_at` (`409` when it changed since). Answers leave out participant records, widget reporters' details and public link tokens. Errors are English JSON. The full reference is [docs/api.md](docs/api.md); how it is built (one services layer under the web app, the REST API and MCP) is [docs/architecture.md](docs/architecture.md).
+
 ## Security and privacy
 
 - Passwords hashed with bcrypt, sessions in an `httpOnly` cookie with a short-lived JWT, revocable from "Sign out everywhere". Optional Google and Microsoft sign-in over OpenID Connect with PKCE, state and nonce; ID tokens verified against the provider's keys.
@@ -180,7 +190,7 @@ Errors are JSON `{ "error": "…" }`: `400` with `issues` for invalid input, `40
 - Uploads validated by magic bytes (SVG rejected), random file names, served with a no-script CSP. HTML prototypes run in a sandboxed iframe with an opaque origin.
 - Every upload goes through a security scan before it is stored: the real type must match the extension, text that is really a scripted HTML/SVG page is refused, and an optional ClamAV antivirus can check every file (see [Upload security scan](#upload-security-scan)).
 - Participants' IP and full user agent are never stored, only the device class. Public reports and the MCP server never include participant data.
-- Outside access (MCP): hashed, revocable tokens; OAuth with PKCE and exact redirect matching; tools can read, create and edit but never delete, and respect project roles.
+- Outside access (MCP and the REST API): hashed, revocable tokens; OAuth with PKCE and exact redirect matching; tools and operations can read, create and edit but never delete, and respect project roles.
 
 The full list is in [SECURITY.md](SECURITY.md), together with how to report a vulnerability.
 
@@ -308,6 +318,9 @@ server/  Express 5 · PostgreSQL · zod · helmet · express-rate-limit · multe
   migrations/   001 base schema · 002 security, reset and uploads · 003 documents
                 004 participant panel · 005 project reports · 006 insight review · … · 012 organizations and comments · 013 onboarding
   src/routes/   auth · dashboard · dashboards · projects · studies · insights · tickets · roadmap · notifications · widget · participants · documents · files · uploads · public · admin · orgs
+  src/services/ projects · studies · insights · documents · tickets · roadmap: the logic the routes, the REST API and MCP share
+  src/api/v1.ts the public REST API (/api/v1) and its OpenAPI document
+  src/mcp/      the MCP server, its tools and the AI operations over HTTP (/api/v1/tools)
   widget/widget.js   the feedback widget other sites load (plain JavaScript, no build step)
   src/lib/i18n.ts   server messages in ES/EN (by the x-lang header)
 web/     React 19 · Vite · Tailwind 4 · React Router

@@ -11,7 +11,7 @@ export interface TokenRow { id: string; name: string; hint: string; scope: Scope
 /** Apps that signed in with OAuth always read and edit (the only OAuth scope is mcp). */
 export interface AppRow { id: string; name: string; created_at: string; last_used_at: string | null }
 /** GET /api/connect/access: the person's tokens and connected apps, and this install's addresses. */
-export interface Access { tokens: TokenRow[]; apps: AppRow[]; mcp_url: string; openapi_url: string }
+export interface Access { tokens: TokenRow[]; apps: AppRow[]; mcp_url: string; openapi_url: string; rest_url: string }
 
 const ReadOnly = () => <span className="ml-1.5 rounded-full bg-ink/5 px-2 py-0.5 text-[11px] font-medium text-ink-2">{t("solo lectura")}</span>;
 

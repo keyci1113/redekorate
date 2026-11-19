@@ -174,6 +174,7 @@ export function connectApi(baseUrl: (req: Request) => string) {
 
   r.get("/access", async (req, res) => res.json({
     ...(await listAccess(req.user!.id)), mcp_url: `${baseUrl(req)}/mcp`, openapi_url: `${baseUrl(req)}/api/v1/tools/openapi.json`,
+    rest_url: `${baseUrl(req)}/api/v1`,
   }));
 
   /** What an app can do once connected, for the Connect AI apps page. */
