@@ -13,6 +13,7 @@ import { participants } from "./routes/participants.js";
 import { publicApi } from "./routes/public.js";
 import { purgeOldRecordings } from "./lib/recordings.js";
 import { dashboard } from "./routes/dashboard.js";
+import { dashboards } from "./routes/dashboards.js";
 import { documents } from "./routes/documents.js";
 import { uploads, UPLOAD_DIR } from "./routes/uploads.js";
 import { files } from "./routes/files.js";
@@ -65,6 +66,7 @@ app.get("/api/health", async (_req, res) => {
 app.use("/api/auth/oauth", oauth);
 app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);
+app.use("/api/dashboards", dashboards);
 app.use("/api/projects/:id/tickets", tickets);
 app.use("/api/projects/:id/milestones", milestones);
 app.use("/api/projects/:id/widget", widget);

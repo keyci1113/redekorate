@@ -34,6 +34,7 @@ const MyWorkPage = lazy(() => import("./pages/MyWorkPage").then((m) => ({ defaul
 const PublicRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.PublicRoadmapPage })));
 const OrgRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.OrgRoadmapPage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
+const DashboardsPage = lazy(() => import("./pages/DashboardsPage").then((m) => ({ default: m.DashboardsPage })));
 const WidgetSettingsPage = lazy(() => import("./pages/WidgetSettingsPage").then((m) => ({ default: m.WidgetSettingsPage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
@@ -76,6 +77,10 @@ export function App() {
       {/* Privado */}
       <Route element={<Private><Layout /></Private>}>
         <Route path="/" element={<DashboardPage />} />
+        {/* Each dashboard has its own data shape: the key remounts the page so one never renders with another's data. */}
+        <Route path="/dashboards" element={<DashboardsPage key="studies" tab="studies" />} />
+        <Route path="/dashboards/tickets" element={<DashboardsPage key="tickets" tab="tickets" />} />
+        <Route path="/dashboards/projects" element={<DashboardsPage key="projects" tab="projects" />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/projects/:id/new" element={<NewStudyPage />} />
