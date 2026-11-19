@@ -8,7 +8,7 @@ import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Insight, OrgAccessMember, Organization, Participant, Project, ProjectMember, ProjectShare, Study } from "../lib/types";
 import { hasArea } from "../lib/access";
-import { BackLink, Button, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, Tag, cx, type TabItem } from "../components/ui";
+import { BackLink, Button, Empty, ErrorNote, Modal, PageSkeleton, Spinner, StatusBadge, Tabs, Tag, cx, type TabItem } from "../components/ui";
 import { ProjectForm } from "../components/ProjectForm";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { TicketsTab } from "../tickets/TicketsTab";
@@ -57,7 +57,7 @@ export function ProjectPage() {
   const members = useLoad(() => api.get<{ members: ProjectMember[]; via_org?: OrgAccessMember[] }>(`/projects/${id}/members`), [id]);
   const orgs = useLoad(() => (editOpen ? api.get<{ organizations: Organization[] }>("/orgs") : Promise.resolve({ organizations: [] as Organization[] })), [editOpen]);
 
-  if (project.loading) return <Spinner />;
+  if (project.loading) return <PageSkeleton />;
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
   const p = project.data.project;
   const list = studies.data?.studies ?? [];

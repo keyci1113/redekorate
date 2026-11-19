@@ -3617,4 +3617,14 @@ export const EN: Record<string, string> = {
 "{n} % hecho": "{n}% done",
 "Actualizar": "Refresh",
 "Cerrar resumen del día": "Close the daily brief",
+// UI review round 2: layout and navigation
+"Controles del lienzo": "Canvas controls",
+"Acercar": "Zoom in",
+"Alejar": "Zoom out",
+"Ajustar a la vista": "Fit to view",
+"Minimapa": "Minimap",
+"Punto de conexión": "Connection point",
+"Ocultar minimapa": "Hide minimap",
+"Mostrar minimapa": "Show minimap",
+"Ningún diagrama coincide con los filtros": "No diagram matches the filters",
 };

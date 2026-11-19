@@ -6,7 +6,7 @@ import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import { t } from "../lib/i18n";
 import type { Project } from "../lib/types";
-import { BackLink, ErrorNote, Spinner } from "../components/ui";
+import { BackLink, ErrorNote, PageSkeleton } from "../components/ui";
 import { categoryOf, startOrder, type ProjectCategory, type StartChoice } from "../lib/projectCategories";
 
 interface Choice { to: string; icon: ReactNode; title: string; text: string; next: string }
@@ -25,7 +25,7 @@ const startHint = (c: ProjectCategory) => ({
 export function ProjectStartPage() {
   const { id } = useParams();
   const project = useLoad(() => api.get<{ project: Project }>(`/projects/${id}`), [id]);
-  if (project.loading) return <Spinner />;
+  if (project.loading) return <PageSkeleton />;
   if (project.error || !project.data) return <div className="p-10"><ErrorNote>{project.error}</ErrorNote></div>;
   const p = project.data.project;
   const category = categoryOf(p);

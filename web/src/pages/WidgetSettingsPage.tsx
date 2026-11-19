@@ -9,7 +9,7 @@ import { copy, useLoad } from "../lib/hooks";
 import { canEdit as roleCanEdit } from "../lib/roles";
 import { plural, relTime, t } from "../lib/i18n";
 import type { ProjectRole } from "../lib/types";
-import { BackLink, Button, ErrorNote, Spinner, cx } from "../components/ui";
+import { BackLink, Button, ErrorNote, PageSkeleton, cx } from "../components/ui";
 import { TYPES, type TicketType } from "../tickets/model";
 import { typeLabel } from "../tickets/parts";
 import { AccessNotice } from "../components/AccessNotice";
@@ -86,7 +86,7 @@ export function WidgetSettingsPage() {
   }, [settings, me?.name, me?.email]);
   useEffect(() => () => { preview.current?.destroy(); preview.current = null; }, []);
 
-  if (load.loading && !load.data) return <Spinner />;
+  if (load.loading && !load.data) return <PageSkeleton />;
   if (load.error || !load.data || !w || !draft) return <div className="p-10"><ErrorNote>{load.error ?? ""}</ErrorNote></div>;
   const { project, role } = load.data, canEdit = roleCanEdit(role), s = draft.settings, base = `/projects/${project.id}/widget`;
   const dirty = JSON.stringify(s) !== JSON.stringify(w.settings) || JSON.stringify(draft.domains) !== JSON.stringify(w.allowed_domains);

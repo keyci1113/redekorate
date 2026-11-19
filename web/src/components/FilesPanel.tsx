@@ -73,16 +73,23 @@ export function FilesPanel({ projectId, canEdit, onCount }: { projectId: string;
           <button type="button" className="mt-2 text-xs font-medium underline" onClick={() => setProblems([])}>{t("Entendido")}</button>
         </div>
       )}
+      {/* One drop zone. With no files yet it is also the empty state, instead of a second dashed box below it. */}
       {canEdit && (
         <button type="button" onClick={() => picker.current?.click()} disabled={!!sending}
-          className={cx("focus-ring mb-5 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 py-6 text-center transition", over ? "border-accent bg-accent-soft" : "border-line-2 hover:bg-ink/5")}>
-          <Upload size={18} aria-hidden className="text-ink-3" />
-          <span className="text-sm font-medium">{over ? t("Suelta para subir") : t("Arrastra archivos aquí o haz clic para elegirlos")}</span>
+          className={cx("focus-ring mb-5 flex w-full flex-col items-center gap-1 rounded-xl border border-dashed px-4 text-center transition", list.length === 0 ? "py-12" : "py-6", over ? "border-accent bg-accent-soft" : "border-line-2 hover:bg-ink/5")}>
+          {list.length === 0 ? <>
+            <span aria-hidden className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-surface text-ink-3 shadow-sm ring-1 ring-line"><Upload size={20} /></span>
+            <span className="font-medium">{over ? t("Suelta para subir") : t("Aún no hay archivos")}</span>
+            <span className="max-w-sm text-sm text-ink-3">{t("Sube el brief, un contrato o las notas de una reunión para tenerlos junto al proyecto.")} {t("Arrastra archivos aquí o haz clic para elegirlos")}</span>
+          </> : <>
+            <Upload size={18} aria-hidden className="text-ink-3" />
+            <span className="text-sm font-medium">{over ? t("Suelta para subir") : t("Arrastra archivos aquí o haz clic para elegirlos")}</span>
+          </>}
           <span className="text-xs text-ink-3">{types}</span>
         </button>
       )}
       {list.length === 0 ? (
-        <Empty icon={<FileText size={20} />} title={t("Aún no hay archivos")} text={canEdit ? t("Sube el brief, un contrato o las notas de una reunión para tenerlos junto al proyecto.") : t("Cuando alguien suba archivos al proyecto, aparecerán aquí.")} />
+        canEdit ? null : <Empty icon={<FileText size={20} />} title={t("Aún no hay archivos")} text={t("Cuando alguien suba archivos al proyecto, aparecerán aquí.")} />
       ) : (
         <>
           {list.length > 5 && (

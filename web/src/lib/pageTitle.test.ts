@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { EN } from "./en";
-import { HOME_TITLE, isSharedLink, pageTitle, TITLE_KEYS } from "./pageTitle";
+import { HOME_TITLE, isSharedLink, namedTitle, pageTitle, TITLE_KEYS } from "./pageTitle";
 
 describe("pageTitle", () => {
   it("names each page in the interface language", () => {
@@ -14,6 +14,11 @@ describe("pageTitle", () => {
     expect(pageTitle("/studies/42/results", "es")).toBe("Resultados · redekorate");
     expect(pageTitle("/projects/abc/tickets/7", "en")).toBe("Ticket · redekorate");
     expect(pageTitle("/orgs/3/roadmap", "es")).toBe("Hoja de ruta · redekorate");
+  });
+
+  it("names a document or diagram tab after the item, not the route", () => {
+    expect(namedTitle("  Site map ")).toBe("Site map · redekorate");
+    expect(namedTitle("   ")).toBeNull();
   });
 
   it("falls back to the home title for / and unknown paths", () => {

@@ -1,16 +1,16 @@
 import { createContext, memo, useCallback, useContext, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode, type Ref, type RefObject } from "react";
 import {
-  Background, BackgroundVariant, BaseEdge, ConnectionMode, Controls, EdgeLabelRenderer, Handle, MarkerType, MiniMap, NodeResizer, Panel, Position,
+  Background, BackgroundVariant, BaseEdge, ConnectionMode, ControlButton, Controls, EdgeLabelRenderer, Handle, MarkerType, MiniMap, NodeResizer, Panel, Position,
   ReactFlow, ReactFlowProvider, SelectionMode, applyEdgeChanges, applyNodeChanges, getBezierPath, getNodesBounds, getSmoothStepPath, getStraightPath,
   useReactFlow, type Connection, type Edge, type EdgeChange, type EdgeProps, type FinalConnectionState, type Node, type NodeChange, type NodeProps,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
   AlignCenter, AlignLeft, AlignRight, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, AlignVerticalJustifyStart, ArrowLeftRight, ArrowRight, Bold, Copy,
-  Download, ExternalLink, Hand, Image as ImageIcon, Italic, Link2, List, ListOrdered, Minus, MousePointer2, Palette, Pipette, Redo2, Spline, Strikethrough, Trash2, Type, Underline, Undo2,
+  Download, ExternalLink, Hand, Image as ImageIcon, Italic, Link2, List, ListOrdered, Map as MapIcon, Minus, MousePointer2, Palette, Pipette, Redo2, Spline, Strikethrough, Trash2, Type, Underline, Undo2,
 } from "lucide-react";
 import { toPng, toSvg } from "html-to-image";
-import { plural, t } from "../lib/i18n";
+import { plural, t, useLang } from "../lib/i18n";
 import { uid } from "../lib/hooks";
 import { api } from "../lib/api";
 import { useTheme } from "../lib/theme";
@@ -344,6 +344,25 @@ export function DiagramCanvas(props: CanvasProps) {
   return <ReactFlowProvider><Canvas {...props} /></ReactFlowProvider>;
 }
 
+/** React Flow's built-in control and minimap names, in the app's language instead of its English defaults. */
+const flowLabels = () => ({
+  "controls.ariaLabel": t("Controles del lienzo"),
+  "controls.zoomIn.ariaLabel": t("Acercar"),
+  "controls.zoomOut.ariaLabel": t("Alejar"),
+  "controls.fitView.ariaLabel": t("Ajustar a la vista"),
+  "minimap.ariaLabel": t("Minimapa"),
+  "handle.ariaLabel": t("Punto de conexión"),
+});
+
+/** Whether this viewer wants the minimap, remembered in this browser; on by default and when storage is blocked. */
+const MINIMAP_KEY = "rk-diagram-minimap";
+function readMinimap() {
+  try { return localStorage.getItem(MINIMAP_KEY) !== "off"; } catch { return true; }
+}
+function saveMinimap(on: boolean) {
+  try { localStorage.setItem(MINIMAP_KEY, on ? "on" : "off"); } catch { /* storage blocked: the choice lasts for this visit */ }
+}
+
 function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, fitKey, board = false, handle }: CanvasProps) {
   const { theme } = useTheme();
   const rf = useReactFlow<FNode, FEdge>();
@@ -354,6 +373,9 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
   const [editing, setEditing] = useState<string | null>(null);
   const [tool, setTool] = useState<"select" | "hand">("select");
   const [connecting, setConnecting] = useState(false);
+  const [minimap, setMinimap] = useState(readMinimap);
+  const { lang } = useLang();
+  const ariaLabelConfig = useMemo(flowLabels, [lang]); // eslint-disable-line react-hooks/exhaustive-deps
   const live = useRef<Snap>({ nodes, edges });
   live.current = { nodes, edges };
 
@@ -706,13 +728,19 @@ function Canvas({ data, onChange, readOnly = false, title = "diagram", actions, 
           panOnDrag={readOnly || tool === "hand" ? true : [1, 2]} panOnScroll={!readOnly} zoomOnDoubleClick={false}
           elevateNodesOnSelect={false} snapToGrid snapGrid={[8, 8]} minZoom={0.1} maxZoom={4}
           deleteKeyCode={readOnly ? null : ["Backspace", "Delete"]} multiSelectionKeyCode={["Shift", "Meta", "Control"]}
-          fitView fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }} colorMode={theme} proOptions={{ hideAttribution: true }}
+          fitView fitViewOptions={{ padding: 0.2, maxZoom: 1.2 }} colorMode={theme} proOptions={{ hideAttribution: true }} ariaLabelConfig={ariaLabelConfig}
           className={cx(tool === "hand" && !readOnly && "cursor-grab")}
         >
           <Background variant={BackgroundVariant.Dots} gap={24} size={1.4} color="var(--color-line-2)" />
-          <Controls showInteractive={false} position="bottom-right" />
-          <MiniMap<FNode> position="bottom-left" pannable zoomable className="!hidden md:!block" nodeStrokeWidth={2}
-            nodeColor={(n) => (n.data.shape === "text" ? "transparent" : fillOf(n.data.color))} nodeStrokeColor={(n) => strokeOf(n.data.color)} />
+          <Controls showInteractive={false} position="bottom-right">
+            {/* The minimap can cover part of the drawing, so it can be hidden; the choice is remembered per viewer. */}
+            <ControlButton className="max-md:!hidden" onClick={() => { saveMinimap(!minimap); setMinimap(!minimap); }} aria-pressed={minimap}
+              title={minimap ? t("Ocultar minimapa") : t("Mostrar minimapa")} aria-label={minimap ? t("Ocultar minimapa") : t("Mostrar minimapa")}>
+              <MapIcon size={14} aria-hidden />
+            </ControlButton>
+          </Controls>
+          {minimap && <MiniMap<FNode> position="bottom-left" pannable zoomable className="!hidden md:!block" nodeStrokeWidth={2}
+            nodeColor={(n) => (n.data.shape === "text" ? "transparent" : fillOf(n.data.color))} nodeStrokeColor={(n) => strokeOf(n.data.color)} />}
 
           {!readOnly && (
             <Panel position="top-left" className="!m-3">

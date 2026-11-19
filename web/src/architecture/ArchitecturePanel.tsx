@@ -1,12 +1,14 @@
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bot, FolderTree as Sitemap, GitFork, LayoutPanelTop, Network, Palette, Plus, Rows3, Shapes, Users, Workflow } from "lucide-react";
+import { Bot, FolderTree as Sitemap, GitFork, LayoutPanelTop, Network, Palette, Plus, Rows3, Search, Shapes, Users, Workflow } from "lucide-react";
 import { api } from "../lib/api";
 import { getLang, t, tr, type Lang } from "../lib/i18n";
 import { Button, Empty, ErrorNote, Field, Modal, cx } from "../components/ui";
 import { Segmented } from "../components/editing";
 import type { DocRecord } from "../docs/types";
 import { DocCard } from "../docs/DocCard";
+import { DocFilterBar, DocsTable, DocsViewToggle, useDocsView, type RowInfo } from "../docs/DocsTable";
+import { DEFAULT_SORT, NO_FILTERS, filterAndSort, toggleSort, type DocFilters, type DocSort } from "../docs/docList";
 import { STARTER_IDS, starter, type StarterId } from "./model";
 
 // A record, so a starter added to the model cannot be left out of the dialog.
@@ -24,27 +26,50 @@ const STARTER_INFO: Record<StarterId, { name: string; text: string; icon: ReactN
 };
 const STARTERS = STARTER_IDS.map((id) => ({ id, ...STARTER_INFO[id] }));
 const kindLabel = (kind: string) => (kind === "sitemap" ? t("Mapa del sitio") : kind === "moodboard" ? t("Mood board") : t("Diagrama"));
+/** What the shared document list (search, type filter, table) shows for a diagram; diagrams have no template category. */
+const rowInfo = (d: DocRecord): RowInfo => ({
+  icon: d.kind === "sitemap" ? <Sitemap size={18} /> : d.kind === "moodboard" ? <Palette size={18} /> : <Shapes size={18} />,
+  type: kindLabel(d.kind), category: "", categoryId: "",
+});
 
 export function ArchitecturePanel({ projectId, diagrams, onChange, canEdit = true }: { projectId: string; diagrams: DocRecord[]; onChange: () => void; canEdit?: boolean }) {
   const [open, setOpen] = useState(false);
   const nav = useNavigate();
+  // The same search, type filter and cards / table switch as UX documents (docs/docList.ts + docs/DocsTable.tsx).
+  const [view, setView] = useDocsView("pref:architecture-view");
+  const [filters, setFilters] = useState<DocFilters>(NO_FILTERS);
+  const [sort, setSort] = useState<DocSort>(DEFAULT_SORT);
+  const rows = useMemo(() => filterAndSort(diagrams, filters, sort, rowInfo), [diagrams, filters, sort]);
   return (
-    <div>
-      <div className="mb-5 flex items-center justify-between gap-3">
-        <p className="text-sm text-ink-2">{t("Diagramas, flujos, mapas del sitio y mood boards: dibuja con figuras y flechas, escribe un esquema y el mapa se arma solo, o junta imágenes y colores.")}</p>
-        {canEdit && <Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo diagrama")}</Button>}
+    <div className="min-w-0">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <p className="min-w-[min(100%,18rem)] flex-1 text-sm text-ink-2">{t("Diagramas, flujos, mapas del sitio y mood boards: dibuja con figuras y flechas, escribe un esquema y el mapa se arma solo, o junta imágenes y colores.")}</p>
+        <div className="flex shrink-0 items-center gap-2">
+          {diagrams.length > 0 && <DocsViewToggle view={view} onChange={setView} />}
+          {canEdit && <Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Nuevo diagrama")}</Button>}
+        </div>
       </div>
       {diagrams.length === 0 ? (
         <Empty icon={<Network size={20} />} title={t("Aún no hay diagramas")}
           text={t("Mapas del sitio, flujos de usuario, diagramas de flujo y de arquitectura del sistema.")}
           action={canEdit ? <Button variant="primary" icon={<Plus size={16} />} onClick={() => setOpen(true)}>{t("Crear el primero")}</Button> : undefined} />
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {diagrams.map((d) => (
-            <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} kind={kindLabel(d.kind)}
-              icon={d.kind === "sitemap" ? <Sitemap size={18} /> : d.kind === "moodboard" ? <Palette size={18} /> : <Shapes size={18} />} />
-          ))}
-        </div>
+        <>
+          <DocFilterBar docs={diagrams} filters={filters} onChange={setFilters} info={rowInfo} shown={rows.length} />
+          {rows.length === 0 ? (
+            <Empty icon={<Search size={20} />} title={t("Ningún diagrama coincide con los filtros")} text={t("Prueba con menos filtros o con otra búsqueda.")}
+              action={<Button onClick={() => setFilters(NO_FILTERS)}>{t("Quitar filtros")}</Button>} />
+          ) : view === "table" ? (
+            <DocsTable rows={rows} sort={sort} onSort={(k) => setSort(toggleSort(sort, k))} info={rowInfo} canEdit={canEdit} onChange={onChange} caption={t("Arquitectura")} noCategory />
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {rows.map((d) => {
+                const m = rowInfo(d);
+                return <DocCard key={d.id} doc={d} canEdit={canEdit} onChange={onChange} kind={m.type} icon={m.icon} />;
+              })}
+            </div>
+          )}
+        </>
       )}
       <NewDiagramModal open={open} onClose={() => setOpen(false)} projectId={projectId} onCreated={(id) => { onChange(); nav(`/docs/${id}`); }} />
     </div>

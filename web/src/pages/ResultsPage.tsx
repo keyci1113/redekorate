@@ -15,7 +15,7 @@ import type { StudySettings } from "../lib/settings";
 import { isDirect, screenName, type PrototypeTaskValue } from "../blocks/prototype";
 import { blockDef } from "../blocks/registry";
 import { susScore, answeredBlocks } from "../lib/analytics";
-import { BackLink, Button, Card, Empty, ErrorNote, Modal, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
+import { BackLink, Button, Card, Empty, ErrorNote, Modal, PageSkeleton, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
 import { BlockResults, Overview } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
@@ -27,6 +27,7 @@ import { CommentsPanel } from "../components/CommentsPanel";
 
 import { t } from "../lib/i18n";
 import { AccessNotice } from "../components/AccessNotice";
+import { usePageProject } from "../lib/pageProject";
 interface Recording { session_id: string; events: number; bytes: number; duration_ms: number }
 const RecordingPlayer = lazy(() => import("../components/RecordingPlayer"));
 interface Results { study: Study; sessions: Session[]; answers: Answer[]; insights: Insight[]; recordings?: Recording[]; role?: ProjectRole; tickets?: { number: number; title: string }[] }
@@ -41,7 +42,9 @@ export function ResultsPage() {
   useEffect(() => { if (st) rememberStudy({ id: st.id, title: st.title, method: st.method, project_id: st.project_id, where: "results" }); }, [st]);
   // Only for the way back ("← Project · Studies"); until it loads the link just says "Project".
   const project = useLoad(() => (st ? api.get<{ project: Project }>(`/projects/${st.project_id}`) : Promise.resolve(null)), [st?.project_id]);
-  if (loading && !data) return <Spinner />;
+  // A study always belongs to a project: the header highlights Projects and shows it in the switcher, like the study editor's back link.
+  usePageProject(st?.project_id);
+  if (loading && !data) return <PageSkeleton />;
   if (error || !data) return <div className="p-10"><ErrorNote>{error}</ErrorNote></div>;
   const { study, sessions, answers, insights } = data;
   const canEdit = roleCanEdit(data.role);   // commenter and viewer: no editing, discarding or sharing
