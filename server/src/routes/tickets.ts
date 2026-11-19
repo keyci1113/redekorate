@@ -1,6 +1,8 @@
 // Tickets of a project: /api/projects/:id/tickets
 // Roles follow the project: viewers read, commenters also comment, editors create and edit, owners delete.
 import { Router, type Request } from "express";
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import type { PoolClient } from "pg";
 import { z } from "zod";
 import { pool, one, query } from "../lib/db.js";
@@ -12,6 +14,7 @@ import { flushEmails, notify, ticketPeople } from "../lib/notify.js";
 import { MAX_COLUMNS, builtInColumns, builtInName, columnLabel, columnsProblem, fallbackColumn, findColumn, type Column } from "../lib/board.js";
 import { TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES, cleanLabels, mentionedIds, mostSimilar, reorder, setDiff, severityFromPriority, type TicketPriority, type TicketStatus } from "../lib/tickets.js";
 import { isoDay, patchOf } from "../lib/schemas.js";
+import { UPLOAD_DIR } from "./uploads.js";
 
 const requireProject = projectIn("tickets");
 
@@ -554,8 +557,44 @@ tickets.post("/:number/merge", async (req, res) => {
 tickets.delete("/:number/reporter", async (req, res) => {
   const p = await requireProject(pid(req), req.user!.id, "editor");
   const t = await ticketRow(p.id, num(req));
+  const before = await query<{ attachments: Attachments }>("select attachments from ticket_reporters where ticket_id = $1", [t.id]);
   await query(`update ticket_reporters set name = null, email = null, external_user_id = null, verified = false, first_seen = null, last_seen = null,
     metadata = '{}', custom_data = '{}', attachments = '{}', erased_at = now() where ticket_id = $1`, [t.id]);
+  await removeUploads(before.flatMap((r) => attachmentUrls(r.attachments)));
   await log(pool, t.id, req.user!.id, "reporter_erased");
+  res.json({ ticket: await detail(p.id, t.number) });
+});
+
+/** What the feedback widget stored with a report. */
+type Attachments = { screenshot?: string; recording?: string; files?: { url: string; name: string }[] };
+const attachmentUrls = (a: Attachments) => [a.screenshot, a.recording, ...(a.files ?? []).map((f) => f.url)].filter((u): u is string => !!u);
+/** Deletes stored widget uploads (bytes and their `uploads` row). A file already gone is not an error. */
+async function removeUploads(urls: string[]) {
+  const names = urls.map((u) => /^\/uploads\/([a-z0-9]+\.[a-z0-9]+)$/.exec(u)?.[1]).filter((n): n is string => !!n);
+  if (!names.length) return;
+  await Promise.all(names.map((n) => unlink(path.join(UPLOAD_DIR, n)).catch(() => {})));
+  await query("delete from uploads where filename = any($1)", [names]);
+}
+
+/**
+ * Removes one attachment (screenshot, recording or file) that came with a widget report, for example a screenshot that shows
+ * private data or a file nobody needs. The report's text stays. Editors and owners only.
+ */
+tickets.delete("/:number/attachments", async (req, res) => {
+  const p = await requireProject(pid(req), req.user!.id, "editor");
+  const t = await ticketRow(p.id, num(req));
+  const { url } = parse(z.object({ url: z.string().min(1).max(300) }), req.body);
+  const reporters = await query<{ id: string; attachments: Attachments }>("select id, attachments from ticket_reporters where ticket_id = $1", [t.id]);
+  const owner = reporters.find((r) => attachmentUrls(r.attachments).includes(url));
+  if (!owner) throw notFound("Adjunto");
+  const a = owner.attachments;
+  const name = a.screenshot === url ? "screenshot" : a.recording === url ? "recording" : a.files?.find((f) => f.url === url)?.name ?? "file";
+  const next: Attachments = { ...a };
+  if (next.screenshot === url) delete next.screenshot;
+  if (next.recording === url) delete next.recording;
+  if (next.files) { next.files = next.files.filter((f) => f.url !== url); if (!next.files.length) delete next.files; }
+  await query("update ticket_reporters set attachments = $2 where id = $1", [owner.id, JSON.stringify(next)]);
+  await removeUploads([url]);
+  await log(pool, t.id, req.user!.id, "attachment_removed", name, null);
   res.json({ ticket: await detail(p.id, t.number) });
 });

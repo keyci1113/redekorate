@@ -62,6 +62,13 @@ const HOW_TOS = (): HowTo[] => [
     t("En Hoja de ruta ves hitos y estudios en una línea de tiempo por mes o trimestre. Compartir crea un link de solo lectura, sin tickets ni respuestas."),
     t("Mi trabajo, en la navegación, reúne los tickets asignados a ti en todos los proyectos."),
   ] },
+  { id: "widget", title: t("Recibir feedback desde tu producto"), where: t("Proyecto → Tickets → Widget de feedback"), steps: [
+    t("Agrega el dominio de tu sitio en Dominios permitidos y guarda."),
+    t("Copia el código de Instalar y pégalo antes de </body> en tu sitio, o en una etiqueta HTML personalizada de Google Tag Manager."),
+    t("Para saber quién escribe, define window.RedekorateUser = { id, name, email } antes del script, o llama a Redekorate.identify({…}) al iniciar sesión."),
+    t("Marca con data-rk-private los campos que nunca deben salir en capturas ni grabaciones."),
+    t("Cada mensaje llega como ticket con la etiqueta feedback; desde el ticket puedes responder por correo a quien lo envió."),
+  ], note: t("Si el botón no aparece en tu sitio: revisa que el dominio esté permitido y que la política de seguridad (CSP) de tu sitio deje cargar scripts y conectarse a tu servidor de Redekorate.") },
   { id: "documents", title: t("Llenar un documento de investigación"), where: t("Proyecto → Documentos"), steps: [
     t("Elige una plantilla: personas, journey map, affinity, guion de usabilidad, evaluación heurística…"),
     t("Los ejemplos aparecen solo como texto guía: nunca se guardan ni se exportan."),

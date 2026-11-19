@@ -1,7 +1,7 @@
 // The Tickets tab of a project: toolbar and filters, the board or the list, and the side panel of the open ticket.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, Calendar, ChevronDown, Columns3, Flag, Kanban, List as ListIcon, MoreHorizontal, Plus, Search, Ticket as TicketIcon, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Calendar, ChevronDown, Columns3, Flag, Kanban, List as ListIcon, MessageSquareDot, MoreHorizontal, Plus, Search, Ticket as TicketIcon, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
 import { useLoad } from "../lib/hooks";
 import { canEdit as roleCanEdit, isOwner as roleIsOwner } from "../lib/roles";
@@ -97,7 +97,7 @@ export function TicketsTab({ projectId, projectName, onCount, onLinksChange }: {
   return (
     <div className="flex items-start gap-6">
       <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <Toolbar state={state} setState={setState} setFilters={setFilters} people={people} milestones={milestones} labels={labels} canEdit={canEdit} onNew={() => openNew()} onColumns={() => setEditingColumns(true)} hrefView={(view) => `?${writeView(params, { ...state, view })}`} />
+        <Toolbar state={state} setState={setState} setFilters={setFilters} people={people} milestones={milestones} labels={labels} canEdit={canEdit} onNew={() => openNew()} onColumns={() => setEditingColumns(true)} hrefView={(view) => `?${writeView(params, { ...state, view })}`} widgetHref={`/projects/${projectId}/widget`} />
         {active && <ActiveFilters filters={state.filters} setFilters={setFilters} people={people} milestones={milestones} onClear={() => setState({ filters: NO_FILTERS })} />}
         {notice && <p role="alert" className="flex items-center justify-between gap-3 rounded-xl border border-bad/30 bg-bad-soft px-4 py-2.5 text-sm text-bad">{notice}<button type="button" onClick={() => setNotice(null)} aria-label={t("Cerrar aviso")} className="focus-ring rounded p-1"><X size={14} /></button></p>}
 
@@ -146,9 +146,9 @@ function Pill({ children, count, ...rest }: { children: ReactNode; count?: numbe
 }
 const toggleIn = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
 
-function Toolbar({ state, setState, setFilters, people, milestones, labels, canEdit, onNew, onColumns, hrefView }: {
+function Toolbar({ state, setState, setFilters, people, milestones, labels, canEdit, onNew, onColumns, hrefView, widgetHref }: {
   state: ViewState; setState: (s: Partial<ViewState>) => void; setFilters: (f: Partial<Filters>) => void;
-  people: Person[]; milestones: Milestone[]; labels: string[]; canEdit: boolean; onNew: () => void; onColumns: () => void; hrefView: (v: "board" | "list") => string;
+  people: Person[]; milestones: Milestone[]; labels: string[]; canEdit: boolean; onNew: () => void; onColumns: () => void; hrefView: (v: "board" | "list") => string; widgetHref: string;
 }) {
   const f = state.filters;
   const [who, setWho] = useState("");
@@ -204,6 +204,7 @@ function Toolbar({ state, setState, setFilters, people, milestones, labels, canE
             <MenuItem checked={f.milestone === NONE} onSelect={() => { setFilters({ milestone: NONE }); close(); }}>{t("Sin hito")}</MenuItem>
           </>}
         </Menu>
+        <Link to={widgetHref} className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-3 text-[13px] font-semibold hover:bg-ink/5"><MessageSquareDot size={15} aria-hidden />{t("Widget de feedback")}</Link>
         {canEdit && <button type="button" onClick={onColumns} className="focus-ring inline-flex min-h-11 items-center gap-2 rounded-[10px] border border-line-2 bg-surface px-3 text-[13px] font-semibold hover:bg-ink/5"><Columns3 size={15} aria-hidden />{t("Columnas")}</button>}
         {canEdit && <Button variant="primary" size="lg" icon={<Plus size={16} />} onClick={onNew}>{t("Nuevo ticket")}</Button>}
       </div>

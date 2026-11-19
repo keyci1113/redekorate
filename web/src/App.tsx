@@ -34,6 +34,7 @@ const MyWorkPage = lazy(() => import("./pages/MyWorkPage").then((m) => ({ defaul
 const PublicRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.PublicRoadmapPage })));
 const OrgRoadmapPage = lazy(() => import("./pages/RoadmapPages").then((m) => ({ default: m.OrgRoadmapPage })));
 const AuthorizePage = lazy(() => import("./pages/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
+const WidgetSettingsPage = lazy(() => import("./pages/WidgetSettingsPage").then((m) => ({ default: m.WidgetSettingsPage })));
 const HelpPage = lazy(() => import("./pages/HelpPage").then((m) => ({ default: m.HelpPage })));
 
 function Private({ children }: { children: ReactNode }) {
@@ -79,6 +80,7 @@ export function App() {
         <Route path="/projects/:id" element={<ProjectPage />} />
         <Route path="/projects/:id/new" element={<NewStudyPage />} />
         <Route path="/projects/:id/tickets/:number" element={<TicketPage />} />
+        <Route path="/projects/:id/widget" element={<WidgetSettingsPage />} />
         <Route path="/studies" element={<LiveStudiesPage />} />
         <Route path="/studies/:id/results" element={<ResultsPage />} />
         <Route path="/account" element={<AccountPage />} />

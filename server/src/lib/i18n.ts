@@ -1,6 +1,9 @@
 // Mensajes del servidor en inglés (el cliente envía x-lang: en|es)
 const EN: Record<string, string> = {
   "Milestone no encontrado": "Milestone not found",
+  "Adjunto no encontrado": "Attachment not found",
+  "Uno de los dominios no es válido. Escribe solo el dominio, por ejemplo app.acme.com o *.acme.com": "One of the domains is not valid. Enter only the domain, for example app.acme.com or *.acme.com",
+  "Formato no permitido": "File type not allowed",
   "Roadmap no encontrado": "Roadmap not found",
   "Ya existe un milestone con ese nombre en este proyecto": "This project already has a milestone with that name",
   "La fecha de inicio debe ser anterior a la de fin": "The start date must be before the end date",

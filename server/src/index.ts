@@ -21,6 +21,7 @@ import { orgs } from "./routes/orgs.js";
 import { tickets } from "./routes/tickets.js";
 import { milestones, myWork, roadmap } from "./routes/roadmap.js";
 import { notifications } from "./routes/notifications.js";
+import { widget, widgetPublic } from "./routes/widget.js";
 import { errorHandler } from "./lib/http.js";
 import { csrfGuard, publicLimiter, securityHeaders } from "./lib/security.js";
 import { migrate } from "./migrate.js";
@@ -53,6 +54,8 @@ app.use("/mcp", openCors, mcpLimiter, mcpRouter({ apiBase: `http://127.0.0.1:${p
 
 // API
 app.use("/api", (_req, res, next) => { res.set("Cache-Control", "no-store"); next(); });
+// The feedback widget is called from other sites: it has its own origin rules (allowed domains) instead of the same-origin guard, and uses no cookies.
+app.use("/api/widget", widgetPublic);
 app.use("/api", csrfGuard);
 // The web app's maintenance screen polls this until the app is back (after a deploy) or maintenance is off.
 app.get("/api/health", async (_req, res) => {
@@ -64,6 +67,7 @@ app.use("/api/auth", auth);
 app.use("/api/dashboard", dashboard);
 app.use("/api/projects/:id/tickets", tickets);
 app.use("/api/projects/:id/milestones", milestones);
+app.use("/api/projects/:id/widget", widget);
 app.use("/api/projects/:id/roadmap", roadmap);
 app.use("/api/my-work", myWork);
 app.use("/api/notifications", notifications);
@@ -79,6 +83,12 @@ app.use("/api/orgs", orgs);
 app.use("/api/connect", connectApi(baseUrl));
 app.use("/api/public", publicLimiter, publicApi);
 app.use("/api", (req, res) => res.status(404).json({ error: translate("Ruta no encontrada", req.get("x-lang")) }));
+
+// The feedback widget script other sites load with one <script> tag. Short cache: a setting or a fix reaches every site within minutes.
+const WIDGET_JS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../widget/widget.js");
+app.get("/widget.js", (_req, res) => {
+  res.type("application/javascript").set({ "Cache-Control": "public, max-age=300", "Cross-Origin-Resource-Policy": "cross-origin", "Access-Control-Allow-Origin": "*" }).sendFile(WIDGET_JS);
+});
 
 // Script de seguimiento de los prototipos HTML (lo cargan desde su sandbox). Sin caché larga: cambia con cada deploy.
 app.get(TRACKER_PATH, (_req, res) => {
