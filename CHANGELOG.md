@@ -4,6 +4,7 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Ranking drag.** Ranking questions use pointer-based drag and drop: the item follows the pointer and the others slide out of the way, on mouse and touch alike. The up and down buttons still work.
 - **Dropdown arrows.** Every dropdown in the app now draws the same arrow with space around it, instead of the browser's own, which sat flush against the edge. It is one CSS rule for all selects, so new ones need no class.
 - **Prototype tasks.** The mission instructions stay visible while the participant works, an HTML prototype really loads on the task's start screen (the tracker waits for the prototype to settle instead of a fixed delay and reports whether it got there), a task can start on the flow's first tap, the prototype's own instructions are shown, and *I'm done* / *I can't complete it* are bigger.
 - **Study styling.** A study can set its own button color and text (automatic by contrast, light or dark); without one the buttons follow the brand color. The color pickers take a hex code or the browser pipette, and the study logo size is adjustable. Brand-tinted selections stay readable in dark mode.
