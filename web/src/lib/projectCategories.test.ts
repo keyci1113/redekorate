@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROJECT_CATEGORIES, categoryCounts, categoryOf, filterByCategory, readCategory } from "./projectCategories";
+import { PROJECT_CATEGORIES, categoryCounts, categoryOf, filterByCategory, readCategory, startOrder } from "./projectCategories";
 
 describe("project categories", () => {
   it("lists the seven kinds of work, UX research first", () => {
@@ -27,5 +27,13 @@ describe("project categories", () => {
       { category: "ux_research", n: 1 }, { category: "ai", n: 2 }, { category: "other", n: 1 },
     ]);
     expect(categoryCounts([])).toEqual([]);
+  });
+});
+
+describe("start page order", () => {
+  it("puts a study first for research and design, the board first for everything else", () => {
+    expect(startOrder("ux_research")).toEqual(["study", "tickets", "milestones"]);
+    expect(startOrder("design")[0]).toBe("study");
+    for (const c of ["software", "ai", "automation", "it", "other"] as const) expect(startOrder(c)).toEqual(["tickets", "milestones", "study"]);
   });
 });

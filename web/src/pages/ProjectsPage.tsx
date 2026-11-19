@@ -218,7 +218,7 @@ export function ProjectsPage() {
       <Modal open={open} onClose={() => setOpen(false)} title={t("Nuevo proyecto")}>
         <ProjectForm key={`${space}-${category}`} orgs={orgList} initial={{ organization_id: space !== "all" && space !== "personal" ? space : null, ...(category ? { category } : {}) }} submitLabel={t("Crear proyecto")} onSubmit={async (v) => {
           const { project } = await api.post<{ project: Project }>("/projects", v);
-          nav(`/projects/${project.id}/new?nuevo=1`);
+          nav(`/projects/${project.id}/start`);   // choose what to set up first: a study, the ticket board or milestones
         }} />
       </Modal>
     </div>
