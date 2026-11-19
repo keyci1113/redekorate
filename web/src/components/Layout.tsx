@@ -141,7 +141,7 @@ export function Layout() {
   const navClass = ({ isActive }: { isActive: boolean }) => cx("focus-ring shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-medium transition", isActive ? "bg-ink/5 text-ink" : "text-ink-3 hover:text-ink");
   return (
     <div className="flex min-h-full flex-col">
-      <header className="no-print">
+      <header data-app-header className="no-print">
         {/* One row from sm up: the project switcher truncates and "Nuevo estudio" turns icon-only below lg. */}
         <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-2 px-(--page-gutter) py-3 sm:flex-nowrap sm:gap-x-4">
           <Link to="/" className="focus-ring order-1 shrink-0 rounded-md"><Logo /></Link>

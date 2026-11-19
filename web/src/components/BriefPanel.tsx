@@ -204,7 +204,7 @@ export function BriefPanel({ onClose, onSeen, focusOnOpen }: { onClose: () => vo
   // Wide screens: the panel starts under the header and reaches the top once the header scrolls away.
   useLayoutEffect(() => {
     const place = () => {
-      const bottom = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
+      const bottom = document.querySelector("[data-app-header]")?.getBoundingClientRect().bottom ?? 0;
       aside.current?.style.setProperty("--brief-top", `${Math.max(0, Math.round(bottom))}px`);
     };
     place();
