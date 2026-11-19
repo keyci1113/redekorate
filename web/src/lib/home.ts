@@ -13,6 +13,12 @@ export function completion(done: number, started: number): number | null {
 /** true si el completado está por debajo del umbral (sin datos nunca es "bajo"). */
 export const isLowCompletion = (rate: number | null, threshold = COMPLETION_THRESHOLD) => rate !== null && rate < threshold;
 
+/**
+ * Whether one study is flagged "Low". The server decides it (studyAttention in server/src/lib/dashboards.ts: under
+ * the threshold once enough people started), the same rule as the dashboards' "Needs attention" and project health.
+ */
+export const isLowStudy = (s: { attention?: string | null }) => s.attention === "low_completion";
+
 /** Completado agregado: suma de terminados entre suma de iniciados. */
 export function aggregateCompletion(studies: { responses: number; started: number }[]) {
   const done = studies.reduce((n, s) => n + s.responses, 0);

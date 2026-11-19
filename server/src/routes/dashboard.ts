@@ -2,6 +2,7 @@ import { Router } from "express";
 import { one, query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { accCte, accessJoins, accessWhere } from "../lib/access.js";
+import { studyAttention } from "../lib/dashboards.js";
 
 // Everything on the home page is research; projects without that section open do not count.
 const ACC_CTE = accCte("research");
@@ -80,7 +81,8 @@ dashboard.get("/", async (req, res) => {
        count(*) filter (where reviewed_at is null)::int as pending
      from insights i join projects p on p.id = i.project_id where p.id in (select id from acc)`, [uid]);
   const [totals, trend, study_trend, live, drafts, activity, insights, insight_counts, recent] = await Promise.all([totalsQ, trendQ, study_trendQ, liveQ, draftsQ, activityQ, insightsQ, insight_countsQ, recentQ]);
-  res.json({ totals, trend, study_trend, live, drafts, activity, insights, insight_counts, recent });
+  const now = Date.now();
+  res.json({ totals, trend, study_trend, live: live.map((s) => ({ ...s, attention: studyAttention({ ...s, finished: s.responses }, now) })), drafts, activity, insights, insight_counts, recent });
 });
 
 // Every study the person can see, in any status, for the Studies page (filtered and sorted on the client).
@@ -94,5 +96,6 @@ dashboard.get("/studies", async (req, res) => {
      from studies s join projects p on p.id = s.project_id
      where s.project_id in (select id from acc) and not p.archived
      order by greatest(s.updated_at, s.published_at, (select max(se.completed_at) from sessions se where se.study_id = s.id)) desc nulls last`, [req.user!.id]);
-  res.json({ studies });
+  const now = Date.now();
+  res.json({ studies: studies.map((s) => (s.status === "live" ? { ...s, attention: studyAttention({ ...s, finished: s.responses }, now) } : s)) });
 });

@@ -10,10 +10,10 @@ import { Avatar } from "../components/Avatar";
 import { Button, ErrorNote, SeverityBadge, cx } from "../components/ui";
 import { templateByKey } from "../templates/catalog";
 import { STATUSES, TYPES, isoDay } from "../tickets/model";
-import { Skeleton, StatusChip, TypeChip, fmtDay, priorityLabel, statusLabel } from "../tickets/parts";
+import { Skeleton, StatusChip, TypeChip, fmtDay, priorityLabel, statusLabel, typeLabel } from "../tickets/parts";
 import { BarList, Columns, EmptyNote, Flag, Panel, Tile } from "../dashboards/charts";
 import {
-  PERIODS, attention, completion, daysSince, delta, dueText, filterQuery, peak, percent, readFilters, weeksBehind,
+  PERIODS, completion, daysSince, delta, dueText, filterQuery, peak, percent, readFilters, weeksBehind,
   type DashFilters, type Health, type MilestoneRow, type MilestoneState, type Period, type ProjectOption, type ProjectsDash, type StudiesDash, type TicketsDash,
 } from "../dashboards/model";
 
@@ -122,13 +122,14 @@ function LiveResponses({ project }: { project: string | null }) {
 function Studies({ d, q, project, open }: { d: StudiesDash; q: string; project: string | null; open: Open }) {
   const x = d.totals, now = Date.now();
   const top = peak(d.series);
-  const flagged = d.live.map((s) => ({ s, why: attention(s, now, d.low_completion, d.min_started) })).filter((r) => r.why);
+  // Which studies need attention is decided once, on the server (studyAttention), for this list, the flags and project health.
+  const flagged = d.live.filter((s) => s.attention).map((s) => ({ s, why: s.attention }));
   const byCompletion = d.live.filter((s) => s.started >= d.min_started).sort((a, b) => completion(b) - completion(a));
   const low = fmtPct(d.low_completion);
   const severities: [Severity, string][] = [["critical", t("Crítica")], ["high", t("Alta")], ["medium", t("Media")], ["low", t("Baja")]];
   const points = d.series.map((p) => ({ label: dayLabel(p.day), values: [p.n] }));
-  const liveRows = (which: "all" | "by_completion"): DrillRow[] => liveStudiesFor(d.live, which, now, d.low_completion, d.min_started).map((s) => {
-    const why = attention(s, now, d.low_completion, d.min_started);
+  const liveRows = (which: "all" | "attention" | "by_completion"): DrillRow[] => liveStudiesFor(d.live, which, d.min_started).map((s) => {
+    const why = s.attention;
     return {
       key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${t("{a} de {b} terminaron", { a: s.finished, b: s.started })}`,
       ...(which === "by_completion" ? { end: pctDown(completion(s)), tone: completion(s) < d.low_completion ? "warn" as const : undefined }
@@ -138,20 +139,20 @@ function Studies({ d, q, project, open }: { d: StudiesDash; q: string; project: 
   return (
     <>
       <Tiles>
-        <Tile label={t("Respuestas, últimos 7 días")} value={fmtNum(x.responses_week)} tone={x.responses_week >= x.responses_prev_week ? "good" : "bad"}
-          onOpen={() => open({ kind: "studies", title: t("Respuestas, últimos 7 días"), by: "responses_week" })}
-          change={{ delta: delta(x.responses_week, x.responses_prev_week), text: t("{n} vs. los 7 días anteriores", { n: fmtNum(Math.abs(x.responses_week - x.responses_prev_week)) }) }}
-          sub={t("{n} en este periodo", { n: fmtNum(x.responses_period) })} />
+        <Tile label={t("Respuestas")} value={fmtNum(x.responses_period)} tone={x.responses_period >= x.responses_prev_period ? "good" : "bad"}
+          onOpen={() => open({ kind: "studies", title: t("Respuestas · {a}", { a: periodLabel(d.period) }), by: "responses_period" })}
+          change={{ delta: delta(x.responses_period, x.responses_prev_period), text: t("{n} vs. el periodo anterior", { n: fmtNum(Math.abs(x.responses_period - x.responses_prev_period)) }) }}
+          sub={periodLabel(d.period)} />
         <Tile label={t("Estudios activos")} value={fmtNum(x.live)} suffix={t("de {n}", { n: fmtNum(x.studies) })} sub={plural(flagged.length, { one: "{n} necesita atención", other: "{n} necesitan atención" })}
           onOpen={() => open({ kind: "rows", title: t("Estudios activos"), rows: liveRows("all"), empty: t("No hay estudios activos."), note: t("Primero los que necesitan atención.") })} />
-        <Tile label={t("Completado promedio")} value={x.started ? fmtPct(x.finished / x.started) : "—"} sub={t("{a} terminaron de {b} que iniciaron", { a: fmtNum(x.finished), b: fmtNum(x.started) })}
+        <Tile label={t("Completado promedio")} value={x.started ? fmtPct(x.finished / x.started) : "—"} sub={t("{a} de {b} sesiones terminaron, en los estudios activos desde su lanzamiento", { a: fmtNum(x.finished), b: fmtNum(x.started) })}
           onOpen={() => open({ kind: "rows", title: t("Completado por estudio activo"), rows: liveRows("by_completion"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto.") })} />
         <Tile label={t("Insights nuevos")} value={fmtNum(x.insights)} sub={t("{a} críticos · {b} altos", { a: x.insights_critical, b: x.insights_high })}
           onOpen={() => open({ kind: "studies", title: t("Insights nuevos"), by: "insights" })} />
         <Tile label={t("Participantes")} value={fmtNum(x.participants)} tone={x.participants >= x.participants_prev ? "good" : "bad"}
           onOpen={() => open({ kind: "studies", title: t("Participantes por estudio"), by: "participants" })}
           change={{ delta: delta(x.participants, x.participants_prev), text: t("{n} vs. el periodo anterior", { n: fmtNum(Math.abs(x.participants - x.participants_prev)) }) }}
-          sub={t("Sesiones iniciadas en este periodo")} />
+          sub={t("Sesiones iniciadas en este periodo, en todos los estudios")} />
       </Tiles>
 
       <Panel title={d.bucket === "day" ? t("Respuestas por día") : t("Respuestas por semana")} link={{ to: "/studies", text: t("Todos los estudios activos") }}
@@ -169,8 +170,8 @@ function Studies({ d, q, project, open }: { d: StudiesDash; q: string; project: 
           {d.methods.length ? <BarList labelWidth={190} rows={d.methods.slice(0, 10).map((m) => ({ key: m.method, name: templateByKey(m.method)?.name ?? m.method, label: templateByKey(m.method)?.name ?? m.method, value: m.n,
             onOpen: () => open({ kind: "studies", by: "method", value: m.method, title: templateByKey(m.method)?.name ?? m.method }) }))} /> : <EmptyNote>{t("Aún no hay estudios.")}</EmptyNote>}
         </Panel>
-        <Panel title={t("Necesitan atención")} note={t("Completado menor a {a}, o sin respuestas en 48 horas.", { a: low })}>
-          {flagged.length ? (
+        <Panel title={t("Necesitan atención")} note={t("Completado (quienes terminaron de los que iniciaron) menor a {a} con al menos {b} sesiones, o sin respuestas en 48 horas.", { a: low, b: d.min_started })}>
+          {flagged.length ? (<>
             <Rows>
               {flagged.slice(0, 6).map(({ s, why }) => (
                 <RowLink key={s.id} to={`/studies/${s.id}/results`} title={s.title}
@@ -179,16 +180,19 @@ function Studies({ d, q, project, open }: { d: StudiesDash; q: string; project: 
                     : <Flag>{plural(Math.max(2, daysSince(s.last_response_at ?? s.published_at ?? new Date().toISOString(), now)), { one: "Sin respuestas en {n} día", other: "Sin respuestas en {n} días" })}</Flag>} />
               ))}
             </Rows>
-          ) : <EmptyNote>{t("Todos los estudios activos van bien.")}</EmptyNote>}
+            {flagged.length > 6 && <Button variant="ghost" className="self-start" aria-haspopup="dialog"
+              onClick={() => open({ kind: "rows", title: t("Necesitan atención"), rows: liveRows("attention"), empty: t("Todos los estudios activos van bien.") })}>{t("Ver los {n}", { n: flagged.length })}</Button>}
+          </>) : <EmptyNote>{t("Todos los estudios activos van bien.")}</EmptyNote>}
         </Panel>
-        <Panel title={t("Completado por estudio activo")} link={d.live.length > 6 ? { to: "/studies", text: t("Ver los {n}", { n: d.live.length }) } : undefined}>
+        <Panel title={t("Completado por estudio activo")} link={d.live.length > 6 ? { to: "/studies", text: t("Ver los {n}", { n: d.live.length }) } : undefined}
+          note={t("«Bajo»: terminaron menos de {a} de quienes iniciaron. Se mide desde {b} sesiones.", { a: low, b: d.min_started })}>
           {byCompletion.length ? <BarList labelWidth={190} max={1} rows={byCompletion.slice(0, 6).map((s) => ({
             key: s.id, name: s.title, label: s.title, to: `/studies/${s.id}/results`, value: completion(s), text: pctDown(completion(s)),
-            flag: completion(s) < d.low_completion ? <Flag>{t("Bajo")}</Flag> : undefined,
+            flag: s.attention === "low_completion" ? <Flag>{t("Bajo")}</Flag> : undefined,
           }))} /> : <EmptyNote>{t("Aún no hay suficientes respuestas para medir el completado.")}</EmptyNote>}
         </Panel>
         <Panel title={t("Insights por severidad")} link={{ to: `/projects${q}`, text: t("Abrir proyectos") }}
-          note={plural(d.severity.with_tickets, { one: "{n} insight ya se convirtió en ticket.", other: "{n} insights ya se convirtieron en tickets." })}>
+          note={`${periodLabel(d.period)} · ${plural(d.severity.with_tickets, { one: "{n} insight ya se convirtió en ticket.", other: "{n} insights ya se convirtieron en tickets." })}`}>
           <BarList labelWidth={120} rows={severities.map(([k, name]) => ({ key: k, name, label: <SeverityBadge severity={k} />, value: d.severity[k],
             onOpen: () => open({ kind: "studies", by: "severity", value: k, title: t("Insights de severidad {a}", { a: name.toLowerCase() }) }) }))} />
         </Panel>
@@ -221,17 +225,19 @@ function Tickets({ d, filters, open }: { d: TicketsDash; filters: DashFilters; o
           onOpen={() => open({ kind: "tickets", title: t("Tickets vencidos"), by: "overdue" })}
           change={{ delta: delta(x.overdue, x.overdue_last_week), text: t("{n} vs. la semana pasada", { n: Math.abs(x.overdue - x.overdue_last_week) }) }}
           sub={x.oldest_days_late ? t("El más antiguo: {a}", { a: plural(x.oldest_days_late, { one: "{n} día de atraso", other: "{n} días de atraso" }) }) : t("Nada vencido")} />
-        <Tile label={t("Creados esta semana")} value={fmtNum(x.created_week)}
-          onOpen={() => open({ kind: "tickets", title: t("Creados esta semana"), by: "created_week" })}
-          change={{ delta: delta(x.created_week, x.created_prev_week), text: t("{n} vs. la semana pasada", { n: Math.abs(x.created_week - x.created_prev_week) }) }}
-          sub={plural(x.created_week_widget, { one: "{n} desde el widget de feedback", other: "{n} desde el widget de feedback" })} />
-        <Tile label={t("Cerrados esta semana")} value={fmtNum(x.closed_week)} onOpen={() => open({ kind: "tickets", title: t("Cerrados esta semana"), by: "closed_week" })} sub={x.created_week ? t("{a} de lo que entró", { a: fmtPct(x.closed_week / x.created_week) }) : t("No entró ninguno esta semana")} />
+        <Tile label={t("Creados")} value={fmtNum(x.created_period)}
+          onOpen={() => open({ kind: "tickets", title: t("Creados · {a}", { a: periodLabel(d.period) }), by: "created_period" })}
+          change={{ delta: delta(x.created_period, x.created_prev_period), text: t("{n} vs. el periodo anterior", { n: fmtNum(Math.abs(x.created_period - x.created_prev_period)) }) }}
+          sub={`${periodLabel(d.period)} · ${plural(x.created_period_widget, { one: "{n} desde el widget de feedback", other: "{n} desde el widget de feedback" })}`} />
+        <Tile label={t("Cerrados")} value={fmtNum(x.closed_period)} onOpen={() => open({ kind: "tickets", title: t("Cerrados · {a}", { a: periodLabel(d.period) }), by: "closed_period" })}
+          change={{ delta: delta(x.closed_period, x.closed_prev_period), text: t("{n} vs. el periodo anterior", { n: fmtNum(Math.abs(x.closed_period - x.closed_prev_period)) }) }}
+          sub={x.created_period ? `${periodLabel(d.period)} · ${t("{a} de lo que entró", { a: fmtPct(x.closed_period / x.created_period) })}` : t("No entró ninguno en este periodo")} />
         <Tile label={t("Tiempo mediano para cerrar")} value={median === null ? "—" : plural(median, { one: "{n} día", other: "{n} días" })} tone={median !== null && medianPrev !== null && median <= medianPrev ? "good" : "bad"}
           change={median !== null && medianPrev !== null ? { delta: delta(median, medianPrev), text: median < medianPrev ? plural(medianPrev - median, { one: "{n} día más rápido", other: "{n} días más rápido" }) : plural(median - medianPrev, { one: "{n} día más lento", other: "{n} días más lento" }) } : undefined}
           sub={periodLabel(d.period)} onOpen={() => open({ kind: "tickets", title: t("Cerrados en este periodo"), by: "closed_period" })} />
       </Tiles>
 
-      <Panel title={t("Creados vs. cerrados por semana")} link={{ to: board, text: filters.project ? t("Abrir tablero") : t("Abrir proyectos") }}
+      <Panel title={t("Creados vs. cerrados por semana · últimas 8 semanas")} link={{ to: board, text: filters.project ? t("Abrir tablero") : t("Abrir proyectos") }}
         note={behind > 0 ? t("Entraron más de los que se cerraron en {a} de las últimas 4 semanas.", { a: behind }) : t("En las últimas 4 semanas se cerró al menos lo que entró.")}>
         {weeks.some((w) => w.values[0] + w.values[1] > 0)
           ? <Columns points={weeks} series={[t("Creados"), t("Cerrados")]} caption={t("Tickets creados y cerrados por semana, del {a} al {b}. Esta semana: {c} creados, {d} cerrados.", { a: weeks[0].label, b: weeks[weeks.length - 1].label, c: lastWeek.created, d: lastWeek.closed })}
@@ -255,8 +261,8 @@ function Tickets({ d, filters, open }: { d: TicketsDash; filters: DashFilters; o
         <Panel title={t("De dónde vienen los tickets")} note={periodLabel(d.period) + "."}>
           <BarList labelWidth={170} rows={sources.map(([key, name, n]) => ({ key, name, label: name, value: n, onOpen: () => open({ kind: "tickets", by: "source", value: key, title: name }) }))} />
         </Panel>
-        <Panel title={t("Por tipo")}>
-          <BarList labelWidth={150} rows={TYPES.map((k) => ({ key: k, name: k, label: <TypeChip type={k} />, value: typeCount(k), onOpen: () => open({ kind: "tickets", by: "type", value: k, title: t("Tickets por tipo") }) }))} />
+        <Panel title={t("Por tipo")} note={t("Todos los tickets, abiertos y cerrados.")}>
+          <BarList labelWidth={150} rows={TYPES.map((k) => ({ key: k, name: typeLabel(k), label: <TypeChip type={k} />, value: typeCount(k), onOpen: () => open({ kind: "tickets", by: "type", value: k, title: typeLabel(k) }) }))} />
         </Panel>
         <Panel title={t("Vencidos y por vencer")} link={filters.project ? { to: `/projects/${filters.project}?tab=tickets&view=list`, text: t("Vista de lista") } : undefined}>
           {d.due.length ? (
@@ -285,12 +291,12 @@ function Tickets({ d, filters, open }: { d: TicketsDash; filters: DashFilters; o
 // ── Projects ────────────────────────────────────────────────────
 const HEALTH_STYLE: Record<Health, string> = { on_track: "bg-good-soft text-good", needs_attention: "bg-warn-soft text-warn", at_risk: "bg-bad-soft text-bad", quiet: "bg-ink/5 text-ink-2" };
 const healthLabel = (h: Health) => ({ on_track: t("En curso"), needs_attention: t("Necesita atención"), at_risk: t("En riesgo"), quiet: t("Sin movimiento") })[h];
-const HealthChip = ({ health }: { health: Health }) => <span className={cx("inline-flex items-center rounded-full px-2 py-[3px] text-xs font-bold whitespace-nowrap", HEALTH_STYLE[health])}>{healthLabel(health)}</span>;
+const HealthChip = ({ health }: { health: Health }) => <span className={cx("inline-flex items-center rounded-full px-2 py-[3px] text-left text-xs font-bold", HEALTH_STYLE[health])}>{healthLabel(health)}</span>;
 const milestoneLabel = (s: MilestoneState) => ({ done: t("Terminado"), planned: t("Planeado"), behind: t("Atrasado"), at_risk: t("En riesgo"), on_track: t("en curso") })[s];
 function Progress({ m }: { m: MilestoneRow }) {
   return (
-    <span className="mt-1 flex items-center gap-2 text-xs text-ink-3 tabular-nums">
-      <span role="img" aria-label={t("{n}% hecho", { n: m.progress })} className="block h-1.5 w-20 rounded-full bg-ink/[0.08]"><span className="block h-1.5 rounded-full bg-chart-1" style={{ width: `${m.progress}%` }} /></span>
+    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3 tabular-nums">
+      <span role="img" aria-label={t("{n}% hecho", { n: m.progress })} className="block h-1.5 w-16 rounded-full bg-ink/[0.08]"><span className="block h-1.5 rounded-full bg-chart-1" style={{ width: `${m.progress}%` }} /></span>
       {m.progress}%{m.end_date ? ` · ${fmtDay(m.end_date)}` : ""}
     </span>
   );
@@ -301,7 +307,8 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
   const live = d.rows.reduce((n, r) => n + r.live_studies, 0), openTickets = d.rows.reduce((n, r) => n + r.open_tickets, 0), overdue = d.rows.reduce((n, r) => n + r.overdue, 0);
   const count = (s: MilestoneState) => d.milestones.filter((m) => m.state === s).length;
   const upcoming = d.milestones.filter((m) => m.state !== "done").slice(0, 6);
-  const th = "border-b border-line px-3 py-2.5 text-left text-xs font-semibold text-ink-3 whitespace-nowrap", td = "border-b border-line/60 p-3 align-top text-[13px] tabular-nums";
+  // Fixed column widths and wrapping headers keep the table inside the panel down to ~640px (no sideways scroll at 1040px).
+  const th = "border-b border-line px-2 py-2.5 text-left align-bottom text-xs font-semibold text-ink-3", td = "border-b border-line/60 px-2 py-3 align-top text-[13px] tabular-nums";
   const activityLine = (a: ProjectsDash["activity"][number]): { to: string; text: string; end?: ReactNode } => {
     switch (a.kind) {
       case "responses": return { to: `/studies/${a.ref}/results`, text: t("{a} recibió {b}", { a: a.title, b: plural(a.n, { one: "{n} respuesta", other: "{n} respuestas" }) }) };
@@ -312,7 +319,7 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
   };
   const milestoneRow = (m: MilestoneRow, withProject = true): DrillRow => ({
     key: m.id, to: `/projects/${m.project_id}?tab=milestones`, title: m.name,
-    sub: [withProject ? m.project_name : null, t("{a} de {b} tickets", { a: m.done, b: m.total }), m.end_date ? fmtDay(m.end_date) : null].filter(Boolean).join(" · "),
+    sub: [withProject ? m.project_name : null, plural(m.total, { one: "{a} de {n} ticket", other: "{a} de {n} tickets" }, { a: m.done }), m.end_date ? fmtDay(m.end_date) : null].filter(Boolean).join(" · "),
     end: m.state === "done" || m.state === "on_track" || m.state === "planned" ? `${m.progress}%` : milestoneLabel(m.state), tone: m.state === "behind" ? "bad" : m.state === "at_risk" ? "warn" : undefined,
   });
   const projectRows = (rows: ProjectsDash["rows"]): DrillRow[] => rows.map((r) => ({
@@ -325,7 +332,7 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
     kind: "rows", title: r.name, note: healthLabel(r.health), empty: t("Sin detalles."),
     rows: [
       { key: "tickets", to: `/projects/${r.id}?tab=tickets`, title: t("Tickets abiertos"), sub: plural(r.overdue, { one: "{n} vencido", other: "{n} vencidos" }), end: fmtNum(r.open_tickets), tone: r.overdue > 0 ? "bad" : undefined },
-      { key: "studies", to: `/projects/${r.id}`, title: t("Estudios activos"), sub: r.low_completion ? plural(r.low_completion, { one: "{n} con completado bajo", other: "{n} con completado bajo" }) : t("Respuestas en 7 días: {a}", { a: fmtNum(r.responses_7d) }), end: fmtNum(r.live_studies), tone: r.low_completion ? "warn" : undefined },
+      { key: "studies", to: `/projects/${r.id}`, title: t("Estudios activos"), sub: r.studies_attention ? plural(r.studies_attention, { one: "{n} necesita atención", other: "{n} necesitan atención" }) : t("Respuestas en 7 días: {a}", { a: fmtNum(r.responses_7d) }), end: fmtNum(r.live_studies), tone: r.studies_attention ? "warn" : undefined },
       ...milestonesFor(d.milestones, "all", r.id).map((m) => milestoneRow(m, false)),
     ],
   });
@@ -343,10 +350,11 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
           onOpen={() => open({ kind: "rows", title: t("Hitos"), rows: milestonesFor(d.milestones, "all").map((m) => milestoneRow(m)), empty: t("No hay hitos abiertos."), note: t("Primero los atrasados y en riesgo.") })} />
       </Tiles>
 
-      <Panel title={t("Todos los proyectos")} note={t("Salud: tickets vencidos, estudios con completado menor a {a} y hitos atrasados.", { a: fmtPct(d.low_completion) })}>
+      <Panel title={t("Todos los proyectos")} note={t("Salud: tickets vencidos, estudios que necesitan atención (completado menor a {a} o sin respuestas en 48 horas) y hitos atrasados o en riesgo.", { a: fmtPct(d.low_completion) })}>
         {d.rows.length ? (
           <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse">
+            <table className="w-full min-w-[640px] table-fixed border-collapse">
+              <colgroup><col className="w-[22%]" /><col className="w-[16%]" /><col className="w-[11%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[9%]" /><col className="w-[24%]" /></colgroup>
               <thead><tr>
                 <th scope="col" className={th}>{t("Proyecto")}</th><th scope="col" className={th}>{t("Salud")}</th><th scope="col" className={th}>{t("Estudios activos")}</th>
                 <th scope="col" className={th}>{t("Respuestas · 7 d")}</th><th scope="col" className={th}>{t("Tickets abiertos")}</th><th scope="col" className={th}>{t("Vencidos")}</th><th scope="col" className={th}>{t("Próximo hito")}</th>
@@ -354,8 +362,8 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
               <tbody>
                 {d.rows.map((r) => (
                   <tr key={r.id} className="hover:bg-paper">
-                    <th scope="row" className={cx(td, "max-w-72 text-left font-normal")}>
-                      <Link to={`/projects/${r.id}`} className="focus-ring flex items-center gap-2 rounded text-sm font-semibold hover:underline"><span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} /><span className="truncate">{r.name}</span></Link>
+                    <th scope="row" className={cx(td, "text-left font-normal")}>
+                      <Link to={`/projects/${r.id}`} className="focus-ring flex items-start gap-2 rounded text-sm font-semibold hover:underline"><span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: r.color }} /><span className="min-w-0 [overflow-wrap:anywhere]">{r.name}</span></Link>
                     </th>
                     <td className={td}>
                       <button type="button" onClick={() => open(projectDetail(r))} aria-haspopup="dialog" className="focus-ring rounded-full" title={t("Ver detalle")}>
@@ -364,14 +372,14 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
                     </td>
                     <td className={td}>
                       {r.live_studies > 0 ? <button type="button" aria-haspopup="dialog" className={cellButton} onClick={() => open({ kind: "studies", by: "live", project: r.id, title: t("Estudios activos · {a}", { a: r.name }) })}>{r.live_studies}</button> : r.live_studies}
-                      {r.low_completion > 0 && <span className="ml-2"><Flag>{plural(r.low_completion, { one: "{n} bajo", other: "{n} bajos" })}</Flag></span>}
+                      {r.low_completion > 0 && <span className="mt-1 block"><Flag>{plural(r.low_completion, { one: "{n} bajo", other: "{n} bajos" })}</Flag></span>}
                     </td>
                     <td className={td}>{fmtNum(r.responses_7d)}</td>
                     <td className={td}><Link to={`/projects/${r.id}?tab=tickets`} className="focus-ring rounded font-semibold text-accent-ink hover:underline">{r.open_tickets}</Link></td>
                     <td className={cx(td, r.overdue > 0 && "font-bold text-bad")}>
                       {r.overdue > 0 ? <button type="button" aria-haspopup="dialog" className="focus-ring rounded font-bold text-bad hover:underline" onClick={() => open({ kind: "tickets", by: "overdue", project: r.id, title: t("Tickets vencidos · {a}", { a: r.name }) })}>{r.overdue}</button> : r.overdue}
                     </td>
-                    <td className={td}>{r.next_milestone ? <><span className="block text-ink">{r.next_milestone.name}</span><Progress m={r.next_milestone} /></> : <span className="text-ink-3">{t("Sin hito")}</span>}</td>
+                    <td className={td}>{r.next_milestone ? <><span className="block text-ink [overflow-wrap:anywhere]">{r.next_milestone.name}</span><Progress m={r.next_milestone} /></> : <span className="text-ink-3">{t("Sin hito")}</span>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -381,13 +389,13 @@ function Projects({ d, q, open }: { d: ProjectsDash; q: string; open: Open }) {
       </Panel>
 
       <Grid>
-        <Panel title={t("Próximos hitos")} note={t("La fecha de un hito es la fecha límite más lejana de sus tickets.")}>
+        <Panel title={t("Próximos hitos")} note={t("En riesgo: vence en {n} días o menos y aún tiene tickets abiertos. Sin fecha propia, un hito termina con la fecha límite más lejana de sus tickets.", { n: d.at_risk_days })}>
           {upcoming.length ? (
             <Rows>
               {upcoming.map((m) => (
                 <RowLink key={m.id} to={`/projects/${m.project_id}?tab=milestones`} title={m.name}
-                  sub={`${m.project_name} · ${m.progress}% · ${m.state === "behind" ? plural(m.overdue_open, { one: "{n} ticket vencido", other: "{n} tickets vencidos" }) : m.state === "at_risk" ? plural(m.unassigned_open, { one: "{n} ticket sin asignar", other: "{n} tickets sin asignar" }) : t("{a} de {b} tickets", { a: m.done, b: m.total })}`}
-                  end={m.state === "behind" ? <Flag tone="bad">{milestoneLabel("behind")}</Flag> : m.state === "at_risk" ? <Flag>{milestoneLabel("at_risk")}</Flag> : m.end_date ? <span className="text-ink-2">{fmtDay(m.end_date)}</span> : undefined} />
+                  sub={`${m.project_name} · ${m.progress}% · ${m.state === "behind" ? plural(m.overdue_open, { one: "{n} ticket vencido", other: "{n} tickets vencidos" }) : m.state === "at_risk" ? plural(m.total - m.done, { one: "{n} ticket abierto", other: "{n} tickets abiertos" }) : plural(m.total, { one: "{a} de {n} ticket", other: "{a} de {n} tickets" }, { a: m.done })}`}
+                  end={m.state === "behind" ? <Flag tone="bad">{milestoneLabel("behind")}</Flag> : m.state === "at_risk" ? <Flag>{milestoneLabel("at_risk")}{m.end_date ? ` · ${fmtDay(m.end_date)}` : ""}</Flag> : m.end_date ? <span className="text-ink-2">{fmtDay(m.end_date)}</span> : undefined} />
               ))}
             </Rows>
           ) : <EmptyNote>{t("No hay hitos abiertos.")}</EmptyNote>}

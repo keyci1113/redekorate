@@ -42,7 +42,7 @@ export interface Project extends OrgRef {
   project_role?: ProjectRole | null;
   created_at: string; updated_at: string;
   study_count?: number; live_count?: number; response_count?: number; insight_count?: number;
-  started_count?: number; document_count?: number; participant_count?: number; share_count?: number;
+  started_count?: number; document_count?: number; diagram_count?: number; participant_count?: number; share_count?: number;
 }
 
 export type StudyStatus = "draft" | "live" | "closed";

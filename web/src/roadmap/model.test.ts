@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { barSpan, dayMark, daysBetween, daysToSunday, filterWork, groupWork, milestoneNote, shownState, span, timeWindow, workGroup, workProjects, type Milestone } from "./model";
+import { barSpan, dayMark, daysBetween, labelPlacement, labelPx, daysToSunday, filterWork, groupWork, milestoneNote, shownState, span, timeWindow, workGroup, workProjects, type Milestone } from "./model";
 
 const TODAY = "2026-11-11";
 const ms = (over: Partial<Milestone>): Milestone => ({
@@ -17,7 +17,9 @@ describe("milestone states and notes", () => {
     expect(milestoneNote(ms({ end_date: null }), TODAY)).toBeNull();
   });
   it("explains why a milestone is at risk, overdue tickets first", () => {
-    expect(milestoneNote(ms({ state: "at_risk", unassigned_open: 2 }), TODAY)).toEqual({ kind: "unassigned", n: 2 });
+    expect(milestoneNote(ms({ state: "at_risk", end_date: "2026-11-20" }), TODAY)).toEqual({ kind: "due_open", days: 9, open: 5 });
+    // Unassigned tickets alone are no reason to alarm: an on-track milestone just says when it is due.
+    expect(milestoneNote(ms({ unassigned_open: 2 }), TODAY)).toEqual({ kind: "due", days: 31 });
     expect(milestoneNote(ms({ state: "behind", overdue_open: 1, unassigned_open: 2 }), TODAY)).toEqual({ kind: "overdue", n: 1 });
     expect(milestoneNote(ms({ state: "behind", end_date: "2026-11-01" }), TODAY)).toEqual({ kind: "late", days: 10 });
   });
@@ -105,5 +107,17 @@ describe("my work", () => {
   });
   it("lists each project once, by name", () => {
     expect(workProjects(list)).toEqual([{ id: "p2", name: "Billing" }, { id: "p1", name: "Fintech" }]);
+  });
+});
+
+describe("bar labels", () => {
+  it("stay inside a bar wide enough for them", () => {
+    expect(labelPlacement({ left: 10, width: 40 }, "On track · 44%")).toBe("inside");
+  });
+  it("move beside a short bar instead of being cut off", () => {
+    // 4% of the narrowest track is ~23px, far less than "At risk · 20%" needs.
+    expect(labelPlacement({ left: 10, width: 4 }, "At risk · 20%")).toBe("after");
+    expect(labelPlacement({ left: 90, width: 4 }, "At risk · 20%")).toBe("before");
+    expect(labelPx("At risk · 20%")).toBeGreaterThan(580 * 0.04);
   });
 });

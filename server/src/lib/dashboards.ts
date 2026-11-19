@@ -16,15 +16,32 @@ export function periodRange(period: Period, now: Date): { since: Date; before: D
   return { since, before: new Date(since.getTime() - length), days: Math.max(1, Math.round(length / 864e5)) };
 }
 
-export type Health = "at_risk" | "needs_attention" | "on_track" | "quiet";
-export interface HealthSignals { overdue: number; low_completion: number; milestones_behind: number; responses_7d: number; ticket_changes_7d: number }
+export type StudyAttention = "low_completion" | "silent";
+export interface StudyActivity { started: number; finished: number; last_response_at: string | Date | null; published_at: string | Date | null }
+/** A live study with no response for this long needs a look. */
+export const SILENT_HOURS = 48;
 /**
- * Health of a project from three signals: overdue tickets, live studies under 88% completion and milestones behind schedule.
+ * Why a live study needs a look, or null: low completion (under LOW_COMPLETION once at least MIN_STARTED people
+ * started; fewer is too few to judge) or no response for SILENT_HOURS. This one rule feeds the "Needs attention"
+ * list, the "Low" flags and the project health, so a study is never flagged in one place and fine in another.
+ */
+export function studyAttention(s: StudyActivity, now: number): StudyAttention | null {
+  if (s.started >= MIN_STARTED && s.finished / s.started < LOW_COMPLETION) return "low_completion";
+  const last = s.last_response_at ?? s.published_at;
+  if (last && now - new Date(last).getTime() > SILENT_HOURS * 3600e3) return "silent";
+  return null;
+}
+
+export type Health = "at_risk" | "needs_attention" | "on_track" | "quiet";
+export interface HealthSignals { overdue: number; studies_attention: number; milestones_behind: number; milestones_at_risk: number; responses_7d: number; ticket_changes_7d: number }
+/**
+ * Health of a project from the same signals the dashboards flag: overdue tickets, live studies that need attention
+ * (studyAttention), milestones behind schedule and milestones at risk (milestoneState in milestones.ts).
  * A milestone behind, or three or more signals, is "at risk"; any signal is "needs attention";
  * no signal and nothing happening for a week is "quiet"; otherwise "on track".
  */
 export function projectHealth(s: HealthSignals): Health {
-  const signals = s.overdue + s.low_completion + s.milestones_behind;
+  const signals = s.overdue + s.studies_attention + s.milestones_behind + s.milestones_at_risk;
   if (s.milestones_behind > 0 || signals >= 3) return "at_risk";
   if (signals > 0) return "needs_attention";
   if (s.responses_7d === 0 && s.ticket_changes_7d === 0) return "quiet";

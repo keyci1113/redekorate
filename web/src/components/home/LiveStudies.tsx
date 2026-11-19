@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check, ChevronDown } from "lucide-react";
 import { fmtNum, fmtPct, plural, relTime, t } from "../../lib/i18n";
 import {
-  COMPLETION_THRESHOLD, HOME_VIEWS, LIVE_SORT_PRESETS, STUDY_FILTERS, completion, filterStudies, type StudyFilter, isLowCompletion, presetOf, sortLive, toggleSort, type Day, type HomeView, type LiveSort, type LiveSortKey,
+  COMPLETION_THRESHOLD, HOME_VIEWS, LIVE_SORT_PRESETS, STUDY_FILTERS, completion, filterStudies, type StudyFilter, isLowCompletion, isLowStudy, presetOf, sortLive, toggleSort, type Day, type HomeView, type LiveSort, type LiveSortKey,
 } from "../../lib/home";
 import { familyColor, familyOf } from "../../lib/families";
 import { templateByKey } from "../../templates/catalog";
@@ -164,7 +164,7 @@ function Snapshot({ s, days }: { s: LiveStudy; days: Day[] }) {
     <div className="space-y-5">
       <DetailHead s={s} />
       <div className="flex items-center gap-5">
-        <Ring rate={rate} />
+        <Ring rate={rate} low={isLowStudy(s)} />
         <div className="min-w-0 flex-1">
           <Facts items={[[t("Iniciaron"), fmtNum(s.started)], [t("Terminaron"), fmtNum(s.responses)], [t("No terminaron"), fmtNum(s.started - s.responses)], [t("Última respuesta"), lastLabel(s)]]} />
         </div>
@@ -177,13 +177,15 @@ function Snapshot({ s, days }: { s: LiveStudy; days: Day[] }) {
 
 function Funnel({ s, days }: { s: LiveStudy; days: Day[] }) {
   const rate = completion(s.responses, s.started);
-  const low = isLowCompletion(rate);
+  const low = isLowStudy(s);
   const missing = s.started - s.responses;
   const advice = rate === null
     ? t("Nadie ha entrado todavía. Comparte el link del estudio para empezar a recibir respuestas.")
     : low
       ? t("El completado está por debajo de {a}. Revisa en qué bloque abandonan y si el estudio es demasiado largo.", { a: fmtPct(COMPLETION_THRESHOLD) })
-      : t("El completado está por encima de {a}. Puedes seguir recolectando o pasar al análisis.", { a: fmtPct(COMPLETION_THRESHOLD) });
+      : isLowCompletion(rate)
+        ? t("Aún son pocas sesiones para juzgar el completado. Sigue recolectando respuestas.")
+        : t("El completado está por encima de {a}. Puedes seguir recolectando o pasar al análisis.", { a: fmtPct(COMPLETION_THRESHOLD) });
   return (
     <div className="space-y-5">
       <DetailHead s={s} />
@@ -191,7 +193,7 @@ function Funnel({ s, days }: { s: LiveStudy; days: Day[] }) {
         <span className="font-display text-2xl font-bold text-ink tabular-nums">{fmtNum(missing)}</span>{" "}
         {plural(s.started, { one: "de {n} persona no terminó", other: "de {n} personas no terminaron" })}
       </p>
-      <div className="space-y-2" role="img" aria-label={t("Embudo: iniciaron {a}, terminaron {b}. {c}", { a: fmtNum(s.started), b: fmtNum(s.responses), c: completionSr(rate) })}>
+      <div className="space-y-2" role="img" aria-label={t("Embudo: iniciaron {a}, terminaron {b}. {c}", { a: fmtNum(s.started), b: fmtNum(s.responses), c: completionSr(rate, low) })}>
         {[[t("Iniciaron"), s.started, 1], [t("Terminaron"), s.responses, rate ?? 0]].map(([label, n, w], i) => (
           <div key={i} aria-hidden>
             <div className="mb-1 flex justify-between text-sm"><span>{label}</span><span className="font-semibold tabular-nums">{fmtNum(n as number)}</span></div>
@@ -246,11 +248,11 @@ export function RowCells({ s, status }: { s: LiveStudy; status?: StudyStatus }) 
       </span>
       <span className="order-3 min-w-0">
         <span className="flex items-center gap-2">
-          <span className="w-full max-w-40"><CompletionBar rate={rate} /></span>
-          {isLowCompletion(rate) && <LowChip />}
+          <span className="w-full max-w-40"><CompletionBar rate={rate} low={isLowStudy(s)} /></span>
+          {isLowStudy(s) && <LowChip />}
         </span>
         <span className="mt-1 block text-xs text-ink-2 tabular-nums" aria-hidden>{fmtNum(s.responses)}/{fmtNum(s.started)}</span>
-        <span className="sr-only">{completionSr(rate)}. {t("{a} de {b} terminaron", { a: s.responses, b: s.started })}.</span>
+        <span className="sr-only">{completionSr(rate, isLowStudy(s))}. {t("{a} de {b} terminaron", { a: s.responses, b: s.started })}.</span>
       </span>
       <span className="order-4 min-w-0 max-w-[9rem] justify-self-end @min-[560px]:order-2 @min-[560px]:max-w-full @min-[560px]:justify-self-start">
         <Chip color={familyColor(familyOf(s.method))} className="max-w-full">{methodName(s.method)}</Chip>

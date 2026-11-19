@@ -4,16 +4,20 @@ import { pool } from "./db.js";
 
 export type MilestoneState = "done" | "planned" | "behind" | "at_risk" | "on_track";
 export interface MilestoneCounts { total: number; done: number; overdue_open: number; unassigned_open: number; start_date?: string | null; end_date?: string | null }
+/** A milestone with open tickets is "at risk" once its end date is this many days away or closer. */
+export const AT_RISK_DAYS = 14;
+const dayNumber = (iso: string) => { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return Math.round(Date.UTC(y, m - 1, d) / 864e5); };
 /**
  * Done when every ticket is; planned while its start date is still ahead; behind when an open ticket is overdue
- * or its own end date has passed; at risk when an open ticket has no one assigned; otherwise on track.
- * `today` and the dates are YYYY-MM-DD.
+ * or its own end date has passed; at risk when it still has open tickets and ends within AT_RISK_DAYS;
+ * otherwise on track. Unassigned tickets alone never make a milestone at risk: a milestone months away
+ * with work nobody has picked up yet is normal planning, not a risk. `today` and the dates are YYYY-MM-DD.
  */
 export function milestoneState(m: MilestoneCounts, today?: string): MilestoneState {
   if (m.total > 0 && m.done === m.total) return "done";
   if (today && m.start_date && m.start_date > today) return "planned";
   if (m.overdue_open > 0 || (today && m.end_date && m.end_date < today)) return "behind";
-  if (m.unassigned_open > 0) return "at_risk";
+  if (today && m.end_date && m.total > m.done && dayNumber(m.end_date) - dayNumber(today) <= AT_RISK_DAYS) return "at_risk";
   return "on_track";
 }
 export const milestoneProgress = (m: Pick<MilestoneCounts, "total" | "done">) => (m.total ? Math.round((m.done / m.total) * 100) : 0);

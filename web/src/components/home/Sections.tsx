@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, ArrowUpRight, BarChart3, Check, Circle, PenLine } from "lucide-react";
 import type { RecentStudy } from "../../lib/recent";
 import { fmtNum, fmtPct, locale, plural, relTime, t } from "../../lib/i18n";
-import { aggregateCompletion, completion, groupActivity, isLowCompletion, peakDay, sortInsights, splitWeeks, type Day } from "../../lib/home";
+import { aggregateCompletion, completion, groupActivity, isLowCompletion, isLowStudy, peakDay, sortInsights, splitWeeks, type Day } from "../../lib/home";
 import { familyColor, familyOf } from "../../lib/families";
 import { templateByKey } from "../../templates/catalog";
 import { SeverityBadge, cx } from "../ui";
@@ -118,7 +118,7 @@ function kpiDrills(data: Dash): Record<"responses" | "live" | "completion" | "in
     live: { kind: "rows", title: t("Estudios activos"), empty: t("No hay estudios activos."),
       rows: data.live.map((s) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: s.last_response_at ? relTime(s.last_response_at) : undefined })) },
     completion: { kind: "rows", title: t("Tasa de completado por estudio"), empty: t("Aún no hay suficientes respuestas para medir el completado."), note: t("Del más bajo al más alto."),
-      rows: rated.map(({ s, rate }) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: fmtPct(rate), tone: isLowCompletion(rate) ? "warn" as const : undefined })) },
+      rows: rated.map(({ s, rate }) => ({ key: s.id, to: `/studies/${s.id}/results`, title: s.title, sub: `${s.project_name} · ${finished(s)}`, end: fmtPct(rate), tone: isLowStudy(s) ? "warn" as const : undefined })) },
     // The home page loads only the most severe insights; the count says when there are more.
     insights: { kind: "rows", title: t("Insights"), empty: t("Aún no hay insights."), note: t("Primero los más graves."), total: data.insight_counts.total,
       rows: sortInsights(data.insights).map((i) => ({ key: i.id, to: `/projects/${i.project_id}?tab=insights`, title: i.title, sub: [i.project_name, relTime(i.created_at)].join(" · "), severity: i.severity })) },
