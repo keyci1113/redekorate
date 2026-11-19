@@ -229,13 +229,19 @@ function BarsBody({ bars: saved, set, placeholder, ex }: { bars: Bar[]; set: Set
   );
 }
 
+// A persona photo is a portrait, not a hero image: in a wide column the square
+// grew to the column's full width (~530px), so it is capped and centred.
+const PORTRAIT = "mx-auto w-full max-w-56";
+
 function ImageBody({ url, set, round }: { url?: string; set: SetFn; round?: boolean }) {
   const { T, readOnly } = useDoc();
-  if (readOnly) return url ? <img src={url} alt="" className={cx("w-full object-cover", round ? "aspect-square rounded-2xl" : "rounded-lg")} />
-    : <div className="flex aspect-square items-center justify-center rounded-2xl bg-paper text-line-2"><UserRound size={56} aria-hidden /></div>;
+  if (readOnly) return url ? <img src={url} alt="" className={cx("w-full object-cover", round ? cx(PORTRAIT, "block aspect-square rounded-2xl") : "rounded-lg")} />
+    : <div className={cx(PORTRAIT, "flex aspect-square items-center justify-center rounded-2xl bg-paper text-line-2")}><UserRound size={56} aria-hidden /></div>;
   return (
     <div>
-      <ImageDrop cover={round} value={url} onChange={(u) => set(u ?? undefined)} label={T("Subir foto")} hint={T("Foto o ilustración representativa")} />
+      <div className={round ? PORTRAIT : undefined}>
+        <ImageDrop cover={round} value={url} onChange={(u) => set(u ?? undefined)} label={T("Subir foto")} hint={T("Foto o ilustración representativa")} />
+      </div>
       {round && !url && (
         <div className="mt-3 print:hidden">
           <p className="text-[12px] text-ink-3">{T("O usa una ilustración")}</p>
