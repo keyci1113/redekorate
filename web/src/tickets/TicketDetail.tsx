@@ -26,7 +26,7 @@ const firstName = (name: string | null) => (name ?? "").trim().split(/\s+/)[0] |
 
 /** Loads a ticket with the project's people and milestones, and exposes every change the screens make. */
 function useTicket(projectId: string, number: number, onChanged?: () => void) {
-  const detail = useLoad(() => api.get<{ ticket: TicketDetail; role: ProjectRole }>(`/projects/${projectId}/tickets/${number}`), [projectId, number]);
+  const detail = useLoad(() => api.get<{ ticket: TicketDetail; role: ProjectRole; ticket_only?: boolean }>(`/projects/${projectId}/tickets/${number}`), [projectId, number]);
   const meta = useLoad(() => api.get<TicketList>(`/projects/${projectId}/tickets`), [projectId]);
   const [error, setError] = useState<string | null>(null);
   const base = `/projects/${projectId}/tickets/${number}`;
@@ -39,7 +39,7 @@ function useTicket(projectId: string, number: number, onChanged?: () => void) {
     setError(null);
     try {
       const r = await send();
-      detail.setData({ ticket: r.ticket, role: before?.role ?? "viewer" });
+      detail.setData({ ticket: r.ticket, role: before?.role ?? "viewer", ticket_only: before?.ticket_only });
       onChanged?.();
       return true;
     } catch (e) {
@@ -51,6 +51,10 @@ function useTicket(projectId: string, number: number, onChanged?: () => void) {
   return {
     ticket, role, loading: detail.loading && !detail.data, loadError: detail.error, reload: detail.reload, error, clearError: () => setError(null),
     people: meta.data?.people ?? [], milestones: meta.data?.milestones ?? [], reloadMeta: meta.reload,
+    /** Everyone a comment can @mention: the ticket people plus those who would get to read this ticket only. */
+    mentionable: [...(meta.data?.people ?? []), ...(meta.data?.mention_only ?? []).map((p) => ({ ...p, ticket_only: true }))],
+    /** This person reads the ticket only because someone @mentioned them on it. */
+    ticketOnly: !!detail.data?.ticket_only,
     columns: meta.data?.columns?.length ? meta.data.columns : BUILT_IN_COLUMNS,
     patch: (p: Patch, optimistic?: Partial<TicketDetail>) => run(() => api.patch(base, p), optimistic),
     comment: (body: string, visibility: "internal" | "email_to_reporter") => run(() => api.post(`${base}/comments`, { body, visibility })),
@@ -137,7 +141,7 @@ export function TicketPanel({ projectId, projectName, number, position, onGo, on
             <Evidence ctx={ctx} />
             <Linked ctx={ctx} />
             {ctx.reporter && <section><H3>{t("Detalles")}</H3><div className="flex flex-col gap-2.5"><WidgetDetails reporter={ctx.reporter} /></div></section>}
-            <Conversation ctx={ctx} people={tk.people} />
+            <Conversation ctx={ctx} people={tk.mentionable} />
             <Activity items={ctx.ticket.activity} />
           </div>
         </div>
@@ -161,12 +165,13 @@ export function TicketFull({ projectId, projectName, projectColor, number, onDel
       <BackLink to={`/projects/${projectId}?tab=tickets`} color={projectColor} label={projectName} section={t("Tickets")} />
       <div className="mt-4"><Heading ctx={ctx} large /></div>
       {r && <p className="mt-1 text-[13px] text-ink-3">{t("El título se tomó del mensaje. Edítalo como cualquier ticket.")}</p>}
+      {tk.ticketOnly && <p className="mt-1 text-[13px] text-ink-3">{t("Te mencionaron en este ticket: puedes leerlo, pero no ves los demás tickets del proyecto.")}</p>}
       {tk.error && <div className="mt-3"><ErrorNote>{tk.error}</ErrorNote></div>}
       <div className="mt-6 flex flex-wrap items-start gap-6">
         <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-6">
           <Box><Description ctx={ctx} /></Box>
           <Box><Evidence ctx={ctx} always /><div className="mt-5"><Linked ctx={ctx} /></div></Box>
-          <Box><Conversation ctx={ctx} people={tk.people} /></Box>
+          <Box><Conversation ctx={ctx} people={tk.mentionable} /></Box>
           <Box><Activity items={x.activity} /></Box>
         </div>
         <aside aria-label={t("Detalles del ticket")} className="flex w-full flex-[1_1_360px] flex-col gap-4 lg:max-w-[400px]">
@@ -711,7 +716,7 @@ function Conversation({ ctx, people }: { ctx: Ctx; people: Person[] }) {
                 {options.map((p, i) => (
                   <li key={p.id} id={`mention-${p.id}`} role="option" aria-selected={i === pick} onMouseDown={(e) => { e.preventDefault(); choose(p.name); }}
                     className={cx("flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[13px]", i === pick && "bg-accent-soft")}>
-                    <Avatar name={p.name} avatar={p.avatar} size={24} /><span className="flex-1">{p.name}</span><span className="text-xs text-ink-3">{roleLabel(p.role)}</span>
+                    <Avatar name={p.name} avatar={p.avatar} size={24} /><span className="flex-1">{p.name}</span><span className="text-xs text-ink-3">{p.ticket_only ? t("Solo verá este ticket") : roleLabel(p.role)}</span>
                   </li>
                 ))}
               </ul>

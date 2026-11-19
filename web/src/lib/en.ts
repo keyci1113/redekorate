@@ -2865,6 +2865,8 @@ export const EN: Record<string, string> = {
 "Personas para mencionar": "People to mention",
 "Solo tu equipo ve los comentarios internos. Escribe @ para mencionar a alguien.": "Only your team sees internal comments. Type @ to tag someone; they’ll be notified.",
 "Escribe @ para mencionar a alguien.": "Type @ to tag someone.",
+"Solo verá este ticket": "Will see this ticket only",
+"Te mencionaron en este ticket: puedes leerlo, pero no ves los demás tickets del proyecto.": "You were mentioned on this ticket: you can read it, but not the project's other tickets.",
 "Se envía por correo a {a}.": "Sent by email to {a}.",
 "Enviar correo": "Send email",
 "creó este ticket desde un insight": "created this ticket from an insight",

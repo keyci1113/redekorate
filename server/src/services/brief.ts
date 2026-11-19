@@ -45,12 +45,16 @@ async function whatsNew(uid: string, since: Date) {
        select t.id, t.number, t.title, t.project_id, acc.name as project_name, (count(*) over())::int as total
        from tickets t join acc on acc.id = t.project_id
        where t.source = 'widget' and t.created_at > $2 order by t.created_at desc limit ${LIST}`, [uid, since]),
-    // Assignments and @mentions in comments are already recorded as notifications for this person.
+    // Assignments and @mentions in comments are already recorded as notifications for this person. A mention also
+    // counts on a project they open without the tickets section when it let them read that ticket (ticket_mention_access).
     query<{ kind: "assigned" | "tagged"; number: number; title: string; project_id: string; project_name: string; actor_name: string | null; excerpt: string | null; created_at: string }>(
       `with ${acc("tickets")}
-       select n.kind, t.number, t.title, t.project_id, acc.name as project_name, a.name as actor_name, n.data->>'excerpt' as excerpt, n.created_at
-       from notifications n join tickets t on t.id = n.ticket_id join acc on acc.id = n.project_id left join users a on a.id = n.actor_id
+       select n.kind, t.number, t.title, t.project_id, pr.name as project_name, a.name as actor_name, n.data->>'excerpt' as excerpt, n.created_at
+       from notifications n join tickets t on t.id = n.ticket_id join projects pr on pr.id = n.project_id left join users a on a.id = n.actor_id
        where n.user_id = $1 and n.created_at > $2 and (n.kind = 'assigned' or (n.kind = 'tagged' and n.data ? 'comment'))
+         and (n.project_id in (select id from acc)
+           or (n.kind = 'tagged' and exists (select 1 from ticket_mention_access g where g.ticket_id = n.ticket_id and g.user_id = $1)
+               and n.project_id in (select p.id ${accessJoins("$1")} where ${accessWhere("$1")} and not p.archived)))
        order by n.created_at desc limit 60`, [uid, since]),
   ]);
   const assignedAll = notices.filter((n) => n.kind === "assigned")

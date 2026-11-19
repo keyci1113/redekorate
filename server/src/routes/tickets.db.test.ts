@@ -15,14 +15,17 @@ let server: Server, base = "", project = "", insight = "";
 const cookie = {} as Record<Role, string>, ids = {} as Record<Role, string>;
 let closePool = async () => {};
 let sql: (text: string, params?: unknown[]) => Promise<unknown> = async () => {};
+/** The session cookie for any user row, as login would set it. */
+let sessionOf: (u: { id: string; email: string; name: string }) => string = () => "";
 
-async function call(as: Role, method: string, path: string, body?: unknown) {
+async function callWith(session: string, method: string, path: string, body?: unknown) {
   const res = await fetch(`${base}${path}`, {
     method, body: body === undefined ? undefined : JSON.stringify(body),
-    headers: { cookie: cookie[as], "content-type": "application/json", "x-lang": "en" },
+    headers: { cookie: session, "content-type": "application/json", "x-lang": "en" },
   });
   return { status: res.status, body: (await res.json().catch(() => ({}))) as any };
 }
+const call = (as: Role, method: string, path: string, body?: unknown) => callWith(cookie[as], method, path, body);
 const tickets = (suffix = "") => `/api/projects/${project}/tickets${suffix}`;
 const create = async (title: string, extra: object = {}) => (await call("editor", "POST", tickets(), { title, ...extra })).body.ticket;
 
@@ -35,6 +38,11 @@ before(async () => {
   ]);
   closePool = () => pool.end();
   sql = (text, params) => pool.query(text, params);
+  sessionOf = (u) => {
+    let c = "";
+    auth.signSession({ cookie: (n: string, v: string) => { c = `${n}=${v}`; } } as any, { ...u, role: "member", avatar: null, onboarded_at: null }, 0);
+    return c;
+  };
   await migrate();
   await pool.query("truncate users cascade");
 
@@ -255,6 +263,73 @@ test("people to assign and mention are everyone the access rules let into the pr
   const t = (await call("owner", "POST", `/api/projects/${p2}/tickets`, { title: "Menciones" })).body.ticket;
   const c = await call("owner", "POST", `/api/projects/${p2}/tickets/${t.number}/comments`, { body: "Mira esto @Olga Todo" });
   assert.deepEqual(c.body.ticket.watchers.map((w: any) => w.id), [everyProject]);
+});
+
+test("a mention lets someone who sees the project but not its tickets read that one ticket, and nothing else", { skip }, async () => {
+  const user = async (name: string) => {
+    const u = ((await sql("insert into users(email, name, password_hash, onboarded_at) values ($1,$2,'x', now()) returning id, email, name",
+      [`${name.toLowerCase().replace(/\W+/g, ".")}@test.local`, name])) as { rows: { id: string; email: string; name: string }[] }).rows[0];
+    return { id: u.id, session: sessionOf(u) };
+  };
+  const org = ((await sql("insert into organizations(name, created_by) values ('Mentions Inc', $1) returning id", [ids.owner])) as { rows: { id: string }[] }).rows[0].id;
+  const p2 = ((await sql("insert into projects(owner_id, name, organization_id) values ($1,'Mentions app',$2) returning id", [ids.owner, org])) as { rows: { id: string }[] }).rows[0].id;
+  const rita = await user("Rita Readonly");     // org member on every project, research only: no tickets
+  const cora = await user("Cora Collab");       // collaborator of this project, research only
+  await sql("insert into organization_members(organization_id, user_id, role, all_projects, areas, project_role) values ($1,$2,'member',true,'{research}','commenter')", [org, rita.id]);
+  await sql("insert into project_members(project_id, user_id, role, areas) values ($1,$2,'commenter','{research}')", [p2, cora.id]);
+  const path = (s = "") => `/api/projects/${p2}/tickets${s}`;
+
+  const list = await call("owner", "GET", path());
+  assert.deepEqual(list.body.mention_only.map((x: any) => x.name).sort(), ["Cora Collab", "Rita Readonly"], "offered in the picker, as ticket-only");
+  assert.ok(!list.body.people.some((x: any) => x.id === rita.id));
+
+  const t = (await call("owner", "POST", path(), { title: "Ticket con mención" })).body.ticket;
+  const other = (await call("owner", "POST", path(), { title: "Ticket con mención, otro" })).body.ticket;
+  await call("owner", "POST", path(`/${t.number}/links`), { target_type: "ticket", target_number: other.number });
+  assert.equal((await callWith(rita.session, "GET", path(`/${t.number}`))).status, 403, "no access before the mention");
+
+  // An outsider's name in a comment grants nothing; Rita's does.
+  const c = await call("owner", "POST", path(`/${t.number}/comments`), { body: "Mira esto @Rita Readonly y @The outsider" });
+  assert.equal(c.status, 201);
+  assert.deepEqual(c.body.ticket.watchers.map((w: any) => w.id), [rita.id]);
+  const grants = (await sql("select user_id, granted_by from ticket_mention_access where ticket_id = $1", [t.id])) as { rows: { user_id: string; granted_by: string }[] };
+  assert.deepEqual(grants.rows, [{ user_id: rita.id, granted_by: ids.owner }]);
+  assert.equal((await call("outsider", "GET", path(`/${t.number}`))).status, 404);
+
+  // Rita reads that ticket, read-only, without a trace of the other tickets.
+  const r = await callWith(rita.session, "GET", path(`/${t.number}`));
+  assert.equal(r.status, 200);
+  assert.equal(r.body.role, "viewer");
+  assert.equal(r.body.ticket_only, true);
+  assert.equal(r.body.ticket.comments.length, 1);
+  assert.equal(r.body.ticket.similar, null);
+  assert.ok(!r.body.ticket.links.some((l: any) => l.target_type === "ticket"));
+  assert.equal((await callWith(rita.session, "GET", path(`/${other.number}`))).status, 403, "another ticket");
+  assert.equal((await callWith(rita.session, "GET", path())).status, 403, "the board and list");
+  assert.equal((await callWith(rita.session, "POST", path(`/${t.number}/comments`), { body: "Puedo?" })).status, 403);
+  assert.equal((await callWith(rita.session, "PATCH", path(`/${t.number}`), { title: "Cambio" })).status, 403);
+  assert.equal((await callWith(rita.session, "POST", path("/move"), { number: t.number, status: "done" })).status, 403);
+  assert.equal((await callWith(rita.session, "POST", path(), { title: "Nuevo" })).status, 403);
+
+  // Editing the watchers keeps her (she is valid there through her grant).
+  assert.equal((await call("owner", "PATCH", path(`/${t.number}`), { watchers: [rita.id] })).status, 200);
+
+  // A mention added by editing a comment grants access too.
+  const mine = c.body.ticket.comments[0];
+  assert.equal((await callWith(cora.session, "GET", path(`/${t.number}`))).status, 403);
+  assert.equal((await call("owner", "PATCH", path(`/${t.number}/comments/${mine.id}`), { body: `${mine.body}, y @Cora Collab` })).status, 200);
+  assert.equal((await callWith(cora.session, "GET", path(`/${t.number}`))).status, 200);
+
+  // Real Tickets access later: everything as a normal member.
+  await sql("update project_members set areas = '{research,tickets}' where project_id = $1 and user_id = $2", [p2, cora.id]);
+  const full = await callWith(cora.session, "GET", path(`/${t.number}`));
+  assert.equal(full.body.ticket_only, false);
+  assert.equal(full.body.role, "commenter");
+  assert.equal((await callWith(cora.session, "GET", path())).status, 200);
+
+  // Losing the project: the grant does not let her back in.
+  await sql("delete from organization_members where organization_id = $1 and user_id = $2", [org, rita.id]);
+  assert.equal((await callWith(rita.session, "GET", path(`/${t.number}`))).status, 404);
 });
 
 test("merging moves the conversation to the other ticket and removes this one", { skip }, async () => {
