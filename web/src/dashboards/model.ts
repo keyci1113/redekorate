@@ -10,18 +10,20 @@ interface Base { projects: ProjectOption[]; period: Period; days: number }
 
 export interface StudiesDash extends Base {
   bucket: "day" | "week"; low_completion: number; min_started: number;
-  totals: { responses_week: number; responses_prev_week: number; responses_period: number; live: number; studies: number; started: number; finished: number;
+  totals: { responses_period: number; responses_prev_period: number; live: number; studies: number; started: number; finished: number;
     insights: number; insights_critical: number; insights_high: number; participants: number; participants_prev: number };
   series: { day: string; n: number }[];
   methods: { method: string; n: number }[];
   live: LiveStudy[];
   severity: Record<Severity, number> & { with_tickets: number };
 }
-export interface LiveStudy { id: string; title: string; method: string; published_at: string | null; project_name: string; started: number; finished: number; last_response_at: string | null }
+/** Why a live study needs a look; the server decides it (studyAttention in server/src/lib/dashboards.ts) so every screen agrees. */
+export type StudyAttention = "low_completion" | "silent" | null;
+export interface LiveStudy { id: string; title: string; method: string; published_at: string | null; project_name: string; started: number; finished: number; last_response_at: string | null; attention: StudyAttention }
 
 export interface TicketsDash extends Base {
   totals: { open: number; todo: number; in_progress: number; in_review: number; overdue: number; overdue_last_week: number; oldest_days_late: number | null;
-    created_week: number; created_prev_week: number; created_week_widget: number; closed_week: number; closed_period: number;
+    created_period: number; created_prev_period: number; created_period_widget: number; closed_period: number; closed_prev_period: number;
     median_days: number | null; median_days_prev: number | null; source_manual: number; source_insight: number; source_widget: number };
   weeks: { week: string; created: number; closed: number }[];
   people: { id: string | null; name: string | null; avatar: string | null; open: number; overdue: number }[];
@@ -33,9 +35,15 @@ export interface TicketsDash extends Base {
 export type Health = "at_risk" | "needs_attention" | "on_track" | "quiet";
 export type MilestoneState = "done" | "planned" | "behind" | "at_risk" | "on_track";
 export interface MilestoneRow { id: string; name: string; project_id: string; project_name: string; total: number; done: number; overdue_open: number; unassigned_open: number; end_date: string | null; state: MilestoneState; progress: number }
-export interface ProjectRow { id: string; name: string; description: string; color: string; live_studies: number; responses_7d: number; low_completion: number; open_tickets: number; overdue: number; health: Health; next_milestone: MilestoneRow | null }
+export interface ProjectRow {
+  id: string; name: string; description: string; color: string; live_studies: number; responses_7d: number; open_tickets: number; overdue: number;
+  /** Live studies that need attention, and how many of those for low completion. */
+  studies_attention: number; low_completion: number; milestones_behind: number; milestones_at_risk: number;
+  health: Health; next_milestone: MilestoneRow | null;
+}
 export interface ActivityItem { kind: "responses" | "ticket_status" | "insight" | "widget"; at: string; project_id: string; project_name: string; ref: string | null; title: string; n: number; extra: string | null }
-export interface ProjectsDash extends Base { rows: ProjectRow[]; milestones: MilestoneRow[]; activity: ActivityItem[]; low_completion: number }
+/** `at_risk_days`: a milestone with open tickets is at risk once it ends this many days away or closer (server rule). */
+export interface ProjectsDash extends Base { rows: ProjectRow[]; milestones: MilestoneRow[]; activity: ActivityItem[]; low_completion: number; at_risk_days: number }
 
 // ── Filters in the URL ──────────────────────────────────────────
 export function readFilters(p: URLSearchParams): DashFilters {
@@ -58,13 +66,6 @@ export const delta = (now: number, before: number): Delta => ({ diff: Math.abs(n
 export const percent = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 export const completion = (s: Pick<LiveStudy, "started" | "finished">) => (s.started > 0 ? s.finished / s.started : 0);
 
-/** Why a live study needs a look: low completion (once enough people started) or no responses for 48 hours. */
-export function attention(s: LiveStudy, now: number, low: number, minStarted: number): "low_completion" | "silent" | null {
-  if (s.started >= minStarted && completion(s) < low) return "low_completion";
-  const last = s.last_response_at ?? s.published_at;
-  if (last && now - new Date(last).getTime() > 48 * 3600e3) return "silent";
-  return null;
-}
 export const daysSince = (iso: string, now: number) => Math.floor((now - new Date(iso).getTime()) / 864e5);
 
 export type DueText = { kind: "late"; days: number } | { kind: "today" } | { kind: "tomorrow" } | { kind: "date" };

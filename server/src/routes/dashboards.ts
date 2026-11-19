@@ -7,8 +7,8 @@ import { query } from "../lib/db.js";
 import { requireAuth } from "../lib/auth.js";
 import { HttpError, parse } from "../lib/http.js";
 import { accessJoins, accessWhere, type Area } from "../lib/access.js";
-import { LOW_COMPLETION, MIN_STARTED, PERIODS, bindNamed, pagePath, periodRange, projectHealth, topCounts } from "../lib/dashboards.js";
-import { milestoneRows } from "../lib/milestones.js";
+import { LOW_COMPLETION, MIN_STARTED, PERIODS, bindNamed, pagePath, periodRange, projectHealth, studyAttention, topCounts } from "../lib/dashboards.js";
+import { AT_RISK_DAYS, milestoneRows } from "../lib/milestones.js";
 import { TICKET_STATUSES, TICKET_TYPES } from "../lib/tickets.js";
 
 // ── Shared SQL ──────────────────────────────────────────────────
@@ -56,6 +56,7 @@ dashboards.get("/studies", async (req, res) => {
            (select count(*)::int from se where completed_at > now() - interval '7 days') as responses_week,
            (select count(*)::int from se where completed_at > now() - interval '14 days' and completed_at <= now() - interval '7 days') as responses_prev_week,
            (select count(*)::int from se where completed_at >= $3) as responses_period,
+           (select count(*)::int from se where completed_at >= $4 and completed_at < $3) as responses_prev_period,
            (select count(*)::int from st where status = 'live') as live,
            (select count(*)::int from st) as studies,
            (select count(*)::int from se join st on st.id = se.study_id where st.status = 'live') as started,
@@ -79,13 +80,17 @@ dashboards.get("/studies", async (req, res) => {
            (select max(x.completed_at) from sessions x where x.study_id = st.id) as last_response_at
          from studies st join projects p on p.id = st.project_id
          where st.project_id in (select id from acc) and st.status = 'live' order by st.title`, s.base),
+    // Insights of the period, like the "New insights" tile. An insight "became a ticket" when a ticket links to it
+    // as its source; a "converted" link is the other way round (the insight was made from the ticket).
     row(`with ${ACC_RESEARCH}
          select count(*) filter (where severity = 'critical')::int as critical, count(*) filter (where severity = 'high')::int as high,
            count(*) filter (where severity = 'medium')::int as medium, count(*) filter (where severity = 'low')::int as low,
-           count(*) filter (where exists(select 1 from ticket_links k where k.target_type = 'insight' and k.target_id = i.id))::int as with_tickets
-         from insights i where i.project_id in (select id from acc)`, s.base),
+           count(*) filter (where exists(select 1 from ticket_links k where k.target_type = 'insight' and k.target_id = i.id and k.relation <> 'converted'))::int as with_tickets
+         from insights i where i.project_id in (select id from acc) and i.created_at >= $3`, [...s.base, s.since]),
   ]);
-  res.json({ projects, period: s.period, days: s.days, bucket: daily ? "day" : "week", totals, series, methods, live, severity, low_completion: LOW_COMPLETION, min_started: MIN_STARTED });
+  const now = Date.now();
+  res.json({ projects, period: s.period, days: s.days, bucket: daily ? "day" : "week", totals, series, methods, severity, low_completion: LOW_COMPLETION, min_started: MIN_STARTED,
+    live: live.map((x) => ({ ...x, attention: studyAttention(x, now) })) });
 });
 
 // ── Tickets ─────────────────────────────────────────────────────
@@ -107,7 +112,11 @@ dashboards.get("/tickets", async (req, res) => {
            (select count(*)::int from tk, wk where created_at >= w - interval '7 days' and created_at < w) as created_prev_week,
            (select count(*)::int from tk, wk where created_at >= w and source = 'widget') as created_week_widget,
            (select count(*)::int from closed, wk where closed_at >= w) as closed_week,
+           (select count(*)::int from tk where created_at >= $3) as created_period,
+           (select count(*)::int from tk where created_at >= $4 and created_at < $3) as created_prev_period,
+           (select count(*)::int from tk where created_at >= $3 and source = 'widget') as created_period_widget,
            (select count(*)::int from closed where closed_at >= $3) as closed_period,
+           (select count(*)::int from closed where closed_at >= $4 and closed_at < $3) as closed_prev_period,
            (select (extract(epoch from percentile_cont(0.5) within group (order by closed_at - created_at)) / 86400)::float8 from closed where closed_at >= $3) as median_days,
            (select (extract(epoch from percentile_cont(0.5) within group (order by closed_at - created_at)) / 86400)::float8 from closed where closed_at >= $4 and closed_at < $3) as median_days_prev,
            (select count(*)::int from tk where created_at >= $3 and source = 'manual') as source_manual,
@@ -144,19 +153,23 @@ dashboards.get("/tickets", async (req, res) => {
 // ── Projects ────────────────────────────────────────────────────
 dashboards.get("/projects", async (req, res) => {
   const s = scope(req);
-  const [projects, rows, milestones, activity] = await Promise.all([
+  const [projects, rows, liveStudies, milestones, activity] = await Promise.all([
     projectOptions(req.user!.id),
     query(`with ${ACC_PROJECTS}
          select p.id, p.name, p.description, p.color,
            (select count(*)::int from studies st where st.project_id = p.id and p.id in (select id from accr) and st.status = 'live') as live_studies,
            (select count(*)::int from sessions x join studies st on st.id = x.study_id where st.project_id = p.id and p.id in (select id from accr) and x.completed_at > now() - interval '7 days') as responses_7d,
-           (select count(*)::int from studies st where st.project_id = p.id and p.id in (select id from accr) and st.status = 'live'
-              and (select count(*) from sessions x where x.study_id = st.id) >= ${MIN_STARTED}
-              and (select count(*) filter (where x.completed_at is not null)::float / count(*) from sessions x where x.study_id = st.id) < ${LOW_COMPLETION}) as low_completion,
            (select count(*)::int from tickets t where t.project_id = p.id and p.id in (select id from acct) and t.status <> 'done') as open_tickets,
            (select count(*)::int from tickets t where t.project_id = p.id and p.id in (select id from acct) and t.status <> 'done' and t.due_date < current_date) as overdue,
            (select count(*)::int from tickets t where t.project_id = p.id and p.id in (select id from acct) and t.updated_at > now() - interval '7 days') as ticket_changes_7d
          from projects p where p.id in (select id from acc) order by lower(p.name)`, s.base),
+    // Live studies, judged by studyAttention like on the studies dashboard.
+    query<{ project_id: string; started: number; finished: number; last_response_at: Date | null; published_at: Date | null }>(`with ${ACC_PROJECTS}
+         select st.project_id, st.published_at,
+           (select count(*)::int from sessions x where x.study_id = st.id) as started,
+           (select count(*)::int from sessions x where x.study_id = st.id and x.completed_at is not null) as finished,
+           (select max(x.completed_at) from sessions x where x.study_id = st.id) as last_response_at
+         from studies st where st.project_id in (select id from accr) and st.status = 'live'`, s.base),
     milestoneRows(`m.project_id in (select p.id ${accessJoins("$1")} where ${accessWhere("$1", "tickets")} and not p.archived and ($2::uuid is null or p.id = $2))`, s.base),
     query(`with ${ACC_PROJECTS}
          select * from (
@@ -175,20 +188,24 @@ dashboards.get("/projects", async (req, res) => {
              from tickets t where t.project_id in (select id from acct) and t.source = 'widget' and t.created_at > now() - interval '7 days' group by t.project_id
          ) e order by at desc limit 8`, s.base),
   ]);
-  const ms = milestones;
+  const ms = milestones, now = Date.now();
   const out = rows.map((r) => {
     const mine = ms.filter((m) => m.project_id === r.id);
     // The next milestone is the unfinished one that ends first; milestones without dated tickets go last.
     const next = mine.find((m) => m.state !== "done") ?? null;
     const milestones_behind = mine.filter((m) => m.state === "behind").length;
-    return { ...r, milestones_behind, health: projectHealth({ ...r, milestones_behind }), next_milestone: next };
+    const milestones_at_risk = mine.filter((m) => m.state === "at_risk").length;
+    const why = liveStudies.filter((x) => x.project_id === r.id).map((x) => studyAttention(x, now));
+    const low_completion = why.filter((w) => w === "low_completion").length, studies_attention = why.filter(Boolean).length;
+    return { ...r, low_completion, studies_attention, milestones_behind, milestones_at_risk,
+      health: projectHealth({ ...r, studies_attention, milestones_behind, milestones_at_risk }), next_milestone: next };
   });
   const names = new Map(rows.map((r) => [r.id, r.name]));
   res.json({
     projects, period: s.period, days: s.days, rows: out,
     milestones: ms,
     activity: activity.map((a) => ({ ...a, project_name: names.get(a.project_id) ?? "" })),
-    low_completion: LOW_COMPLETION,
+    low_completion: LOW_COMPLETION, at_risk_days: AT_RISK_DAYS,
   });
 });
 
@@ -200,7 +217,7 @@ dashboards.get("/projects", async (req, res) => {
 const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const Base = { project: z.string().uuid().optional(), period: z.enum(PERIODS).default("30") };
 
-const TICKET_DRILLS = ["open", "status", "overdue", "due", "created_week", "closed_week", "closed_period", "assignee", "type", "source", "week", "page"] as const;
+const TICKET_DRILLS = ["open", "status", "overdue", "due", "created_week", "closed_week", "created_period", "closed_period", "assignee", "type", "source", "week", "page"] as const;
 const TicketDrill = z.object({ ...Base, by: z.enum(TICKET_DRILLS), value: z.string().max(500).optional() });
 
 /** The SQL condition (on `t` = tickets, `c` = closed) and its parameter for one ticket drill-down. `{since}` is the period start, `{arg}` the value. */
@@ -218,6 +235,7 @@ function ticketCondition(by: (typeof TICKET_DRILLS)[number], value: string | und
     case "due": return { where: "t.status <> 'done' and t.due_date <= current_date + 3", order: byDue };
     case "created_week": return { where: "t.created_at >= date_trunc('week', now())", order: "t.created_at desc" };
     case "closed_week": return { where: "c.closed_at >= date_trunc('week', now())", order: "c.closed_at desc" };
+    case "created_period": return { where: "t.created_at >= {since}", order: "t.created_at desc" };
     case "closed_period": return { where: "c.closed_at >= {since}", order: "c.closed_at desc" };
     case "type": return { where: "t.type = {arg}", arg: need(z.enum(TICKET_TYPES)), order: "t.status = 'done', t.created_at desc" };
     case "source": return { where: "t.created_at >= {since} and t.source = {arg}", arg: need(z.enum(["manual", "insight", "widget"])), order: "t.created_at desc" };
@@ -287,7 +305,7 @@ async function studyItems(userId: string, input: unknown) {
        from insights i join projects p on p.id = i.project_id left join studies s on s.id = i.study_id
        where i.project_id in (select id from acc) and ($3::timestamptz is null or i.created_at >= $3) and ($4::text is null or i.severity = $4)
        order by array_position(array['critical','high','medium','low']::text[], i.severity), i.created_at desc limit ${DRILL_LIMIT}`,
-      [...base, f.by === "insights" ? since : null, severity?.data ?? null]);
+      [...base, since, severity?.data ?? null]);   // both figures count the insights of the period
     return { kind: "insights" as const, total: rows[0]?.total ?? 0, items: rows.map(({ total: _, ...r }) => r) };
   }
 

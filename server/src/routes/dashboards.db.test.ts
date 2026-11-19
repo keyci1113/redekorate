@@ -6,7 +6,8 @@ import type { Server } from "node:http";
 
 const url = process.env.TEST_DATABASE_URL;
 const skip = !url ? "set TEST_DATABASE_URL to run" : !/_test(\?|$)/.test(url) ? "TEST_DATABASE_URL must point to a database whose name ends in _test" : false;
-let server: Server, base = "", project = "", other = "";
+let server: Server, base = "", project = "", other = "", ownerId = "";
+let db: { query: (sql: string, params?: unknown[]) => Promise<{ rows: any[] }> };
 const cookie: Record<string, string> = {};
 let closePool = async () => {};
 const get = async (as: string, path: string) => {
@@ -21,6 +22,7 @@ before(async () => {
     import("express"), import("cookie-parser"), import("../lib/db.js"), import("../migrate.js"), import("../lib/auth.js"), import("./dashboards.js"), import("../lib/http.js"),
   ]);
   closePool = () => pool.end();
+  db = pool;
   await migrate();
   await pool.query("truncate users cascade");
   const ids: Record<string, string> = {};
@@ -29,6 +31,7 @@ before(async () => {
     ids[who] = u.id;
     auth.signSession({ cookie: (n: string, v: string) => { cookie[who] = `${n}=${v}`; } } as any, { ...u, role: "member", avatar: null, onboarded_at: null }, 0);
   }
+  ownerId = ids.owner;
   project = (await pool.query("insert into projects(owner_id, name) values ($1,'Fintech') returning id", [ids.owner])).rows[0].id;
   other = (await pool.query("insert into projects(owner_id, name) values ($1,'Tienda') returning id", [ids.owner])).rows[0].id;
   await pool.query("insert into projects(owner_id, name, archived) values ($1,'Archivado', true)", [ids.owner]);
@@ -75,6 +78,10 @@ test("ticket figures count open, overdue and closed tickets and the median time 
   assert.equal(x.closed_period, 2);
   assert.equal(Math.round(x.median_days), 6);    // median of 4 and 8 days
   assert.equal(x.source_widget, 1);
+  // The "Created" and "Closed" tiles follow the period, with the period before for comparison.
+  assert.deepEqual([x.created_period, x.created_period_widget, x.closed_period, x.closed_prev_period], [5, 1, 2, 0]);
+  assert.equal((await get("owner", "tickets?period=7")).body.totals.created_period, 2);   // #1 and #2
+  assert.equal((await get("owner", "tickets?period=7")).body.totals.created_prev_period, 2); // #4 and #5
   assert.equal(d.weeks.length, 8);
   assert.equal(d.weeks.reduce((n: number, w: any) => n + w.closed, 0), 2);
   assert.deepEqual(d.people.map((p: any) => [p.name, p.open, p.overdue]), [["owner", 2, 1], [null, 2, 1]]);
@@ -107,6 +114,7 @@ test("ticket drill-downs list exactly the tickets behind each figure", { skip },
   assert.deepEqual(await numbers("by=overdue"), [3, 2]);
   assert.deepEqual(await numbers("by=status&value=todo"), [1, 6]);
   assert.deepEqual(await numbers("by=closed_period"), [5, 4]);           // last closed first
+  assert.deepEqual(await numbers("by=created_period&period=7"), [1, 2]);
   assert.deepEqual(await numbers("by=assignee&value=none"), [3, 6]);
   assert.deepEqual(await numbers("by=source&value=widget"), [1]);
   assert.deepEqual(await numbers("by=page&value=/caja"), [1]);
@@ -147,4 +155,47 @@ test("people only see the projects they can open", { skip }, async () => {
   assert.equal((await get("stranger", "projects")).body.rows.length, 0);
   assert.equal((await fetch(`${base}/api/dashboards/tickets`)).status, 401);
   assert.equal((await get("owner", "tickets?period=year")).status, 400);
+});
+
+test("the studies figures follow the period and count each insight that became a ticket once", { skip }, async () => {
+  const insight = async (title: string) => (await db.query("select id from insights where title = $1", [title])).rows[0].id;
+  const [pay, menu] = [await insight("Pago confuso"), await insight("Menú largo")];
+  const t6 = (await db.query("select id from tickets where number = 6")).rows[0].id;
+  const t3 = (await db.query("select id from tickets where number = 3")).rows[0].id;
+  // #6 was created from "Pago confuso"; "Menú largo" was made FROM ticket #3 (converted), which is the other direction.
+  await db.query("insert into ticket_links(ticket_id, target_type, target_id, relation) values ($1,'insight',$2,'evidence'), ($3,'insight',$4,'converted')", [t6, pay, t3, menu]);
+  const { body: d } = await get("owner", "studies?period=30");
+  assert.equal(d.severity.with_tickets, 1);
+  assert.equal(d.severity.critical + d.severity.high + d.severity.medium + d.severity.low, d.totals.insights, "the severity bars add up to the New insights tile");
+  assert.deepEqual([d.totals.responses_period, d.totals.responses_prev_period], [1, 0]);
+  assert.deepEqual(d.live.map((s: any) => [s.title, s.attention]), [["Encuesta", null]], "two sessions are too few to judge completion");
+  await db.query("delete from ticket_links where ticket_id in ($1, $2)", [t6, t3]);
+});
+
+test("one rule decides which studies need attention and how healthy a project is", { skip }, async () => {
+  // A study live for three days without a single response: silent.
+  const quiet = (await db.query("insert into projects(owner_id, name) values ($1,'Silencio') returning id", [ownerId])).rows[0].id;
+  const study = (await db.query("insert into studies(project_id, owner_id, title, method, status, public_slug, published_at) values ($1,$2,'Mudo','survey','live','dash-mute', now() - interval '3 days') returning id", [quiet, ownerId])).rows[0].id;
+  const s = (await get("owner", `studies?project=${quiet}`)).body;
+  assert.deepEqual(s.live.map((x: any) => [x.title, x.attention]), [["Mudo", "silent"]]);
+  const row = (await get("owner", "projects")).body.rows.find((r: any) => r.id === quiet);
+  // Nothing happened this week, but its study needs attention: that is not "quiet".
+  assert.deepEqual([row.studies_attention, row.health], [1, "needs_attention"]);
+  // A milestone due soon with open work is at risk, and the project is not "on track".
+  const ms = (await db.query("insert into milestones(project_id, name, due_date) values ($1,'Pronto', current_date + 5) returning id", [quiet])).rows[0].id;
+  await db.query("insert into tickets(project_id, number, title, status, milestone_id, created_by, source) values ($1, 1, 'Abierto', 'todo', $2, $3, 'manual')", [quiet, ms, ownerId]);
+  await db.query("delete from studies where id = $1", [study]);
+  const again = (await get("owner", "projects")).body.rows.find((r: any) => r.id === quiet);
+  assert.deepEqual([again.studies_attention, again.milestones_at_risk, again.health], [0, 1, "needs_attention"]);
+  await db.query("delete from projects where id = $1", [quiet]);
+});
+
+test("the projects list counts UX documents and diagrams apart, as the project tabs do", { skip }, async () => {
+  const { listProjects } = await import("../services/projects.js");
+  await db.query(`insert into documents(project_id, owner_id, kind, title) values
+    ($1,$2,'text','Plan'), ($1,$2,'persona','Ana'), ($1,$2,'diagram','Flujo'), ($1,$2,'sitemap','Mapa'), ($1,$2,'moodboard','Tablero')`, [other, ownerId]);
+  const { projects } = await listProjects({ id: ownerId } as any);
+  const tienda = projects.find((p: any) => p.id === other);
+  assert.deepEqual([tienda.document_count, tienda.diagram_count], [2, 3]);
+  await db.query("delete from documents where project_id = $1", [other]);
 });

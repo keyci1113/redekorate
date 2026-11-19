@@ -70,10 +70,17 @@ test("a milestone's counts, dates and state come from its tickets", { skip }, as
   const id = (await call("viewer", "GET", M())).body.milestones[0].id;
   await ticket(1, "done", null, id, ids.owner);
   await ticket(2, "in_progress", 20, id, ids.owner);
-  await ticket(3, "todo", 40, id, null);            // unassigned → at risk
+  await ticket(3, "todo", 40, id, null);            // unassigned, but that alone is no risk
+  await call("editor", "PATCH", `${M()}/${id}`, { name: "Cierre de caja v2", due_date: "2999-12-12" });
   let m = (await call("viewer", "GET", M())).body.milestones[0];
-  assert.deepEqual([m.total, m.todo, m.in_progress, m.in_review, m.done, m.progress, m.unassigned_open, m.state], [3, 1, 1, 0, 1, 33, 1, "at_risk"]);
-  assert.equal(m.end_date, "2026-12-12", "its own due date wins over the tickets'");
+  assert.deepEqual([m.total, m.todo, m.in_progress, m.in_review, m.done, m.progress, m.unassigned_open, m.state], [3, 1, 1, 0, 1, 33, 1, "on_track"]);
+  assert.equal(m.end_date, "2999-12-12", "its own due date wins over the tickets'");
+  // Due within two weeks with open tickets → at risk.
+  const soon = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+  await call("editor", "PATCH", `${M()}/${id}`, { name: "Cierre de caja v2", due_date: soon });
+  m = (await call("viewer", "GET", M())).body.milestones[0];
+  assert.equal(m.state, "at_risk");
+  await call("editor", "PATCH", `${M()}/${id}`, { name: "Cierre de caja v2", due_date: "2026-12-12" });   // back to the date the later tests expect
   await ticket(4, "todo", -3, id, ids.owner);        // overdue → behind
   m = (await call("viewer", "GET", M())).body.milestones[0];
   assert.deepEqual([m.overdue_open, m.state], [1, "behind"]);

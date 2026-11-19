@@ -27,15 +27,19 @@ export function span(days: number): { n: number; unit: "day" | "month" } {
 
 export type MilestoneNote =
   | { kind: "closed"; date: string } | { kind: "starts"; days: number } | { kind: "overdue"; n: number } | { kind: "late"; days: number }
-  | { kind: "unassigned"; n: number } | { kind: "due"; days: number } | null;
-/** The one line under a milestone: why it is at risk, when it starts or is due, or when it was closed. */
-export function milestoneNote(m: Pick<Milestone, "state" | "closed_at" | "begin_date" | "end_date" | "overdue_open" | "unassigned_open">, today: string): MilestoneNote {
+  | { kind: "due_open"; days: number; open: number } | { kind: "due"; days: number } | null;
+/**
+ * The one line under a milestone: why it is at risk, when it starts or is due, or when it was closed.
+ * The state comes from the server (milestoneState): at risk means it ends soon with tickets still open.
+ */
+export function milestoneNote(m: Pick<Milestone, "state" | "closed_at" | "begin_date" | "end_date" | "overdue_open" | "total" | "done">, today: string): MilestoneNote {
   if (m.state === "done") return m.closed_at ? { kind: "closed", date: m.closed_at } : null;
   if (m.state === "planned" && m.begin_date) return { kind: "starts", days: daysBetween(today, m.begin_date) };
   if (m.overdue_open > 0) return { kind: "overdue", n: m.overdue_open };
   if (m.end_date && m.end_date < today) return { kind: "late", days: daysBetween(m.end_date, today) };
-  if (m.unassigned_open > 0) return { kind: "unassigned", n: m.unassigned_open };
-  return m.end_date ? { kind: "due", days: daysBetween(today, m.end_date) } : null;
+  if (!m.end_date) return null;
+  const days = daysBetween(today, m.end_date);
+  return m.state === "at_risk" ? { kind: "due_open", days, open: m.total - m.done } : { kind: "due", days };
 }
 
 // ── Timeline ────────────────────────────────────────────────────
@@ -69,6 +73,19 @@ export function barSpan(begin: string, end: string, w: TimeWindow): { left: numb
   if (end < begin || end < w.start || begin > w.end) return null;
   const from = Math.max(0, daysBetween(w.start, begin)), to = Math.min(w.days, daysBetween(w.start, end) + 1);
   return { left: (from / w.days) * 100, width: Math.max(((to - from) / w.days) * 100, 0.6), cutStart: begin < w.start, cutEnd: end > w.end };
+}
+/** The narrowest the timeline's track gets, in px: the timeline's 820px minimum less its 240px name column. */
+export const TRACK_MIN_PX = 580;
+/** A generous width for a bar's label: 12px bold text plus the bar's padding. */
+export const labelPx = (text: string) => text.length * 7 + 16;
+/**
+ * Where a bar's label goes: inside when it fits even on the narrowest track, otherwise next to the bar, after it,
+ * or before it when the bar sits near the end of the window. A short bar never shows a clipped "At ri…".
+ */
+export function labelPlacement(pos: { left: number; width: number }, text: string, track = TRACK_MIN_PX): "inside" | "after" | "before" {
+  const need = labelPx(text);
+  if ((pos.width / 100) * track >= need) return "inside";
+  return pos.left + pos.width + (need / track) * 100 <= 100 ? "after" : "before";
 }
 /** Position of a single day (today) in the window, or null when it is off screen. */
 export function dayMark(day: string, w: TimeWindow): number | null {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attention, completion, daysSince, delta, dueText, filterQuery, labelTicks, peak, percent, readFilters, shares, weeksBehind, type LiveStudy } from "./model";
+import { completion, daysSince, delta, dueText, filterQuery, labelTicks, peak, percent, readFilters, shares, weeksBehind } from "./model";
 
 describe("filters", () => {
   it("defaults to all projects and the last 30 days", () => {
@@ -27,22 +27,11 @@ describe("figures", () => {
   });
 });
 
-describe("studies that need attention", () => {
-  const NOW = new Date("2026-11-11T18:00:00Z").getTime();
-  const study = (over: Partial<LiveStudy>): LiveStudy => ({ id: "s", title: "S", method: "survey", published_at: "2026-11-01T00:00:00Z", project_name: "P", started: 90, finished: 85, last_response_at: "2026-11-11T12:00:00Z", ...over });
-  it("flags completion under the threshold once enough people started", () => {
-    expect(attention(study({ started: 31, finished: 26 }), NOW, 0.88, 5)).toBe("low_completion");
-    expect(attention(study({ started: 4, finished: 1 }), NOW, 0.88, 5)).toBeNull();
+describe("completion", () => {
+  it("is finished over started, and 0 with nobody started", () => {
+    expect(completion({ started: 8, finished: 6 })).toBe(0.75);
     expect(completion({ started: 0, finished: 0 })).toBe(0);
-  });
-  it("flags a study with no responses for 48 hours, counting from publication when it has none", () => {
-    expect(attention(study({ last_response_at: "2026-11-09T12:00:00Z" }), NOW, 0.88, 5)).toBe("silent");
-    expect(attention(study({ started: 0, finished: 0, last_response_at: null }), NOW, 0.88, 5)).toBe("silent");
-    expect(attention(study({ started: 0, finished: 0, last_response_at: null, published_at: "2026-11-11T00:00:00Z" }), NOW, 0.88, 5)).toBeNull();
-    expect(daysSince("2026-11-09T12:00:00Z", NOW)).toBe(2);
-  });
-  it("leaves healthy studies alone", () => {
-    expect(attention(study({}), NOW, 0.88, 5)).toBeNull();
+    expect(daysSince("2026-11-09T12:00:00Z", new Date("2026-11-11T18:00:00Z").getTime())).toBe(2);
   });
 });
 

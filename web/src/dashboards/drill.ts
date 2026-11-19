@@ -3,9 +3,9 @@
 // GET /api/dashboards/{tickets|studies}/items (server/src/services/dashboards.ts).
 import type { TicketPriority, TicketStatus, TicketType } from "../tickets/model";
 import type { Severity } from "../lib/types";
-import { attention, completion, filterQuery, type DashFilters, type Health, type LiveStudy, type MilestoneRow, type MilestoneState, type ProjectRow } from "./model";
+import { completion, filterQuery, type DashFilters, type Health, type LiveStudy, type MilestoneRow, type MilestoneState, type ProjectRow } from "./model";
 
-export type TicketBy = "open" | "status" | "overdue" | "due" | "created_week" | "closed_week" | "closed_period" | "assignee" | "type" | "source" | "week" | "page";
+export type TicketBy = "open" | "status" | "overdue" | "due" | "created_week" | "closed_week" | "created_period" | "closed_period" | "assignee" | "type" | "source" | "week" | "page";
 export type StudyBy = "live" | "method" | "responses_week" | "responses_period" | "participants" | "day" | "insights" | "severity";
 
 /** One row of a drill-down list that the page builds from data it already has. */
@@ -46,8 +46,8 @@ export type LiveWhich = "all" | "attention" | "by_completion";
  * Live studies behind a tile: all of them (those that need attention first), only those that need attention,
  * or the ones with enough sessions to judge, lowest completion first.
  */
-export function liveStudiesFor(live: LiveStudy[], which: LiveWhich, now: number, low: number, minStarted: number): LiveStudy[] {
-  const flagged = (s: LiveStudy) => attention(s, now, low, minStarted) !== null;
+export function liveStudiesFor(live: LiveStudy[], which: LiveWhich, minStarted: number): LiveStudy[] {
+  const flagged = (s: LiveStudy) => s.attention !== null;
   if (which === "attention") return live.filter(flagged);
   if (which === "by_completion") return live.filter((s) => s.started >= minStarted).sort((a, b) => completion(a) - completion(b) || a.title.localeCompare(b.title));
   return [...live].sort((a, b) => Number(flagged(b)) - Number(flagged(a)) || a.title.localeCompare(b.title));

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowRight, Building2, FileText, Folder, FolderPlus, Lightbulb, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
+import { ArrowRight, Building2, FileText, Folder, FolderPlus, Lightbulb, Network, Plus, Share2, UsersRound, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { timeAgo, useLoad } from "../lib/hooks";
 import type { Organization, Project, Study } from "../lib/types";
@@ -99,6 +99,7 @@ function ProjectStudies({ project: p }: { project: Project }) {
 function ProjectContents({ project: p }: { project: Project }) {
   const rows: [LucideIcon, string, number, string][] = [
     [FileText, t("Documentos UX"), p.document_count ?? 0, "docs"],
+    [Network, t("Arquitectura"), p.diagram_count ?? 0, "architecture"],
     [Lightbulb, t("Insights"), p.insight_count ?? 0, "insights"],
     [UsersRound, t("Participantes"), p.participant_count ?? 0, "participants"],
     [Share2, t("Reportes compartidos"), p.share_count ?? 0, "report"],

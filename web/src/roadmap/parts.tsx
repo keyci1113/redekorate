@@ -7,7 +7,7 @@ import { locale, plural, t } from "../lib/i18n";
 import { Button, ErrorNote, cx } from "../components/ui";
 import { isoDay } from "../tickets/model";
 import { Dialog } from "../tickets/parts";
-import { barSpan, dayMark, milestoneNote, shownState, span, timeWindow, type Milestone, type MilestoneState, type ShownState, type Zoom } from "./model";
+import { barSpan, dayMark, labelPlacement, milestoneNote, shownState, span, timeWindow, type Milestone, type MilestoneState, type ShownState, type Zoom } from "./model";
 
 export const stateLabel = (s: ShownState) => ({ on_track: t("En curso"), at_risk: t("En riesgo"), planned: t("Planeado"), done: t("Hecho") })[s];
 const CHIP: Record<ShownState, string> = { on_track: "bg-tk-done text-tk-done-ink", at_risk: "bg-caution-soft text-caution-ink", planned: "bg-ink/5 text-ink-2", done: "bg-tk-progress text-tk-progress-ink" };
@@ -31,7 +31,7 @@ export function noteText(m: Milestone, today: string): string | null {
     case "starts": return t("Empieza en {a}", { a: inSpan(n.days) });
     case "overdue": return plural(n.n, { one: "{n} ticket vencido", other: "{n} tickets vencidos" });
     case "late": return t("Debió terminar hace {a}", { a: inSpan(n.days) });
-    case "unassigned": return plural(n.n, { one: "{n} ticket no tiene a nadie asignado", other: "{n} tickets no tienen a nadie asignado" });
+    case "due_open": return `${n.days === 0 ? t("Vence hoy") : t("Vence en {a}", { a: inSpan(n.days) })} · ${plural(n.open, { one: "{n} ticket abierto", other: "{n} tickets abiertos" })}`;
     case "due": return n.days === 0 ? t("Vence hoy") : t("Vence en {a}", { a: inSpan(n.days) });
   }
 }
@@ -148,6 +148,8 @@ export function Timeline({ groups, zoom, shift }: { groups: TimelineGroup[]; zoo
                 const cls = cx("focus-ring absolute top-1/2 flex h-8 -translate-y-1/2 items-center overflow-hidden border px-2 text-xs font-bold whitespace-nowrap", BAR[it.kind],
                   pos?.cutStart ? "rounded-l-none border-l-0" : "rounded-l-lg", pos?.cutEnd ? "rounded-r-none border-r-0" : "rounded-r-lg");
                 const style = pos ? { left: `${pos.left}%`, width: `${pos.width}%` } : undefined;
+                const place = pos ? labelPlacement(pos, it.text) : "inside";
+                const inner = place === "inside" ? <span aria-hidden className="truncate">{it.text}</span> : null;
                 return (
                   <div key={it.id} className={cx(grid, "min-h-[52px] border-b border-line/60")}>
                     <div className="flex min-w-0 flex-col gap-0.5 px-4 py-2"><span className="truncate text-[13px] font-semibold">{it.name}</span><span className="truncate text-xs text-ink-3 tabular-nums">{it.sub}</span></div>
@@ -155,8 +157,13 @@ export function Timeline({ groups, zoom, shift }: { groups: TimelineGroup[]; zoo
                       {lines}
                       {mark !== null && <span aria-hidden className="absolute inset-y-0 w-px bg-accent" style={{ left: `${mark}%` }} />}
                       {pos && (it.to
-                        ? <Link to={it.to} aria-label={it.label} title={it.label} className={cls} style={style}><span aria-hidden className="truncate">{it.text}</span></Link>
-                        : <span role="img" aria-label={it.label} title={it.label} className={cls} style={style}><span aria-hidden className="truncate">{it.text}</span></span>)}
+                        ? <Link to={it.to} aria-label={it.label} title={it.label} className={cls} style={style}>{inner}</Link>
+                        : <span role="img" aria-label={it.label} title={it.label} className={cls} style={style}>{inner}</span>)}
+                      {pos && place !== "inside" && (
+                        // Too short for its label: the label sits beside the bar instead of being cut off.
+                        <span aria-hidden className="pointer-events-none absolute top-1/2 -translate-y-1/2 text-xs font-bold whitespace-nowrap text-ink-2"
+                          style={place === "after" ? { left: `calc(${pos.left + pos.width}% + 6px)` } : { right: `calc(${100 - pos.left}% + 6px)` }}>{it.text}</span>
+                      )}
                       {!pos && <span className="absolute inset-y-0 left-3 flex items-center text-xs text-ink-3">{!it.begin || !it.end ? t("Sin fechas") : it.end < w.start ? t("← Antes de este periodo") : t("Después de este periodo →")}</span>}
                     </div>
                   </div>
