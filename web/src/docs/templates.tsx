@@ -248,6 +248,13 @@ const stakeholderMap: DocTemplate = {
     { id: "inform", type: "notes", color: "green", title: "Bajo poder · Alto interés — Mantener informados", prompt: "Comunícales avances; pueden influir en la opinión de otros.", span: 6 },
     { id: "monitor", type: "notes", color: "yellow", title: "Bajo poder · Bajo interés — Monitorear", prompt: "Esfuerzo mínimo de seguimiento.", span: 6 },
   ],
+  // Power upward, interest to the right, as the map is usually drawn: high power and low interest sits top-left.
+  matrix: { y: "Poder", x: "Interés", cells: [
+    { id: "satisfy", label: "Mantener satisfechos" },
+    { id: "manage", label: "Gestionar de cerca" },
+    { id: "monitor", label: "Monitorear" },
+    { id: "inform", label: "Mantener informados" },
+  ] },
   example: (lang) => ({
     context: { project: L(lang, "Rediseño del checkout", "Checkout redesign"), date: "" },
     manage: notes(L(lang, "Dirección de Producto", "Head of Product"), L(lang, "Gerencia de Operaciones", "Operations management")),

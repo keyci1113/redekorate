@@ -1,6 +1,11 @@
 import type { ReactNode } from "react";
 import type { Lang } from "../lib/i18n";
 
+/** A cell of a template's 2×2 grid: the section drawn there and the short name shown on it (the axes say the rest). */
+export interface MatrixCell { id: string; label: string }
+/** y runs low → high upward and x low → high rightward; cells are top-left, top-right, bottom-left, bottom-right. */
+export interface Matrix { y: string; x: string; cells: [MatrixCell, MatrixCell, MatrixCell, MatrixCell] }
+
 export type NoteColor = "yellow" | "orange" | "blue" | "pink" | "green" | "purple";
 
 interface S { id: string; title?: string; prompt?: string; span?: 3 | 4 | 5 | 6 | 7 | 8 | 12 }
@@ -37,7 +42,9 @@ export interface DocTemplate {
   instructions: string[];
   credit?: string;
   sections: Section[];
-  init?: (lang: Lang) => DocData;      // estructura inicial vacía (filas, etapas, tareas…): nunca trae texto llenado
+  /** Draw four of the sections as a 2×2 grid with labelled axes (the stakeholder map's power / interest) instead of in the normal grid. */
+  matrix?: Matrix;
+  init?:(lang: Lang) => DocData;      // estructura inicial vacía (filas, etapas, tareas…): nunca trae texto llenado
   example?: (lang: Lang) => DocData;   // valores de ejemplo: solo se muestran como texto guía (placeholder), no se guardan
 }
 

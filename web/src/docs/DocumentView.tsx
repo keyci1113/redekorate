@@ -7,6 +7,7 @@ import { UsabilityMatrix, type UsabilityData } from "./UsabilityMatrix";
 import { Heuristic, type HeuristicData } from "./Heuristic";
 import { Blueprint, type BlueprintData } from "./Blueprint";
 import { TimeStudy, type TimeStudyData } from "./TimeStudy";
+import { MatrixView } from "./Matrix";
 import { normalize } from "./timeStudyModel";
 import type { Lang } from "../lib/i18n";
 import { cx } from "../components/ui";
@@ -23,6 +24,8 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
   const ctx = makeCtx(lang, readOnly || !onChange, ex);
   const T = ctx.T;
   const set = (id: string) => (v: unknown) => onChange?.({ ...data, [id]: v });
+  const inMatrix = new Set(tpl.matrix?.cells.map((c) => c.id) ?? []);
+  const firstCell = tpl.sections.find((s) => inMatrix.has(s.id))?.id;
 
   const body = (s: Section) => {
     if (s.type !== "custom") return <SectionCard key={s.id} section={s}><SectionBody section={s} value={data[s.id]} set={set(s.id)} /></SectionCard>;
@@ -69,7 +72,12 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-12">
-          {tpl.sections.map((s) => <div key={s.id} className={cx("min-w-0", SPAN[s.span ?? 12])}>{body(s)}</div>)}
+          {tpl.sections.map((s) => {
+            // The sections of a 2×2 grid are drawn together, where the first of them would have been.
+            if (!inMatrix.has(s.id)) return <div key={s.id} className={cx("min-w-0", SPAN[s.span ?? 12])}>{body(s)}</div>;
+            if (s.id !== firstCell || !tpl.matrix) return null;
+            return <div key="matrix" className="min-w-0 lg:col-span-12"><MatrixView matrix={tpl.matrix} sections={tpl.sections} value={(id) => data[id]} set={set} /></div>;
+          })}
         </div>
         {tpl.credit && <p className="text-center text-[11px] text-ink-3">{T("Crédito")}: {T(tpl.credit)}</p>}
       </article>

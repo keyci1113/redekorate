@@ -4,6 +4,7 @@ All notable changes to redekorate are documented here. The project does not publ
 
 ## Unreleased
 
+- **Stakeholder map drawn as a power / interest grid.** The four quadrants of the *Stakeholder Map* document now sit on one 2×2 with labelled axes (Power up, Interest across, Low / High on each), as the map is usually drawn: *Keep satisfied* top-left, *Manage closely* top-right, *Monitor* bottom-left, *Keep informed* bottom-right. Each quadrant is still its own sticky-note section, so existing maps, exports and the API (`stakeholder_map` with `manage`, `satisfy`, `inform`, `monitor`) are unchanged. On phones the axes hide and the quadrants stack, each with its full name. Any template can declare such a grid (`matrix` on the template; `docs/matrix.test.ts` checks its cells and translations).
 - **UI review round 2: tickets, insights and comments.**
   - **No more duplicate insights from one ticket.** Two *Convert to insight* requests at once (a double click, a retry) used to both create an insight: each read "not converted yet" before taking the ticket's lock. The ticket is now locked before it is read, a repeated request answers with the insight already made instead of an error, and the dialog ignores a second click while it saves. Existing duplicates are left for the owner to delete.
   - **Research requests stay requests.** A *Research request* ticket has no *Convert to insight* button, and the server refuses to convert one.
