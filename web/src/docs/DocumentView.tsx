@@ -8,6 +8,7 @@ import { Heuristic, type HeuristicData } from "./Heuristic";
 import { Blueprint, type BlueprintData } from "./Blueprint";
 import { TimeStudy, type TimeStudyData } from "./TimeStudy";
 import { MatrixView } from "./Matrix";
+import { LetterRow } from "./LetterRow";
 import { normalize } from "./timeStudyModel";
 import type { Lang } from "../lib/i18n";
 import { cx } from "../components/ui";
@@ -28,6 +29,7 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
   const firstCell = tpl.sections.find((s) => inMatrix.has(s.id))?.id;
 
   const body = (s: Section) => {
+    if (s.letter && s.type !== "custom") return <LetterRow key={s.id} section={s} value={data[s.id]} set={set(s.id)} />;
     if (s.type !== "custom") return <SectionCard key={s.id} section={s}><SectionBody section={s} value={data[s.id]} set={set(s.id)} /></SectionCard>;
     const e = exAt(ex, s.id);
     const inner = s.component === "journey" ? <Journey data={(data[s.id] as JourneyData) ?? { stages: [] }} set={set(s.id)} ex={e as JourneyData | undefined} />
