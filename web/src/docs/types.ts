@@ -8,7 +8,8 @@ export interface Matrix { y: string; x: string; cells: [MatrixCell, MatrixCell, 
 
 export type NoteColor = "yellow" | "orange" | "blue" | "pink" | "green" | "purple";
 
-interface S { id: string; title?: string; prompt?: string; span?: 3 | 4 | 5 | 6 | 7 | 8 | 12 }
+/** letter: draw the section as a row with this letter on a tile, its title under it and its prompt as the question (SCAMPER). */
+interface S { id: string; title?: string; prompt?: string; span?: 3 | 4 | 5 | 6 | 7 | 8 | 12; letter?: string }
 export type Section =
   | (S & { type: "text"; placeholder?: string; rows?: number })
   | (S & { type: "list"; placeholder?: string; numbered?: boolean })

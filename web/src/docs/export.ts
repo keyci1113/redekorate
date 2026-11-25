@@ -31,7 +31,7 @@ export function docBlocks(tpl: DocTemplate, title: string, data: DocData, lang: 
   for (const s of tpl.sections) {
     const v = data[s.id];
     // Los campos sin título (moderador, producto, fecha…) van bajo "Datos generales"
-    const heading = s.title ? T(s.title) : s.type === "fields" ? T("Datos generales") : "";
+    const heading = s.title ? [s.letter, T(s.title)].filter(Boolean).join(" · ") : s.type === "fields" ? T("Datos generales") : "";
     const blocks: Block[] = [];
 
     switch (s.type) {

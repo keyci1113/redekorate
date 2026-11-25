@@ -25,7 +25,7 @@ export const DOC_TEMPLATES = {
   usability_moderated: "usability_script", time_study: "time_study", heuristic_eval: "heuristic_eval", interview: "interview_guide",
   aeiou: "aeiou", diary_study: "diary_study", contextual_inquiry: "observation", jtbd: "jtbd", affinity_map: "affinity",
   empathy_map: "empathy_map", persona: "persona_profile", journey_map: "journey_map", service_blueprint: "service_blueprint",
-  cognitive_map: "cognitive_map", user_flow: "user_flow", stakeholder_map: "stakeholder_map", research_plan: "ux_blueprint",
+  cognitive_map: "cognitive_map", user_flow: "user_flow", stakeholder_map: "stakeholder_map", scamper: "scamper", research_plan: "ux_blueprint",
 } as const;
 
 export const BLOCK_REFERENCE = `A study is an ordered array of blocks. Every block has:

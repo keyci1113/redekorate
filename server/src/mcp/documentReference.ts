@@ -110,6 +110,21 @@ export const DOC_KINDS: Record<string, DocKind> = {
       { id: "monitor", type: "notes", title: "Low power · Low interest — Monitor", prompt: "Minimal follow-up effort." },
     ],
   },
+  scamper: {
+    name: "SCAMPER",
+    description: "Seven questions (Substitute, Combine, Adapt, Modify, Put to another use, Eliminate, Rearrange) to generate ideas about a product, service or problem. Each letter is a list; aim for three proposals each.",
+    sections: [
+      { id: "context", type: "fields", fields: [{ id: "subject", label: "Product, service or problem" }, { id: "date", label: "Date", date: "one" }] },
+      { id: "substitute", type: "list", title: "S · Substitute", prompt: "What could you substitute to improve it?" },
+      { id: "combine", type: "list", title: "C · Combine", prompt: "What could you combine to create something better?" },
+      { id: "adapt", type: "list", title: "A · Adapt", prompt: "What could you adapt and use in a different way?" },
+      { id: "modify", type: "list", title: "M · Modify", prompt: "What would happen if you changed it drastically?" },
+      { id: "put_to_use", type: "list", title: "P · Put to another use", prompt: "What else could it be used for?" },
+      { id: "eliminate", type: "list", title: "E · Eliminate or reduce", prompt: "What could you remove that would really make things better?" },
+      { id: "rearrange", type: "list", title: "R · Rearrange", prompt: "How could you change the order or layout of the parts to add value?" },
+      { id: "chosen", type: "list", title: "Chosen ideas", prompt: "The proposals you'll take forward, and why." },
+    ],
+  },
   cognitive_map: {
     name: "Cognitive Mapping",
     description: "Mapa de conceptos y relaciones que muestra cómo el usuario entiende un sistema.",

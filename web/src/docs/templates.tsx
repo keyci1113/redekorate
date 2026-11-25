@@ -1,4 +1,4 @@
-import { BookOpenCheck, Timer, Brain, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
+import { BookOpenCheck, Timer, Brain, Lightbulb, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
 import type { DocCategory, DocData, DocTemplate, Entry, Note, RowGroup } from "./types";
 import type { Lang } from "../lib/i18n";
 import { uid } from "../lib/hooks";
@@ -261,6 +261,37 @@ const stakeholderMap: DocTemplate = {
     satisfy: notes(L(lang, "Legal y cumplimiento", "Legal and compliance")),
     inform: notes(L(lang, "Equipo de soporte al cliente", "Customer support team"), L(lang, "Vendedores en tienda", "In-store sales staff")),
     monitor: notes(L(lang, "Proveedores externos de pago", "External payment providers")),
+  }),
+};
+
+const scamper: DocTemplate = {
+  kind: "scamper", name: "SCAMPER", category: "Mapas y síntesis", icon: <Lightbulb size={18} />,
+  description: "Siete preguntas (Sustituir, Combinar, Adaptar, Modificar, Propósito, Eliminar, Reorganizar) para generar ideas sobre un producto, servicio o problema.",
+  purpose: "Para generar ideas de mejora a partir de algo que ya existe, mirándolo desde siete ángulos",
+  question: "¿Cómo podríamos mejorar lo que ya tenemos si lo cambiamos de siete maneras distintas?",
+  instructions: ["Escribe el producto, servicio o problema que quieres mejorar", "Responde cada letra con al menos tres propuestas; no las juzgues todavía", "Al final, elige las ideas que vale la pena llevar adelante"],
+  credit: "Basado en SCAMPER de Bob Eberle, a partir de las preguntas de Alex Osborn",
+  sections: [
+    { id: "context", type: "fields", span: 12, cols: 2, fields: [{ id: "subject", label: "Producto, servicio o problema" }, { id: "date", label: "Fecha", date: "one" }] },
+    { id: "substitute", type: "list", letter: "S", title: "Sustituir", prompt: "¿Qué podrías sustituir para mejorarlo?", placeholder: "Escribe tres propuestas:" },
+    { id: "combine", type: "list", letter: "C", title: "Combinar", prompt: "¿Qué podrías combinar para crear algo mejor?", placeholder: "Escribe tres propuestas:" },
+    { id: "adapt", type: "list", letter: "A", title: "Adaptar", prompt: "¿Qué podrías adaptar y usar de manera diferente?", placeholder: "Escribe tres propuestas:" },
+    { id: "modify", type: "list", letter: "M", title: "Modificar", prompt: "¿Qué ocurriría si lo cambias drásticamente?", placeholder: "Escribe tres propuestas:" },
+    { id: "put_to_use", type: "list", letter: "P", title: "Propósito", prompt: "¿Para qué otra cosa podría servir?", placeholder: "Escribe tres propuestas:" },
+    { id: "eliminate", type: "list", letter: "E", title: "Eliminar o reducir", prompt: "¿Qué se puede quitar que realmente mejore las cosas?", placeholder: "Escribe tres propuestas:" },
+    { id: "rearrange", type: "list", letter: "R", title: "Reorganizar", prompt: "¿Cómo puedes cambiar el orden o la disposición de las partes para añadir valor?", placeholder: "Escribe tres propuestas:" },
+    { id: "chosen", type: "list", title: "Ideas elegidas", prompt: "Las propuestas que vas a llevar adelante y por qué.", span: 12 },
+  ],
+  example: (lang) => ({
+    context: { subject: L(lang, "App de pedidos para restaurantes", "Restaurant ordering app"), date: "" },
+    substitute: [L(lang, "Escribir la dirección → detectar la ubicación", "Typing the address → detecting the location"), L(lang, "Registro con correo → entrar como invitado", "Email sign-up → guest checkout"), L(lang, "Fotos genéricas → fotos reales del platillo", "Stock photos → real photos of the dish")],
+    combine: [L(lang, "Pedido y reservación en un solo flujo", "Order and booking in one flow"), L(lang, "Propina y calificación en la misma pantalla", "Tip and rating on the same screen"), L(lang, "Carrito compartido con amigos", "A cart shared with friends")],
+    adapt: [L(lang, "El seguimiento en vivo de las apps de transporte", "Live tracking from ride-hailing apps"), L(lang, "Listas de \"lo de siempre\" como en el súper", "\"The usual\" lists, as at the supermarket"), L(lang, "Recomendaciones como en las apps de música", "Recommendations as in music apps")],
+    modify: [L(lang, "Un menú de una sola pantalla", "A one-screen menu"), L(lang, "Pedir solo por voz", "Ordering by voice only"), L(lang, "Entregas cada 15 minutos a una hora fija", "Deliveries at fixed 15-minute slots")],
+    put_to_use: [L(lang, "Encargar comida para eventos de la oficina", "Catering for office events"), L(lang, "Vender los ingredientes del platillo", "Selling the dish's ingredients"), L(lang, "Avisar al restaurante de alergias antes de llegar", "Telling the restaurant about allergies before arriving")],
+    eliminate: [L(lang, "El paso de confirmar el pedido dos veces", "Confirming the order twice"), L(lang, "Los campos opcionales del registro", "The optional sign-up fields"), L(lang, "Las notificaciones de promociones", "Promotional notifications")],
+    rearrange: [L(lang, "Pagar al final, cuando llega la comida", "Paying at the end, when the food arrives"), L(lang, "Mostrar primero los platillos que ya pidió", "Showing past orders first"), L(lang, "Elegir la hora antes que el restaurante", "Picking the time before the restaurant")],
+    chosen: [L(lang, "Entrar como invitado: quita la mayor barrera del primer pedido.", "Guest checkout: removes the biggest barrier to a first order.")],
   }),
 };
 
@@ -667,7 +698,7 @@ const heuristic: DocTemplate = {
   },
 };
 
-export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, timeStudy, diaryStudy, script, results, heuristic];
+export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, scamper, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, timeStudy, diaryStudy, script, results, heuristic];
 export const docTemplate = (kind: string) => DOC_TEMPLATES.find((d) => d.kind === kind);
 export const DOC_ICON = Compass;
 export type { DocData };
