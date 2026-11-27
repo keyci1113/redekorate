@@ -16,7 +16,7 @@ import { isDirect, screenName, type PrototypeTaskValue } from "../blocks/prototy
 import { blockDef } from "../blocks/registry";
 import { susScore, answeredBlocks } from "../lib/analytics";
 import { BackLink, Button, Card, Empty, ErrorNote, Modal, PageSkeleton, Spinner, StatusBadge, Tabs, cx } from "../components/ui";
-import { BlockResults, Overview } from "../components/ReportBody";
+import { BlockResults, Overview, ResultsLayoutToggle, useResultsLayout } from "../components/ReportBody";
 import { InsightsPanel } from "../components/InsightsPanel";
 import { ReportPdfButton, StudyReportPdf } from "../components/ReportPdf";
 import type { Project, ProjectRole } from "../lib/types";
@@ -37,6 +37,7 @@ export function ResultsPage() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const [tab, setTab] = useState<TabId>(params.get("tab") === "insights" ? "insights" : "summary");
+  const [layout, setLayout] = useResultsLayout();
   const { data, error, loading, reload } = useLoad(() => api.get<Results>(`/studies/${id}/results`), [id]);
   const st = data?.study;
   useEffect(() => { if (st) rememberStudy({ id: st.id, title: st.title, method: st.method, project_id: st.project_id, where: "results" }); }, [st]);
@@ -97,7 +98,8 @@ export function ResultsPage() {
         ]} />
       </div>
       <div className="mt-6">
-        {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings} />}
+        {tab === "summary" && <BlockResults blocks={study.blocks} sessions={sessions} answers={answers} settings={study.settings as StudySettings}
+          layout={layout} toolbar={<ResultsLayoutToggle layout={layout} onChange={setLayout} />} />}
         {tab === "responses" && <Responses study={study} sessions={sessions} answers={answers} recordings={data.recordings ?? []} onChange={reload} canEdit={canEdit} />}
         {tab === "insights" && <InsightsPanel projectId={study.project_id} studyId={study.id} insights={insights} onChange={reload} canEdit={canEdit} />}
         {tab === "comments" && <CommentsPanel projectId={study.project_id} studyId={study.id} role={data.role} />}
