@@ -92,12 +92,13 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
   }
   const cur = proto.screens.find((s) => s.id === hist[hist.length - 1]);
   const mobile = proto.device === "mobile";
-  // El marco se ajusta al espacio disponible: el teléfono (390×844) o la pantalla de escritorio (16:10)
-  // siempre caben completos; las pantallas más largas se desplazan dentro del marco.
-  const bare = mobile && avail.w < 440;   // en un teléfono real: pantalla completa, sin marco
+  // The frame fits the space available: the phone (390×844) always fits whole, and a desktop
+  // prototype fills the whole area (no fixed aspect ratio), so it is as wide as the window allows;
+  // taller screens scroll inside the frame.
+  const bare = mobile && avail.w < 440;   // on a real phone: full screen, no frame
   const frame = bare ? { width: avail.w, height: avail.h } : mobile
     ? (() => { const w = Math.min(390, avail.w, (avail.h - 16) * 390 / 844); return { width: w, height: w * 844 / 390 }; })()
-    : (() => { const w = Math.min(1280, avail.w, avail.h * 1.6); return { width: w, height: Math.min(avail.h, w / 1.6) }; })();
+    : { width: avail.w, height: avail.h };
 
   const begin = () => {
     start.current = performance.now(); clicks.current = []; stepsDone.current = []; startTries.current = 0;
@@ -193,8 +194,8 @@ export function PrototypeTaskView({ block, proto, value, onChange, onAdvance, pr
         </div>
       )}
 
-      {/* Prototipo */}
-      <div ref={area} className={cx("flex min-h-0 flex-1 items-center justify-center", bare ? "p-0" : "p-3 sm:p-6")}>
+      {/* Prototype */}
+      <div ref={area} className={cx("flex min-h-0 flex-1 items-center justify-center", bare ? "p-0" : mobile ? "p-3 sm:p-6" : "p-2 sm:p-3")}>
         <div ref={scroller}
           className={cx("relative overscroll-contain bg-white shadow-2xl", embedded ? "overflow-hidden" : "overflow-y-auto", bare ? "" : mobile ? "rounded-[2rem] ring-8 ring-black" : "rounded-lg")}
           style={frame}>
