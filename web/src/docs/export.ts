@@ -6,7 +6,7 @@ import type { JourneyData } from "./Journey";
 import type { AffinityData } from "./Affinity";
 import { taskRate, type UsabilityData } from "./UsabilityMatrix";
 import type { HeuristicData } from "./Heuristic";
-import type { BlueprintData } from "./Blueprint";
+import { LANES, LANE_LABEL, linkLabel, liveLinks, type BlueprintData } from "./blueprintModel";
 import { heuristicCategories } from "./heuristics";
 import { compare, logTable, normalize, summarize, type TimeStudyData } from "./timeStudyModel";
 
@@ -153,16 +153,16 @@ function timeStudyBlocks(raw: TimeStudyData | undefined, T: TF): Block[] {
   return out;
 }
 
-const BP_LANES = [["evidence", "Evidencia física"], ["customer", "Acciones del cliente"], ["frontstage", "Frontstage (visible)"], ["backstage", "Backstage (no visible)"], ["support", "Procesos de soporte"]] as const;
-
 function blueprintBlocks(d: BlueprintData, T: TF): Block[] {
   const out: Block[] = [];
   d.stages.forEach((s, i) => {
-    const pairs = BP_LANES.filter(([k]) => s[k]?.trim()).map(([k, label]) => [T(label), s[k].trim()] as [string, string]);
+    const pairs = LANES.filter((k) => s[k]?.trim()).map((k) => [T(LANE_LABEL[k]), s[k].trim()] as [string, string]);
     if (!s.name.trim() && !pairs.length) return;
     out.push({ t: "h", level: 2, text: `${i + 1}. ${s.name.trim() || T("Etapa")}` });
     if (pairs.length) out.push({ t: "kv", pairs });
   });
+  const links = liveLinks(d);
+  if (links.length) out.push({ t: "h", level: 2, text: T("Conexiones entre pasos") }, { t: "list", items: links.map((l) => linkLabel(d, l, T)) });
   return out;
 }
 

@@ -374,14 +374,19 @@ const serviceBlueprint: DocTemplate = {
   description: "Frontstage, backstage, procesos de soporte y evidencia física del servicio, etapa por etapa.",
   purpose: "Para entender y rediseñar servicios con muchas partes, visibles e invisibles para el usuario",
   question: "¿Qué hace el cliente, qué ve, y qué pasa detrás de cámaras en cada etapa del servicio?",
-  instructions: ["Nombra cada etapa del servicio en orden", "Llena la evidencia física y las acciones del cliente", "Documenta lo que hace el personal o sistema visible (frontstage) y el invisible (backstage)", "Anota los procesos de soporte que hacen posible cada etapa"],
+  instructions: ["Describe al cliente y el escenario que vas a mapear", "Nombra cada etapa del servicio en orden", "Llena la evidencia física y las acciones del cliente", "Documenta lo que hace el personal o sistema visible (frontstage) y el invisible (backstage)", "Anota los procesos de soporte que hacen posible cada etapa", "Conecta los pasos que dependen uno de otro y deja vacíos los que no aplican", "Anota las áreas de oportunidad que encuentres"],
   sections: [
     { id: "who", type: "fields", span: 12, cols: 3, fields: [{ id: "service", label: "Servicio" }, { id: "scenario", label: "Escenario" }, { id: "goal", label: "Objetivo del cliente" }] },
+    { id: "photo", type: "image", title: "Cliente", span: 4, round: true },
+    { id: "persona", type: "text", title: "Customer persona", prompt: "¿Quién es el cliente? Su contexto, lo que espera del servicio y lo que le preocupa.", span: 8, rows: 5 },
     { id: "blueprint", type: "custom", component: "blueprint", span: 12 },
+    { id: "opportunities", type: "notes", color: "blue", title: "Áreas de oportunidad", prompt: "Puntos de dolor, esperas, pasos duplicados o fallas entre carriles que vale la pena mejorar.", span: 12 },
   ],
   init: () => ({ blueprint: { stages: [0, 1, 2].map(() => bstage("")) } }),
   example: (lang) => ({
     who: { service: L(lang, "Devolución en tienda", "In-store return"), scenario: L(lang, "Cliente quiere devolver un producto defectuoso", "Customer wants to return a defective product"), goal: L(lang, "Recuperar su dinero sin fricción", "Get their money back with no friction") },
+    persona: L(lang, "Ana, 34 años. Compró una licuadora en línea que llegó defectuosa. Trabaja de 9 a 6, prefiere resolverlo en una sola visita y le preocupa no tener el recibo impreso.", "Ana, 34. Bought a blender online that arrived defective. Works 9 to 6, wants to sort it out in a single visit and worries she has no printed receipt."),
+    opportunities: notes(L(lang, "Aceptar el recibo digital en el mostrador", "Accept the digital receipt at the counter"), L(lang, "Evitar la espera del supervisor en montos bajos", "Skip the supervisor wait on small amounts"), L(lang, "Avisar al cliente cuando el reembolso se acredite", "Tell the customer when the refund lands")),
     blueprint: { stages: [
       bstage(L(lang, "Llegada a tienda", "Arrival at the store"),
         L(lang, "Letrero de \"Devoluciones\" en la entrada", "\"Returns\" sign at the entrance"),
