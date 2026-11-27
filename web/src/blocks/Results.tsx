@@ -51,16 +51,17 @@ function Columns({ rows, total }: { rows: { value: number; count: number }[]; to
   );
 }
 
-export function BlockResult({ block, answers, index, settings }: { block: Block; answers: Answer[]; index: number; settings?: StudySettings }) {
+/** compact: a narrower card (a row or grid of results), with a smaller title that fills the card's height. */
+export function BlockResult({ block, answers, index, settings, compact }: { block: Block; answers: Answer[]; index: number; settings?: StudySettings; compact?: boolean }) {
   const def = blockDef(block.type);
   const n = answers.length;
   const med = median(answers.map((a) => a.duration_ms ?? 0).filter(Boolean));
   return (
-    <Card className="p-5">
+    <Card className={cx("p-5", compact && "h-full")}>
       <div className="mb-5 flex items-start justify-between gap-4 break-after-avoid">
-        <div>
+        <div className="min-w-0">
           <p className="label flex items-center gap-1.5 !text-[12px]">{def?.icon}<span>{index}. {def?.label}</span></p>
-          <h3 className="display mt-2 text-[22px] leading-snug text-balance [overflow-wrap:anywhere] sm:text-[26px]">{block.title}</h3>
+          <h3 className={cx("display mt-2 leading-snug text-balance [overflow-wrap:anywhere]", compact ? "text-[19px]" : "text-[22px] sm:text-[26px]")}>{block.title}</h3>
         </div>
         <div className="shrink-0 text-right text-[13px] text-ink-3">
           <p className="tabular-nums"><span className="font-semibold text-ink">{n}</span> {t("respuestas")}</p>
