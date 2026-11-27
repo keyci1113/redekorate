@@ -43,6 +43,7 @@ export function docBlocks(tpl: DocTemplate, title: string, data: DocData, lang: 
       case "bars": { const b = ((v as Bar[]) ?? []).filter((x) => x.label.trim()); if (b.length) blocks.push({ t: "kv", pairs: b.map((x) => [x.label, `${x.value}%`]) }); break; }
       case "gallery": { const g = ((v as { caption: string }[]) ?? []).map((x) => x.caption).filter(Boolean); if (g.length) blocks.push({ t: "list", items: g }); break; }
       case "image": break;
+      case "sketch": { const idea = (v as { idea?: string } | undefined)?.idea?.trim(); if (idea) blocks.push({ t: "p", text: idea }); break; }
       case "rowgroups":
         for (const g of (v as RowGroup[]) ?? []) {
           const rows = g.rows.filter((r) => r.label.trim() || r.answer?.trim() || r.yes != null).map((r) => [

@@ -1,4 +1,4 @@
-import { BookOpenCheck, Timer, Brain, Lightbulb, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
+import { BookOpenCheck, Timer, Brain, Lightbulb, PenTool, Briefcase, ClipboardList, Compass, Eye, FileText, Gauge, Heart, LayoutGrid, Map, MessagesSquare, Network, NotebookPen, Route, ScanSearch, UserRound, UsersRound, Workflow } from "lucide-react";
 import type { DocCategory, DocData, DocTemplate, Entry, Note, RowGroup } from "./types";
 import type { Lang } from "../lib/i18n";
 import { uid } from "../lib/hooks";
@@ -292,6 +292,31 @@ const scamper: DocTemplate = {
     eliminate: [L(lang, "El paso de confirmar el pedido dos veces", "Confirming the order twice"), L(lang, "Los campos opcionales del registro", "The optional sign-up fields"), L(lang, "Las notificaciones de promociones", "Promotional notifications")],
     rearrange: [L(lang, "Pagar al final, cuando llega la comida", "Paying at the end, when the food arrives"), L(lang, "Mostrar primero los platillos que ya pidió", "Showing past orders first"), L(lang, "Elegir la hora antes que el restaurante", "Picking the time before the restaurant")],
     chosen: [L(lang, "Entrar como invitado: quita la mayor barrera del primer pedido.", "Guest checkout: removes the biggest barrier to a first order.")],
+  }),
+};
+
+const crazyEights: DocTemplate = {
+  kind: "crazy_eights", name: "Crazy 8s", category: "Mapas y síntesis", icon: <PenTool size={18} />,
+  description: "Ocho bocetos en ocho minutos, uno por minuto, en una hoja doblada en ocho partes.",
+  purpose: "Para sacar muchas ideas distintas en poco tiempo y dejar atrás la primera que se te ocurre",
+  question: "¿De cuántas maneras distintas podríamos resolver este reto?",
+  instructions: ["Escribe el reto como una pregunta: ¿Cómo podríamos…?", "Inicia el temporizador: tienes un minuto por boceto; dibuja aquí o en papel y sube la foto", "Bocetos rápidos y feos están bien: lo que importa es la cantidad, no la calidad", "Ponle a cada boceto la idea en pocas palabras y, al final, elige las que vale la pena llevar adelante"],
+  credit: "Método Crazy 8's del Design Sprint de Google Ventures",
+  sections: [
+    { id: "context", type: "fields", span: 12, cols: 3, fields: [{ id: "challenge", label: "Reto" }, { id: "author", label: "Quién dibuja" }, { id: "date", label: "Fecha", date: "one" }] },
+    { id: "sketch_1", type: "sketch", title: "Boceto 1" },
+    { id: "sketch_2", type: "sketch", title: "Boceto 2" },
+    { id: "sketch_3", type: "sketch", title: "Boceto 3" },
+    { id: "sketch_4", type: "sketch", title: "Boceto 4" },
+    { id: "sketch_5", type: "sketch", title: "Boceto 5" },
+    { id: "sketch_6", type: "sketch", title: "Boceto 6" },
+    { id: "sketch_7", type: "sketch", title: "Boceto 7" },
+    { id: "sketch_8", type: "sketch", title: "Boceto 8" },
+    { id: "chosen", type: "list", title: "Ideas elegidas", prompt: "Las propuestas que vas a llevar adelante y por qué.", span: 12 },
+  ],
+  example: (lang) => ({
+    context: { challenge: L(lang, "¿Cómo podríamos hacer que el primer pedido tome menos de un minuto?", "How might we make the first order take less than a minute?"), author: L(lang, "Ana", "Ana"), date: "" },
+    chosen: [L(lang, "Boceto 3, pedir de nuevo con un toque: el que más votos tuvo.", "Sketch 3, reorder in one tap: the one with the most votes.")],
   }),
 };
 
@@ -698,7 +723,7 @@ const heuristic: DocTemplate = {
   },
 };
 
-export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, scamper, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, timeStudy, diaryStudy, script, results, heuristic];
+export const DOC_TEMPLATES: DocTemplate[] = [blueprint, protoPersona, personaCanvas, personaProfile, journey, affinity, empathyMap, stakeholderMap, scamper, crazyEights, cognitiveMap, userFlow, serviceBlueprint, jtbd, interviews, aeiou, observation, timeStudy, diaryStudy, script, results, heuristic];
 export const docTemplate = (kind: string) => DOC_TEMPLATES.find((d) => d.kind === kind);
 export const DOC_ICON = Compass;
 export type { DocData };

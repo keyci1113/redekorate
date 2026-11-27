@@ -239,6 +239,8 @@ export const TEMPLATES: Template[] = [
     get description() { return t("Actores, influencia e interés alrededor del producto."); }, get when() { return t("Al iniciar un proyecto."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
   { key: "scamper", doc: "scamper", get name() { return t("SCAMPER"); }, category: "Síntesis y mapeo", phase: 5,
     get description() { return t("Siete preguntas para generar ideas: Sustituir, Combinar, Adaptar, Modificar, Propósito, Eliminar, Reorganizar."); }, get when() { return t("Idear mejoras a algo que ya existe."); }, get duration() { return t("Taller"); }, get participants() { return t("Equipo"); } },
+  { key: "crazy_eights", doc: "crazy_eights", get name() { return t("Crazy 8s"); }, category: "Síntesis y mapeo", phase: 5,
+    get description() { return t("Ocho bocetos en ocho minutos para explorar muchas soluciones a un mismo reto."); }, get when() { return t("Idear soluciones antes de elegir una para prototipar."); }, get duration() { return t("8 minutos por ronda"); }, get participants() { return t("Equipo"); } },
 
   // ── Métricas ─────────────────────────────────────────────────
   { key: "sus", get name() { return t("SUS · System Usability Scale"); }, category: "Métricas", phase: 1,
