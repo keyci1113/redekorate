@@ -166,7 +166,10 @@ export const DOC_KINDS: Record<string, DocKind> = {
     description: "Frontstage, backstage, support processes and physical evidence of the service, stage by stage.",
     sections: [
       { id: "who", type: "fields", fields: [{ id: "service", label: "Service" }, { id: "scenario", label: "Scenario" }, { id: "goal", label: "Customer's goal" }] },
+      { id: "photo", type: "image", title: "Customer" },
+      { id: "persona", type: "text", title: "Customer persona", prompt: "Who is the customer? Their context, what they expect from the service and what worries them." },
       { id: "blueprint", type: "custom", component: "blueprint" },
+      { id: "opportunities", type: "notes", title: "Areas of opportunity", prompt: "Pain points, waits, duplicated steps or hand-off failures between lanes worth improving." },
     ],
   },
   jtbd: {
@@ -284,7 +287,7 @@ export const SECTION_SHAPES: Record<string, string> = {
   sketch: "{ idea: string, image?: string, strokes?: string[] } — idea is the sketch in a few words; strokes (SVG path data on a 300×200 panel) and image (an uploaded photo) are drawn in the app, so send only idea",
   gallery: "an array of photos: [{ id, url, caption }] (leave it out; people add photos in the app)",
   "custom:journey": "{ stages: [{ id, name, actions: [{ id, text, emotion }], value, barriers, opportunities }] } — emotion is an integer from -2 (very negative) to 2 (very positive); value, barriers and opportunities are strings",
-  "custom:blueprint": "{ stages: [{ id, name, evidence, customer, frontstage, backstage, support }] } — all strings",
+  "custom:blueprint": "{ stages: [{ id, name, evidence, customer, frontstage, backstage, support }], links?: [{ id, from: { stage, lane }, to: { stage, lane } }] } — stage fields are strings, empty when a lane has no step at that stage; a link draws a line from one step to another (stage is a stage id, lane is evidence | customer | frontstage | backstage | support)",
   "custom:affinity": "{ participants: [{ id, name, color }], notes: [{ id, text, type: \"obs\" | \"judgment\" | \"value\", participantId, groupId: string | null }], groups: [{ id, name, conclusion? }], conclusion? } — color is a hex like #fde68a",
   "custom:usability": "{ tasks: [{ id, name, success }], users: [{ id, name, profile }], results: { \"<task id>:<user id>\": { status: \"pass\" | \"partial\" | \"fail\" | \"na\" | null, note } } }",
   "custom:heuristic": "{ framework: \"weinschenk\" | \"nielsen\", product, evaluators: [{ id, name }], answers: {} } — answers are filled in the app; send them empty",

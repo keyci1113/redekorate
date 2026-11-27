@@ -1522,6 +1522,17 @@ export const EN: Record<string, string> = {
 "Línea de interacción": "Line of interaction",
 "Línea de visibilidad": "Line of visibility",
 "Línea de interacción interna": "Line of internal interaction",
+"Describe al cliente y el escenario que vas a mapear": "Describe the customer and the scenario you're mapping",
+"Conecta los pasos que dependen uno de otro y deja vacíos los que no aplican": "Connect the steps that depend on each other, and leave empty the ones that don't apply",
+"Anota las áreas de oportunidad que encuentres": "Note the areas of opportunity you find",
+"Customer persona": "Customer persona",
+"¿Quién es el cliente? Su contexto, lo que espera del servicio y lo que le preocupa.": "Who is the customer? Their context, what they expect from the service and what worries them.",
+"Áreas de oportunidad": "Areas of opportunity",
+"Puntos de dolor, esperas, pasos duplicados o fallas entre carriles que vale la pena mejorar.": "Pain points, waits, duplicated steps or hand-off failures between lanes worth improving.",
+"Elige otro paso para conectarlo, o uno ya conectado para quitar la línea. Esc cancela.": "Pick another step to connect it, or one already connected to remove the line. Esc cancels.",
+"Conectar con otro paso": "Connect to another step",
+"Conectar aquí": "Connect here",
+"Conexiones entre pasos": "Connections between steps",
 
 // Jobs To Be Done
 "Job statements, contexto de la \"contratación\" y las cuatro fuerzas del progreso.": "Job statements, hiring context and forces of progress.",
