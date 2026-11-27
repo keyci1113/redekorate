@@ -19,6 +19,7 @@ export type Section =
   | (S & { type: "bars"; placeholder?: string })
   | (S & { type: "image"; round?: boolean })
   | (S & { type: "gallery" })
+  | (S & { type: "sketch" })                               // one Crazy 8s panel; a template's sketch sections are drawn together as one folded sheet
   | (S & { type: "rowgroups"; addGroups?: boolean })        // grupos de filas: AEIOU, fases de observación
   | (S & { type: "entries"; nameLabel: string; bodyLabel: string; addLabel: string })
   | (S & { type: "custom"; component: "journey" | "affinity" | "usability" | "heuristic" | "blueprint" | "timestudy" });
@@ -28,6 +29,8 @@ export interface Bar { id: string; label: string; value: number }
 export interface Row { id: string; label: string; kind: "text" | "yesno"; answer?: string; yes?: boolean | null }
 export interface RowGroup { id: string; title: string; letter?: string; rows: Row[] }
 export interface Entry { id: string; name: string; body: string }
+/** A sketch panel: a drawing (strokes as SVG path data, see sketchModel.ts) or an uploaded photo of a paper sketch, and the idea in a few words. */
+export interface Sketch { idea?: string; image?: string; strokes?: string[] }
 
 export type DocCategory = "Planeación" | "Personas" | "Mapas y síntesis" | "Campo y entrevistas" | "Evaluación";
 export type DocData = Record<string, unknown>;

@@ -9,6 +9,7 @@ import { Blueprint, type BlueprintData } from "./Blueprint";
 import { TimeStudy, type TimeStudyData } from "./TimeStudy";
 import { MatrixView } from "./Matrix";
 import { LetterRow } from "./LetterRow";
+import { SketchSheet } from "./SketchSheet";
 import { normalize } from "./timeStudyModel";
 import type { Lang } from "../lib/i18n";
 import { cx } from "../components/ui";
@@ -27,6 +28,8 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
   const set = (id: string) => (v: unknown) => onChange?.({ ...data, [id]: v });
   const inMatrix = new Set(tpl.matrix?.cells.map((c) => c.id) ?? []);
   const firstCell = tpl.sections.find((s) => inMatrix.has(s.id))?.id;
+  // Sketch sections (Crazy 8s) are drawn together as one folded sheet, where the first of them would have been.
+  const sketches = tpl.sections.filter((s) => s.type === "sketch");
 
   const body = (s: Section) => {
     if (s.letter && s.type !== "custom") return <LetterRow key={s.id} section={s} value={data[s.id]} set={set(s.id)} />;
@@ -76,6 +79,10 @@ export function DocumentView({ tpl, title, data, lang, onChange, readOnly = fals
         <div className="grid gap-4 lg:grid-cols-12">
           {tpl.sections.map((s) => {
             // The sections of a 2×2 grid are drawn together, where the first of them would have been.
+            if (s.type === "sketch") {
+              if (s.id !== sketches[0].id) return null;
+              return <div key="sketches" className="min-w-0 lg:col-span-12"><SketchSheet sections={sketches} value={(id) => data[id]} set={set} /></div>;
+            }
             if (!inMatrix.has(s.id)) return <div key={s.id} className={cx("min-w-0", SPAN[s.span ?? 12])}>{body(s)}</div>;
             if (s.id !== firstCell || !tpl.matrix) return null;
             return <div key="matrix" className="min-w-0 lg:col-span-12"><MatrixView matrix={tpl.matrix} sections={tpl.sections} value={(id) => data[id]} set={set} /></div>;
